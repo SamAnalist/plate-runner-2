@@ -64,6 +64,8 @@ scale(t)     = lerp(0.04, 1.0, t^0.8)   // non-linear
 | Wait for signal | `wait_for_signal` | Vehicle stops at reading position; gate stays closed until signal |
 | Hidden | `hidden` | Gate not rendered |
 
+**Note:** `hidden` is a UI convenience extension beyond the two modes specified in AGENTS.md (`auto_open` and `wait_for_signal`). It is safe and intentional — it enables no-gate simulations and camera-only testing without the gate arm in view. It does not need to be supported by a future backend.
+
 ---
 
 ## 5. Vehicle
@@ -211,12 +213,44 @@ inZone = overlapPercent ≥ 50%
 
 ## 10. Simulation Phases
 
+### Current implementation (Phase 0.2)
+
 | Phase | Description |
 |---|---|
 | `idle` | Initial / after reset. Vehicle at start position, no animation. |
 | `running` | Vehicle animating. Gate logic active. |
 | `at_gate` | Vehicle stopped at reading position (wait_for_signal or holdAt()). |
 | `done` | Vehicle completed the run. |
+
+### Preferred model (AGENTS.md target — migrate gradually)
+
+```ts
+type SimulationPhase =
+  | "idle"
+  | "queued"
+  | "approaching"
+  | "decelerating"
+  | "stopped_at_gate"
+  | "waiting_for_signal"
+  | "gate_opening"
+  | "exiting"
+  | "completed"
+  | "cancelled"
+  | "failed";
+```
+
+### Migration mapping
+
+| Current phase | Maps to preferred phase(s) | Notes |
+|---|---|---|
+| `idle` | `idle` | Direct equivalent |
+| `running` | `approaching` → `decelerating` | Split when deceleration is implemented |
+| `at_gate` | `stopped_at_gate` → `waiting_for_signal` | `waiting_for_signal` activates when mode is `wait_for_signal` |
+| `done` | `gate_opening` → `exiting` → `completed` | Split into sub-phases when gate sequence is tracked |
+| _(no current equivalent)_ | `queued` | Needed for Phase 0.3 plate queue |
+| _(no current equivalent)_ | `cancelled` / `failed` | Needed for Phase 0.4+ API-driven runs |
+
+Migration will happen incrementally as phases are added. The current 4-phase model is a valid subset.
 
 ---
 
