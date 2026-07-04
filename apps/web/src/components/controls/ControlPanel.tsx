@@ -11,6 +11,8 @@ import type { SimulationControls } from '../../hooks/useSimulation';
 import { READING_T_INCOMING, READING_T_AWAY } from '../../hooks/useSimulation';
 import { PlateInput } from './PlateInput';
 import { FocusZoneControls } from './FocusZoneControls';
+import type { VisualStyle } from '../simulation/renderers/types';
+import { VISUAL_STYLE_LABELS } from '../simulation/renderers/types';
 
 interface ControlPanelProps {
   config: SimulationConfig;
@@ -24,6 +26,8 @@ interface ControlPanelProps {
   onCalibrationModeChange: (v: boolean) => void;
   onEnterFullscreen: () => void;
   onEnterCamera: () => void;
+  visualStyle: VisualStyle;
+  onVisualStyleChange: (s: VisualStyle) => void;
 }
 
 // ─── Shared primitives ─────────────────────────────────────────────────────
@@ -204,6 +208,8 @@ export function ControlPanel({
   onCalibrationModeChange,
   onEnterFullscreen,
   onEnterCamera,
+  visualStyle,
+  onVisualStyleChange,
 }: ControlPanelProps) {
   const { state, start, stop, reset, openGate, closeGate } = simulation;
 
@@ -224,6 +230,30 @@ export function ControlPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
+
+        {/* ── Visual Style ───────────────────────────────────────────────── */}
+        <div>
+          <SectionLabel>Visual Style</SectionLabel>
+          <div className="flex flex-col gap-1">
+            {(Object.entries(VISUAL_STYLE_LABELS) as [VisualStyle, string][]).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => onVisualStyleChange(val)}
+                className={`
+                  px-3 py-2 rounded text-xs font-mono font-semibold text-left
+                  border transition-all
+                  ${visualStyle === val
+                    ? 'bg-blue-600/80 border-blue-500/70 text-white'
+                    : 'bg-white/5 border-white/12 text-white/50 hover:text-white/80 hover:border-white/25'}
+                `}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <Divider />
 
         {/* ── Plate ──────────────────────────────────────────────────────── */}
         <PlateInput value={config.plate} onChange={p => set('plate', p)} />
@@ -490,7 +520,7 @@ export function ControlPanel({
       {/* Footer */}
       <div className="px-4 py-3 border-t border-white/8 shrink-0">
         <p className="text-[10px] font-mono text-white/20 leading-snug">
-          Plate Runner v0.2.0 — Visual Simulation
+          v0.3.0 — Visual Redesign Sprint
         </p>
       </div>
     </div>

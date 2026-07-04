@@ -1,9 +1,6 @@
 import { useMemo } from 'react';
 import type { SimulationConfig, FocusZoneConfig } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
-import { Road } from './Road';
-import { Vehicle } from './Vehicle';
-import { Gate } from './Gate';
 import { FocusZoneOverlay } from './FocusZoneOverlay';
 import { DebugOverlay } from './DebugOverlay';
 import {
@@ -15,25 +12,38 @@ import {
   getDepthValues,
   getPlateReadability,
 } from '../../utils/depth';
+import type { VisualStyle, SceneRendererProps } from './renderers/types';
+import { ClassicSvgRenderer } from './renderers/ClassicSvgRenderer';
+import { RealisticRenderer } from './renderers/RealisticRenderer';
+import { GateCameraRenderer } from './renderers/GateCameraRenderer';
+import { OverheadRenderer } from './renderers/OverheadRenderer';
+import { CinematicRenderer } from './renderers/CinematicRenderer';
+import type React from 'react';
+
+const RENDERERS: Record<VisualStyle, React.FC<SceneRendererProps>> = {
+  classic:         ClassicSvgRenderer,
+  realistic:       RealisticRenderer,
+  'gate-camera':   GateCameraRenderer,
+  overhead:        OverheadRenderer,
+  cinematic:       CinematicRenderer,
+};
 
 interface Props {
   config: SimulationConfig;
   simulation: SimulationControls;
   focusZone: FocusZoneConfig;
+  visualStyle?: VisualStyle;
   showDebug?: boolean;
   /** Camera mode: suppress status overlays and debug for a clean capture image */
   cameraMode?: boolean;
   calibrationMode?: boolean;
 }
 
-const SKY_TOP    = '#060810';
-const SKY_MID    = '#0d1728';
-const SKY_BOTTOM = '#1a2a3e';
-
 export function SimulationScene({
   config,
   simulation,
   focusZone,
+  visualStyle = 'classic',
   showDebug = false,
   cameraMode = false,
   calibrationMode = false,
@@ -50,12 +60,24 @@ export function SimulationScene({
   // Plate readability: live-calculated for debug/focus zone display
   const plateReadability = getPlateReadability(vehicleT, config.detectorPlacement, focusZone);
 
+  const ActiveRenderer = RENDERERS[visualStyle];
+
+  const rendererProps: SceneRendererProps = {
+    config,
+    vehicleT,
+    vehicleDepth,
+    gateDepth,
+    gateOpen,
+    phase,
+    vehicleBehindGate,
+  };
+
   return (
     <div
       className="relative w-full rounded-lg overflow-hidden border border-white/10 shadow-2xl"
       style={{ aspectRatio: `${SCENE_W}/${SCENE_H}`, maxWidth: '100%' }}
     >
-      {/* ── SVG Scene ──��──────────────────────────────────────────────────── */}
+      {/* ── SVG Scene ─────────────────────────────────────────────────────── */}
       <svg
         viewBox={`0 0 ${SCENE_W} ${SCENE_H}`}
         width="100%"
@@ -63,51 +85,10 @@ export function SimulationScene({
         xmlns="http://www.w3.org/2000/svg"
         style={{ display: 'block' }}
       >
-        <defs>
-          <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor={SKY_TOP} />
-            <stop offset="55%"  stopColor={SKY_MID} />
-            <stop offset="100%" stopColor={SKY_BOTTOM} />
-          </linearGradient>
+        {/* Active renderer provides background + road + vehicle + gate */}
+        <ActiveRenderer {...rendererProps} />
 
-          <radialGradient id="horizGlow" cx="50%" cy="100%" r="60%">
-            <stop offset="0%"   stopColor="#1e4a7a" stopOpacity={0.45} />
-            <stop offset="100%" stopColor="#0d1728"  stopOpacity={0}    />
-          </radialGradient>
-
-          <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
-            <stop offset="0%"   stopColor="transparent" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
-          </radialGradient>
-        </defs>
-
-        {/* Background */}
-        <rect x={0} y={0} width={SCENE_W} height={SCENE_H} fill="url(#skyGrad)" />
-        <rect x={0} y={VP_Y - 40} width={SCENE_W} height={120} fill="url(#horizGlow)" />
-        <line x1={0} y1={VP_Y + 2} x2={SCENE_W} y2={VP_Y + 2}
-              stroke="#2a3a50" strokeWidth={1} opacity={0.6} />
-
-        {/* Road */}
-        <Road />
-
-        {/* Gate + Vehicle (depth-ordered) */}
-        {vehicleBehindGate ? (
-          <>
-            <Vehicle config={config} vehicleT={vehicleT} vehicleDepth={vehicleDepth} />
-            <Gate gateDepth={gateDepth} gateOpen={gateOpen} gateMode={config.gateMode} />
-          </>
-        ) : (
-          <>
-            <Gate gateDepth={gateDepth} gateOpen={gateOpen} gateMode={config.gateMode} />
-            <Vehicle config={config} vehicleT={vehicleT} vehicleDepth={vehicleDepth} />
-          </>
-        )}
-
-        {/* Vignette */}
-        <rect x={0} y={0} width={SCENE_W} height={SCENE_H}
-              fill="url(#vignette)" pointerEvents="none" />
-
-        {/* Focus Zone overlay (always on top, inside SVG for correct scaling) */}
+        {/* Focus zone overlay (renderer-agnostic, always on top) */}
         {!cameraMode && (
           <FocusZoneOverlay
             focusZone={focusZone}

@@ -10,6 +10,7 @@ import { ControlPanel } from './components/controls/ControlPanel';
 import { useSimulation } from './hooks/useSimulation';
 import { READING_T_INCOMING, READING_T_AWAY } from './hooks/useSimulation';
 import { getPlateReadability } from './utils/depth';
+import type { VisualStyle } from './components/simulation/renderers/types';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
@@ -19,6 +20,7 @@ export default function App() {
   const [appMode, setAppMode]         = useState<AppMode>('normal');
   const [calibrationMode, setCalibrationMode] = useState(false);
   const [showDebug, setShowDebug]     = useState(false);
+  const [visualStyle, setVisualStyle] = useState<VisualStyle>('classic');
 
   const simulation = useSimulation(config);
 
@@ -117,6 +119,7 @@ export default function App() {
             config={config}
             simulation={simulation}
             focusZone={focusZone}
+            visualStyle={visualStyle}
             showDebug={showDebug}
             calibrationMode={calibrationMode}
           />
@@ -134,6 +137,8 @@ export default function App() {
             onCalibrationModeChange={handleCalibrationMode}
             onEnterFullscreen={() => setAppMode('fullscreen')}
             onEnterCamera={() => setAppMode('camera')}
+            visualStyle={visualStyle}
+            onVisualStyleChange={setVisualStyle}
           />
         </aside>
       </div>
@@ -149,6 +154,7 @@ export default function App() {
           config={config}
           simulation={simulation}
           focusZone={focusZone}
+          visualStyle={visualStyle}
           showDebug={!isCameraMode && showDebug}
           cameraMode={isCameraMode}
           calibrationMode={!isCameraMode && calibrationMode}
