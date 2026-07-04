@@ -4,6 +4,86 @@ Format follows `CLAUDE.md § Progress Documentation Format`.
 
 ---
 
+## Phase 0.3 — Visual Redesign Sprint
+
+**Date:** 2025-07-03
+
+### Goal
+
+Introduce a pluggable renderer architecture that allows the simulation scene to switch between five distinct visual styles without touching the simulation engine, depth math, or plate rendering. No new simulation features — purely a visual and architectural upgrade.
+
+### Implemented
+
+- `renderers/types.ts` — `VisualStyle` union type, `VISUAL_STYLE_LABELS` record, `SceneRendererProps` interface
+- `renderers/ClassicSvgRenderer.tsx` — original scene look; reuses `Road`, `Vehicle`, `Gate` as-is
+- `renderers/RealisticRenderer.tsx` — parking garage aesthetic; concrete wall, asphalt floor, yellow edge lines; inline improved car and gate SVG
+- `renderers/GateCameraRenderer.tsx` — CCTV security camera view; camera UI overlay (CAM-01, timestamp, REC pulse, viewfinder corners, resolution badge); plate scan box + corner brackets + READING label when `phase === 'at_gate'`
+- `renderers/OverheadRenderer.tsx` — bird's eye top-down view; separate coordinate system; lane, gate arm, direction arrow
+- `renderers/CinematicRenderer.tsx` — cinematic night scene; stars, city silhouette, amber horizon glow, headlight/taillight glow ellipses, wet road reflection, strong vignette
+- `SimulationScene.tsx` — renderer selector via `RENDERERS` record; accepts `visualStyle?: VisualStyle` prop (default `'classic'`); shared overlays (FocusZone, Debug, status text) remain renderer-agnostic
+- `ControlPanel.tsx` — "Visual Style" section added at top of scrollable area; list of styled buttons for each style; footer updated to `v0.3.0 — Visual Redesign Sprint`
+- `App.tsx` — `visualStyle` state; passed to both `SimulationScene` instances and `ControlPanel`
+- `docs/VISUAL_REDESIGN.md` — NEW: renderer architecture doc, per-renderer pros/cons, legibility ratings, recommendations table, contract spec
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/types.ts` — NEW
+- `apps/web/src/components/simulation/renderers/ClassicSvgRenderer.tsx` — NEW
+- `apps/web/src/components/simulation/renderers/RealisticRenderer.tsx` — NEW
+- `apps/web/src/components/simulation/renderers/GateCameraRenderer.tsx` — NEW
+- `apps/web/src/components/simulation/renderers/OverheadRenderer.tsx` — NEW
+- `apps/web/src/components/simulation/renderers/CinematicRenderer.tsx` — NEW
+- `apps/web/src/components/simulation/SimulationScene.tsx` — renderer selector, `visualStyle` prop added
+- `apps/web/src/components/controls/ControlPanel.tsx` — Visual Style section, footer version bump
+- `apps/web/src/App.tsx` — `visualStyle` state, props wired to both scene + panel
+- `docs/VISUAL_REDESIGN.md` — NEW
+- `docs/PROGRESS.md` — this entry
+
+### Decisions
+
+- `VisualStyle` type lives in `apps/web` (inside `renderers/types.ts`), not in `packages/shared` — it is a display-only concern; the shared package deals with simulation config, not rendering choices
+- `LicensePlate.tsx` was never modified — plate rendering is considered a safety contract
+- `Vehicle.tsx`, `Road.tsx`, `Gate.tsx` were never modified — ClassicSvgRenderer reuses them as-is; other renderers that needed different aesthetics implemented inline SVG
+- `FocusZoneOverlay` and `DebugOverlay` remain in `SimulationScene`, not in individual renderers — they are renderer-agnostic and must always be on top regardless of visual style
+- `GateCameraRenderer` uses `getPlateSceneRect` for the scan indicator — this is the same function used by calibration mode, ensuring the scan box matches the actual plate position
+- SVG gradient `id` values are prefixed per renderer (`cSkyGrad`, `rWallGrad`, `gcWallGrad`, `cinSkyGrad`, etc.) to prevent `<defs>` ID collisions when switching styles
+- `OverheadRenderer` uses a simplified linear Y-mapping rather than the perspective model — it is a debugging/demo view, not a camera simulation
+
+### Manual Testing
+
+1. Run `npm run dev` from the monorepo root (or `pnpm dev` inside `apps/web`)
+2. In the sidebar, find the "Visual Style" section at the top
+3. Click each style in sequence: Classic SVG → Realistic 2D → Gate Camera → Overhead 2.5D → Cinematic Night
+4. Verify the scene changes for each style without errors
+5. Start a simulation run (click Start) and verify the vehicle animates correctly in each style
+6. Switch to `wait_for_signal` gate mode; start the simulation; when the vehicle stops at the gate, switch to `gate-camera` style and verify the green scan box appears around the plate
+7. Open Gate while in `gate-camera` style; verify the scan box disappears after the vehicle passes
+8. Switch to `overhead` style; verify the vehicle moves up/down the lane and the gate arm rotates
+9. Toggle `incoming` vs `away` direction in `overhead` style; verify the direction arrow flips
+10. Enter Fullscreen Scene (in sidebar); verify the selected visual style persists
+11. Enter Camera Mode; verify the selected visual style persists and the camera UI overlay (if in `gate-camera`) is visible
+12. Switch vehicle colors and verify color changes are visible in all perspective styles (overhead palette is separate)
+13. Test all 6 detector placements; verify skew direction in perspective renderers
+
+### Known Limitations
+
+- **OverheadRenderer:** plate text is not rendered; a white indicator bar marks the plate position only
+- **RealisticRenderer car body:** the inline car SVG diverges from `Vehicle.tsx`; if `Vehicle.tsx` is updated, `RealisticRenderer.tsx` must be manually updated to match
+- **GateCameraRenderer timestamp:** the timestamp in the camera overlay is a static string (`2025-07-03  12:34:56`), not a live clock
+- **CinematicRenderer dark vehicles:** black cars on the dark cinematic road have reduced contrast — no rim light or outline has been added yet
+- **SVG gradient ID collisions:** if two scene instances were ever rendered simultaneously, gradient IDs would conflict; not a concern for the current single-scene layout
+- **Overhead gate arm:** the gate arm in OverheadRenderer is a simplified horizontal bar; it does not share the detailed Gate.tsx component
+
+### Next Steps
+
+- Phase 0.4: Select a primary renderer for ongoing development (recommend `gate-camera`) and add plate queue / local plate list playback
+- Add a live clock to the GateCameraRenderer timestamp display (optional)
+- Add rim light or ambient outline to CinematicRenderer for dark vehicle colors
+- Extract shared car body SVG shapes into a sub-module to keep RealisticRenderer in sync with Vehicle.tsx
+- Consider adding a `style` field to `SimulationConfig` if the visual style should be part of a saved/loaded session
+
+---
+
 ## Phase 0.2 — Camera Calibration & Visual Stabilization
 
 **Date:** 2025-07-03
