@@ -48,10 +48,86 @@
 import type { DetectorPlacement } from '@plate-runner/shared';
 import {
   VP_X,
+  SCENE_H,
   GATE_T,
   getDepthValues,
   lerp,
 } from '../../../../utils/depth';
+
+// ─── POV entry / exit ─────────────────────────────────────────────────────────
+
+/**
+ * t-value at which the vehicle is fully visible after entering the scene.
+ * Between t=0 and POV_SPAWN_T the car fades in and slides down from above
+ * the horizon — simulating the vehicle appearing from outside the camera's
+ * field of view.
+ *
+ * Phase 0.9: increased from 0.07 → 0.14 for a more natural, slower horizon entry.
+ */
+export const POV_SPAWN_T = 0.14;
+
+/**
+ * t-value at which the vehicle begins to leave the scene.
+ * Between POV_EXIT_T and t=0.98 the car slides off the bottom of the scene
+ * and fades out — the vehicle naturally exits the camera's frame.
+ *
+ * Phase 0.9: decreased from 0.90 → 0.82 for a longer, more gradual exit.
+ */
+export const POV_EXIT_T = 0.82;
+
+/**
+ * Vehicle opacity during POV entry and exit.
+ *
+ *   t < POV_SPAWN_T  →  0 … 1  (fade in from horizon)
+ *   POV_SPAWN_T … POV_EXIT_T  →  1.0  (fully visible)
+ *   t > POV_EXIT_T   →  1 … 0  (fade out as car exits frame)
+ *
+ * Direction-agnostic: for `away` (t: 1→0) the fade-in at t≈1 becomes the
+ * "entry from the near end" and the fade-out at t≈0 becomes the horizon exit.
+ */
+export function getPovOpacity(t: number): number {
+  if (t < POV_SPAWN_T) return t / POV_SPAWN_T;
+  if (t > POV_EXIT_T)  return (1 - t) / (1 - POV_EXIT_T);
+  return 1;
+}
+
+/**
+ * Additional Y offset (scene pixels) to slide the vehicle into / out of frame.
+ * Apply to carY (the top-left Y of the car bounding box) and to the shadow cy.
+ *
+ *  Entry (t < POV_SPAWN_T):
+ *    Starts with the car just above the scene horizon (y ≈ 0).
+ *    Slides into its normal depth position by t = POV_SPAWN_T.
+ *
+ *  Exit (t > POV_EXIT_T):
+ *    Slides the car downward until its top edge is at SCENE_H + 10 (fully
+ *    off the bottom of the scene) by t = 1.0.
+ *
+ *  Mid range: 0 — car is fully in frame, no offset applied.
+ *
+ * @param t        current vehicleT (0–1)
+ * @param depthY   bottom-of-car y from getDepthValues(t)
+ * @param carH     car height in scene pixels at current depth
+ */
+export function getPovYOffset(
+  t: number,
+  depthY: number,
+  carH: number,
+): number {
+  if (t < POV_SPAWN_T) {
+    // Slide down from just above the horizon to normal position.
+    // At t=0: offset = -(depthY + 1), placing carY just above y=0.
+    const progress = t / POV_SPAWN_T;
+    return lerp(-(depthY + 1), 0, progress);
+  }
+  if (t > POV_EXIT_T) {
+    // Slide off the bottom of the scene.
+    // At t=1: offset pushes carY to SCENE_H+10 (fully off-screen).
+    const progress = (t - POV_EXIT_T) / (1 - POV_EXIT_T);
+    return lerp(0, SCENE_H + 10 - (depthY - carH), progress);
+  }
+  return 0;
+}
 
 // ─── Easing ──────────────────────────────────────────────────────────────────
 
@@ -115,14 +191,15 @@ export interface MotionPathPoint {
   label: string;
 }
 
-// Sample points across the full depth range
-const SAMPLE_T = [0.04, 0.14, 0.25, 0.36, 0.46, GATE_T, 0.62, 0.75, 0.88, 0.96];
+// Sample points — include key POV transition t-values
+const SAMPLE_T = [0.00, POV_SPAWN_T, 0.28, 0.46, GATE_T, 0.65, POV_EXIT_T, 0.98];
 
 const LABEL_AT: Partial<Record<string, string>> = {
-  '0.04':                       'FAR',
+  '0.00':                       'FAR',
+  [POV_SPAWN_T.toFixed(2)]:     'SPAWN',
   '0.46':                       'READ',
   [GATE_T.toFixed(2)]:          'GATE',
-  '0.96':                       'EXIT',
+  [POV_EXIT_T.toFixed(2)]:      'EXIT',
 };
 
 /**
