@@ -18,7 +18,7 @@
  *   Open:    arm rotated -80° (pointing nearly straight up).
  *   Transition: 0.85s easeInOut cubic.
  */
-import type { SceneRendererProps } from '../types';
+import type { SceneRendererProps } from './rendererProps';
 import { VehicleAssetLayer } from './VehicleAssetLayer';
 import {
   SCENE_W,

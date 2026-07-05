@@ -7,7 +7,6 @@ import { SimulationScene } from './components/simulation/SimulationScene';
 import { ControlPanel } from './components/controls/ControlPanel';
 import { useSimulation } from './hooks/useSimulation';
 import { READING_T_INCOMING, READING_T_AWAY } from './hooks/useSimulation';
-import type { VisualStyle } from './components/simulation/renderers/types';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
@@ -16,7 +15,6 @@ export default function App() {
   const [appMode, setAppMode]         = useState<AppMode>('normal');
   const [calibrationMode, setCalibrationMode] = useState(false);
   const [showDebug, setShowDebug]     = useState(false);
-  const [visualStyle, setVisualStyle] = useState<VisualStyle>('classic');
   const [showAnchorOverlay, setShowAnchorOverlay]         = useState(false);
   const [showMotionPathOverlay, setShowMotionPathOverlay] = useState(false);
 
@@ -97,7 +95,6 @@ export default function App() {
           <SimulationScene
             config={config}
             simulation={simulation}
-            visualStyle={visualStyle}
             showDebug={showDebug}
             calibrationMode={calibrationMode}
             showAnchorOverlay={showAnchorOverlay}
@@ -115,14 +112,11 @@ export default function App() {
             onCalibrationModeChange={handleCalibrationMode}
             onEnterFullscreen={() => setAppMode('fullscreen')}
             onEnterCamera={() => setAppMode('camera')}
-            visualStyle={visualStyle}
-            onVisualStyleChange={setVisualStyle}
             showAnchorOverlay={showAnchorOverlay}
             onShowAnchorOverlayChange={setShowAnchorOverlay}
             showMotionPathOverlay={showMotionPathOverlay}
             onShowMotionPathOverlayChange={setShowMotionPathOverlay}
             onEnterVisualQA={() => {
-              setVisualStyle('asset-realistic');
               handleCalibrationMode(true);
               setShowAnchorOverlay(false);
               setShowMotionPathOverlay(false);
@@ -140,7 +134,6 @@ export default function App() {
         <SimulationScene
           config={config}
           simulation={simulation}
-          visualStyle={visualStyle}
           showDebug={!isCameraMode && showDebug}
           cameraMode={isCameraMode}
           calibrationMode={!isCameraMode && calibrationMode}

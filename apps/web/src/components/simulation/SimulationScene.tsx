@@ -10,42 +10,25 @@ import {
   GATE_T,
   getDepthValues,
 } from '../../utils/depth';
-import type { VisualStyle, SceneRendererProps } from './renderers/types';
-import { ClassicSvgRenderer } from './renderers/ClassicSvgRenderer';
-import { RealisticRenderer } from './renderers/RealisticRenderer';
-import { GateCameraRenderer } from './renderers/GateCameraRenderer';
-import { OverheadRenderer } from './renderers/OverheadRenderer';
-import { CinematicRenderer } from './renderers/CinematicRenderer';
 import { AssetRealisticRenderer } from './renderers/asset-realistic/AssetRealisticRenderer';
-import type React from 'react';
-
-const RENDERERS: Record<VisualStyle, React.FC<SceneRendererProps>> = {
-  classic:            ClassicSvgRenderer,
-  realistic:          RealisticRenderer,
-  'gate-camera':      GateCameraRenderer,
-  overhead:           OverheadRenderer,
-  cinematic:          CinematicRenderer,
-  'asset-realistic':  AssetRealisticRenderer,
-};
+import type { SceneRendererProps } from './renderers/asset-realistic/rendererProps';
 
 interface Props {
   config: SimulationConfig;
   simulation: SimulationControls;
-  visualStyle?: VisualStyle;
   showDebug?: boolean;
   /** Camera mode: suppress status overlays and debug for a clean capture image */
   cameraMode?: boolean;
   calibrationMode?: boolean;
-  /** Visual QA: show anchor bounding rect in asset-realistic renderer */
+  /** Visual QA: show plate anchor bounding rect overlay */
   showAnchorOverlay?: boolean;
-  /** Visual QA: show motion path curve + key points in asset-realistic renderer */
+  /** Visual QA: show motion path curve + key points overlay */
   showMotionPathOverlay?: boolean;
 }
 
 export function SimulationScene({
   config,
   simulation,
-  visualStyle = 'classic',
   showDebug = false,
   cameraMode = false,
   calibrationMode = false,
@@ -60,8 +43,6 @@ export function SimulationScene({
 
   // Z-ordering: vehicle behind gate (farther from camera) → draw first
   const vehicleBehindGate = vehicleT < GATE_T;
-
-  const ActiveRenderer = RENDERERS[visualStyle];
 
   const rendererProps: SceneRendererProps = {
     config,
@@ -91,8 +72,7 @@ export function SimulationScene({
         xmlns="http://www.w3.org/2000/svg"
         style={{ display: 'block' }}
       >
-        {/* Active renderer provides background + road + vehicle + gate */}
-        <ActiveRenderer {...rendererProps} />
+        <AssetRealisticRenderer {...rendererProps} />
 
         {/* Status overlays (hidden in camera mode) */}
         {!cameraMode && phase === 'idle' && (
