@@ -41,6 +41,8 @@ interface Props {
   calibrationMode?: boolean;
   /** Visual QA: show anchor bounding rect in asset-realistic renderer */
   showAnchorOverlay?: boolean;
+  /** Visual QA: show motion path curve + key points in asset-realistic renderer */
+  showMotionPathOverlay?: boolean;
 }
 
 export function SimulationScene({
@@ -52,6 +54,7 @@ export function SimulationScene({
   cameraMode = false,
   calibrationMode = false,
   showAnchorOverlay = false,
+  showMotionPathOverlay = false,
 }: Props) {
   const { state } = simulation;
   const { vehicleT, gateOpen, phase } = state;
@@ -75,8 +78,9 @@ export function SimulationScene({
     gateOpen,
     phase,
     vehicleBehindGate,
-    // Anchor overlay is suppressed in camera mode regardless of caller intent
-    showAnchorOverlay: !cameraMode && showAnchorOverlay,
+    // QA overlays are suppressed in camera mode regardless of caller intent
+    showAnchorOverlay:     !cameraMode && showAnchorOverlay,
+    showMotionPathOverlay: !cameraMode && showMotionPathOverlay,
   };
 
   return (

@@ -33,4 +33,10 @@ export interface SceneRendererProps {
    * Has no effect on other renderers. Must be false/absent in camera mode.
    */
   showAnchorOverlay?: boolean;
+  /**
+   * Visual QA: when true, the asset-realistic renderer draws the motion path
+   * curve (far→read→gate→exit), key point labels, and current position marker.
+   * Has no effect on other renderers. Must be false/absent in camera mode.
+   */
+  showMotionPathOverlay?: boolean;
 }

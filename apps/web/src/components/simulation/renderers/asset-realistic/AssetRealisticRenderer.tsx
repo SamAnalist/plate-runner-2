@@ -28,6 +28,12 @@ import {
   VP_Y,
   lerp,
 } from '../../../../utils/depth';
+import {
+  getMotionPathDebugPoints,
+  getViewAwareX,
+} from './viewMotionPaths';
+import { getDepthValues } from '../../../../utils/depth';
+import type { DetectorPlacement } from '@plate-runner/shared';
 
 // ── Road geometry ──────────────────────────────────────────────────────────
 const RL_FAR        = VP_X - 10;
@@ -192,6 +198,93 @@ function AssetGate({
   );
 }
 
+// ── Motion path debug overlay ──────────────────────────────────────────────
+
+/**
+ * MotionPathDebugOverlay — QA-only component, renders in scene space.
+ *
+ * Colour coding:
+ *   Yellow dashed line  = full motion path (xFar → xNear)
+ *   Orange dot          = sampled path point
+ *   Blue dot            = FAR
+ *   Cyan dot            = READ
+ *   Red dot             = GATE
+ *   White dot           = EXIT
+ *   Magenta dot         = current vehicle position
+ */
+function MotionPathDebugOverlay({
+  placement,
+  vehicleT,
+}: {
+  placement: DetectorPlacement;
+  vehicleT:  number;
+}) {
+  const pts = getMotionPathDebugPoints(placement);
+
+  const { y: curY } = getDepthValues(vehicleT);
+  const curX = getViewAwareX(vehicleT, placement);
+
+  function dotColor(label: string) {
+    if (label === 'READ') return '#00ffcc';
+    if (label === 'GATE') return '#ff4444';
+    if (label === 'EXIT') return '#ffffff';
+    if (label === 'FAR')  return '#88aaff';
+    return '#f5a623';
+  }
+
+  return (
+    <g>
+      {/* Path line segments */}
+      {pts.map((p, i) => {
+        if (i === 0) return null;
+        const prev = pts[i - 1];
+        return (
+          <line key={i}
+            x1={prev.x} y1={prev.y}
+            x2={p.x}    y2={p.y}
+            stroke="#f5a623" strokeWidth={1.2}
+            strokeDasharray="5 3" opacity={0.55}
+          />
+        );
+      })}
+
+      {/* Sampled key points */}
+      {pts.map((p, i) => {
+        const r    = p.label ? 5 : 2.5;
+        const fill = dotColor(p.label);
+        const labelLeft = p.label === 'FAR' || p.label === 'READ';
+        return (
+          <g key={i}>
+            {p.label && <circle cx={p.x} cy={p.y} r={r + 3} fill={fill} opacity={0.15} />}
+            <circle cx={p.x} cy={p.y} r={r} fill={fill} opacity={0.85} />
+            {p.label && (
+              <text
+                x={p.x + (labelLeft ? -55 : 8)}
+                y={p.y - 4}
+                fill={fill} fontSize={9} fontFamily="monospace" fontWeight="700" opacity={0.9}
+              >
+                {p.label} t={p.t.toFixed(2)}
+              </text>
+            )}
+          </g>
+        );
+      })}
+
+      {/* Current vehicle position */}
+      <circle cx={curX} cy={curY} r={7}   fill="#ff00ff" opacity={0.20} />
+      <circle cx={curX} cy={curY} r={4}   fill="#ff00ff" opacity={0.90} />
+      <circle cx={curX} cy={curY} r={1.5} fill="white"   opacity={0.95} />
+
+      {/* Header */}
+      <rect x={8} y={154} width={240} height={15} fill="rgba(0,0,0,0.60)" rx={2} />
+      <text x={12} y={165}
+        fill="#f5a623" fontSize={9} fontFamily="monospace" fontWeight="700">
+        {'MOTION PATH ▸ '}{placement}{'  t='}{vehicleT.toFixed(3)}
+      </text>
+    </g>
+  );
+}
+
 // ── Main renderer ──────────────────────────────────────────────────────────
 export function AssetRealisticRenderer({
   config,
@@ -201,6 +294,7 @@ export function AssetRealisticRenderer({
   gateOpen,
   vehicleBehindGate,
   showAnchorOverlay = false,
+  showMotionPathOverlay = false,
 }: SceneRendererProps) {
   const road      = roadPoints(RL_FAR, RR_FAR, VP_Y, RL_NEAR, RR_NEAR, SCENE_H);
   const lShoulder = roadPoints(RL_FAR - SHOULDER_FAR, RL_FAR, VP_Y, RL_NEAR - SHOULDER_NEAR, RL_NEAR, SCENE_H);
@@ -293,6 +387,14 @@ export function AssetRealisticRenderer({
       {/* ── Vignette ── */}
       <rect x={0} y={0} width={SCENE_W} height={SCENE_H}
             fill="url(#arVignette)" pointerEvents="none" />
+
+      {/* ── Motion path debug overlay (Visual QA only, hidden in camera mode) ── */}
+      {showMotionPathOverlay && (
+        <MotionPathDebugOverlay
+          placement={config.detectorPlacement}
+          vehicleT={vehicleT}
+        />
+      )}
     </>
   );
 }

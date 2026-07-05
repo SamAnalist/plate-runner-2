@@ -30,7 +30,9 @@ interface ControlPanelProps {
   onVisualStyleChange: (s: VisualStyle) => void;
   showAnchorOverlay: boolean;
   onShowAnchorOverlayChange: (v: boolean) => void;
-  /** One-click: switch to asset-realistic + calibration + anchor overlay */
+  showMotionPathOverlay: boolean;
+  onShowMotionPathOverlayChange: (v: boolean) => void;
+  /** One-click: switch to asset-realistic + calibration freeze */
   onEnterVisualQA: () => void;
 }
 
@@ -216,6 +218,8 @@ export function ControlPanel({
   onVisualStyleChange,
   showAnchorOverlay,
   onShowAnchorOverlayChange,
+  showMotionPathOverlay,
+  onShowMotionPathOverlayChange,
   onEnterVisualQA,
 }: ControlPanelProps) {
   const { state, start, stop, reset, openGate, closeGate } = simulation;
@@ -488,7 +492,7 @@ export function ControlPanel({
         {/* ── Visual QA ──────────────────────────────────────────────────── */}
         <CollapsibleSection
           title="Visual QA"
-          badge={visualStyle === 'asset-realistic' && showAnchorOverlay ? 'ON' : undefined}
+          badge={visualStyle === 'asset-realistic' && (showAnchorOverlay || showMotionPathOverlay) ? 'ON' : undefined}
           defaultOpen={false}
         >
           <div className="flex flex-col gap-3">
@@ -531,23 +535,37 @@ export function ControlPanel({
               </div>
             </div>
 
-            {/* Anchor bounds toggle */}
+            {/* Overlays */}
             <div>
               <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Overlays</p>
-              <button
-                onClick={() => onShowAnchorOverlayChange(!showAnchorOverlay)}
-                className={`
-                  w-full py-1.5 rounded text-xs font-mono font-semibold
-                  border transition-all
-                  ${showAnchorOverlay
-                    ? 'bg-green-600/25 border-green-500/45 text-green-300'
-                    : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
-                `}
-              >
-                {showAnchorOverlay ? 'Anchor bounds: ON' : 'Anchor bounds: OFF'}
-              </button>
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={() => onShowAnchorOverlayChange(!showAnchorOverlay)}
+                  className={`
+                    w-full py-1.5 rounded text-xs font-mono font-semibold
+                    border transition-all
+                    ${showAnchorOverlay
+                      ? 'bg-green-600/25 border-green-500/45 text-green-300'
+                      : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
+                  `}
+                >
+                  {showAnchorOverlay ? '▣ Anchor bounds: ON' : '▢ Anchor bounds: OFF'}
+                </button>
+                <button
+                  onClick={() => onShowMotionPathOverlayChange(!showMotionPathOverlay)}
+                  className={`
+                    w-full py-1.5 rounded text-xs font-mono font-semibold
+                    border transition-all
+                    ${showMotionPathOverlay
+                      ? 'bg-orange-600/25 border-orange-500/45 text-orange-300'
+                      : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
+                  `}
+                >
+                  {showMotionPathOverlay ? '◈ Motion path: ON' : '◇ Motion path: OFF'}
+                </button>
+              </div>
               <p className="mt-1 text-[9px] text-white/25 font-mono leading-snug">
-                Only visible in Asset Realistic renderer, hidden in Camera Mode
+                Asset Realistic only · hidden in Camera Mode
               </p>
             </div>
 

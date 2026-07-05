@@ -24,11 +24,11 @@
 import type { SimulationConfig } from '@plate-runner/shared';
 import type { DepthValues } from '../../../../utils/depth';
 import {
-  getVehicleX,
   CAR_LW,
   CAR_LH,
   CAR_ROAD_FRACTION,
 } from '../../../../utils/depth';
+import { getViewAwareX } from './viewMotionPaths';
 import { ASSET_REGISTRY } from './assetRegistry';
 import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
@@ -148,7 +148,9 @@ export function VehicleAssetLayer({
   const { roadWidth, y } = vehicleDepth;
 
   // ── Scene-space car dimensions ──────────────────────────────────────────
-  const centerX = getVehicleX(vehicleT, config.detectorPlacement);
+  // View-aware X: driver/passenger views sweep laterally as the car approaches.
+  // Y and scale still come from vehicleDepth (standard depth model).
+  const centerX = getViewAwareX(vehicleT, config.detectorPlacement);
 
   const carW  = roadWidth * CAR_ROAD_FRACTION;
   const carH  = carW * (CAR_LH / CAR_LW);
