@@ -1,6 +1,6 @@
 # Renderer Architecture — Plate Runner
 
-**Phase:** 0.3 (renderer separation) + 0.4 (asset-based layer) + 0.4c (per-view assets, gate fix)
+**Phase:** 0.3 (renderer separation) + 0.4 (asset-based layer) + 0.4c (per-view assets, gate fix) + 0.5 (real assets, pixel-calibrated anchors)
 **Date:** 2026-07-04
 
 ---
@@ -193,7 +193,7 @@ driver_front/back:    skewXDeg = -7   (left edge recedes — driver-side camera)
 passenger_front/back: skewXDeg = +7   (right edge recedes — passenger-side camera)
 ```
 
-Values are calibrated against placeholder SVG geometry. Re-calibrate when real photorealistic assets are installed.
+Values calibrated against real 1536×1024 PNG assets in Phase 0.5 via pixel-level plate blank detection. Updated to ±9° (was ±7° against placeholder geometry). Re-calibrate if a new render with a different camera angle is produced.
 
 ## 10. Extension Points
 

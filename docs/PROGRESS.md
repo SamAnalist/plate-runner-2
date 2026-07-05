@@ -4,6 +4,77 @@ Format follows `CLAUDE.md § Progress Documentation Format`.
 
 ---
 
+## Phase 0.5 — Real Vehicle Asset Integration
+
+**Date:** 2026-07-04
+
+### Goal
+
+Replace all six placeholder SVG schematics with real photorealistic PNG vehicle renders and re-calibrate all plate anchors against the actual image geometry. The architecture installed in Phase 0.4c required only file-slot and anchor updates — no structural code changes were needed.
+
+### Implemented
+
+- `assetRegistry.tsx` — 6 raster entries updated to `.png` paths, `isPlaceholder` removed, `naturalW/naturalH = 1536×1024` (actual PNG dimensions)
+- `plateAnchors.ts` — all 6 anchors fully re-calibrated via pixel-level analysis of each real asset:
+  - Car bounding boxes extracted per image
+  - Plate blank detected via low-saturation brightness scan
+  - `xPct/yPct/wPct/hPct` derived as (plate_px − car_edge_px) / car_dimension_px
+  - `skewXDeg` updated from ±7° to ±9° to match actual 3/4-angle perspective in real images
+  - `driver_back` and `passenger_back` wPct widened beyond raw auto-detection to cover full plate blank
+- `docs/VISUAL_QA.md` — per-placement table updated; asset checklist items ticked; realism scores updated
+- `docs/ASSET_RENDERER_STRATEGY.md` — status updated to "assets installed"; placeholder notes removed
+- `docs/RENDERER_ARCHITECTURE.md` — calibration notes updated to reflect real image geometry
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/assetRegistry.tsx` — updated to real PNG paths
+- `apps/web/src/components/simulation/renderers/asset-realistic/plateAnchors.ts` — re-calibrated all 6 anchors
+- `apps/web/public/assets/vehicles/main-car/center_front.png` — NEW (1536×1024)
+- `apps/web/public/assets/vehicles/main-car/driver_front.png` — NEW (1536×1024)
+- `apps/web/public/assets/vehicles/main-car/passenger_front.png` — NEW (1536×1024)
+- `apps/web/public/assets/vehicles/main-car/center_back.png` — NEW (1536×1024)
+- `apps/web/public/assets/vehicles/main-car/driver_back.png` — NEW (1536×1024)
+- `apps/web/public/assets/vehicles/main-car/passenger_back.png` — NEW (1536×1024)
+- `docs/VISUAL_QA.md` — updated
+- `docs/ASSET_RENDERER_STRATEGY.md` — updated
+- `docs/RENDERER_ARCHITECTURE.md` — updated
+
+### Decisions
+
+- **No code architecture changes**: The Phase 0.4c design was correct. Only data (file paths, anchor values) changed.
+- **Underscore filename convention**: Assets use underscores (`center_front.png`) matching the `AssetViewKey` string values — avoids any mapping layer.
+- **wPct widening for 3/4 rear views**: Auto-detection of `driver_back` and `passenger_back` found a narrow sub-run of the plate blank due to the small apparent size in 3/4 rear images. wPct was conservatively widened to ~0.21 / ~0.20 to cover the expected full blank width. Final values require visual verification.
+- **skewXDeg ±9°** (was ±7°): The real photorealistic 3/4-angle renders have a more pronounced perspective angle than the placeholder SVG schematics. ±9° calibrated against the actual bumper face angle visible in the images.
+
+### Manual Testing
+
+1. `pnpm dev` from repo root, open `localhost:5173`
+2. Select **Asset Realistic** visual style
+3. Cycle all 6 detector placements — each must show the correct real photorealistic image
+4. For each placement: verify the plate overlay lands on the grey plate blank in the image
+5. Test plate text `ABC123` (short) and `ABCDEFGHIJ12` (12 chars, maximum) — must not overflow
+6. Direction: test both `incoming` and `away`
+7. Gate modes: `auto_open` — gate arm lifts; `wait_for_signal` — car stops, arm stays closed, Open Gate lifts arm
+8. Camera Mode — plate area not obscured
+9. Calibration Mode — focus zone overlay visible
+10. `cd apps/web && npx tsc --noEmit` → no output (clean)
+
+### Known Limitations
+
+- `driver_back` and `passenger_back` plate anchor wPct values are estimated/widened — visual verification required and fine-tuning likely needed
+- `vehicleColor` config does not affect the raster PNG (single body colour from the render). Colour tinting (CSS/SVG hue-rotate filter) or per-colour asset variants are a future task
+- Contact shadow ellipse does not match the 3/4-view perspective depth of the real images
+- Plate `skewXDeg=±9°` is a calibration estimate — may need ±1–2° fine-tuning per view after visual QA with real camera hardware
+
+### Next Steps
+
+- Visual verification of plate overlay positioning for all 6 views (especially `driver_back` / `passenger_back`)
+- Fine-tune anchor wPct/hPct for 3/4 rear views if the plate text clips or sits outside the blank
+- Implement vehicle colour tinting (CSS `filter: hue-rotate()` on the `<image>` element, or commission per-colour asset variants)
+- Run ANPR/camera readability test with real external camera hardware
+
+---
+
 ## Phase 0.4c — Asset Renderer Visual Correction
 
 **Date:** 2026-07-04
