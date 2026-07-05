@@ -762,6 +762,72 @@ road past a parking-arm gate. All controls in a local sidebar. No backend.
 
 ---
 
+---
+
+## Phase 1.0 — Renderer Cleanup (Asset Realistic only)
+
+### Goal
+
+Remove all legacy renderers and the Visual Style selector. Hardwire `AssetRealisticRenderer` as the sole renderer. Eliminate dead components.
+
+### Implemented
+
+- Deleted 5 legacy renderer files: `ClassicSvgRenderer`, `RealisticRenderer`, `GateCameraRenderer`, `OverheadRenderer`, `CinematicRenderer`
+- Deleted `renderers/types.ts` (contained `VisualStyle` union and `VISUAL_STYLE_LABELS`)
+- Created `renderers/asset-realistic/rendererProps.ts` — `SceneRendererProps` now lives here
+- Updated `AssetRealisticRenderer.tsx` to import `SceneRendererProps` from local `rendererProps.ts`
+- `SimulationScene.tsx` hardwires `AssetRealisticRenderer` directly (no registry, no `visualStyle` prop)
+- `ControlPanel.tsx`: removed Visual Style section, removed `visualStyle`/`onVisualStyleChange` props
+- `App.tsx`: removed `visualStyle` state, removed all `visualStyle` prop threading
+- Deleted dead simulation components: `Gate.tsx`, `Vehicle.tsx`, `Road.tsx`, `FocusZoneOverlay.tsx`
+- Deleted dead controls component: `FocusZoneControls.tsx`
+- `LicensePlate.tsx` retained — still used by `DynamicPlateOverlay.tsx`
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/rendererProps.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — import path updated
+- `apps/web/src/components/simulation/SimulationScene.tsx` — hardwired renderer, removed visualStyle prop
+- `apps/web/src/components/controls/ControlPanel.tsx` — removed VisualStyle imports and Visual Style section
+- `apps/web/src/App.tsx` — removed visualStyle state and prop threading
+- `apps/web/src/components/simulation/renderers/types.ts` — deleted
+- `apps/web/src/components/simulation/renderers/ClassicSvgRenderer.tsx` — deleted
+- `apps/web/src/components/simulation/renderers/RealisticRenderer.tsx` — deleted
+- `apps/web/src/components/simulation/renderers/GateCameraRenderer.tsx` — deleted
+- `apps/web/src/components/simulation/renderers/OverheadRenderer.tsx` — deleted
+- `apps/web/src/components/simulation/renderers/CinematicRenderer.tsx` — deleted
+- `apps/web/src/components/simulation/Gate.tsx` — deleted (superseded by inline gate in AssetRealisticRenderer)
+- `apps/web/src/components/simulation/Vehicle.tsx` — deleted (superseded by VehicleAssetLayer)
+- `apps/web/src/components/simulation/Road.tsx` — deleted (superseded by AssetRealisticRenderer background)
+- `apps/web/src/components/simulation/FocusZoneOverlay.tsx` — deleted (removed in Phase 0.9)
+- `apps/web/src/components/controls/FocusZoneControls.tsx` — deleted (removed in Phase 0.9)
+
+### Decisions
+
+- `SceneRendererProps` moved from `renderers/types.ts` to `renderers/asset-realistic/rendererProps.ts` — co-located with the only renderer that uses it
+- No renderer registry. `SimulationScene` imports `AssetRealisticRenderer` directly
+- Visual Style UI section fully removed — single renderer, no user choice needed
+- `Gate.tsx` retained through Phase 0.9 for reference but was already unused; deleted here
+
+### Manual Testing
+
+1. `pnpm dev` in `apps/web`
+2. Confirm simulation scene renders in Asset Realistic style
+3. Confirm Visual Style selector is gone from ControlPanel
+4. Run an incoming simulation with auto_open gate — confirm full cycle works
+5. Run with wait_for_signal — confirm Send Signal button works
+6. Enter Camera Mode and Fullscreen — confirm clean output
+
+### Known Limitations
+
+- None. Single-renderer architecture is intentional.
+
+### Next Steps
+
+- Phase 0.3: Plate list queue
+
+---
+
 ## Recommended Next Prompts
 
 ### Phase 0.3 — Plate List Playback
