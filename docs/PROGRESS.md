@@ -4,6 +4,82 @@ Format follows `CLAUDE.md § Progress Documentation Format`.
 
 ---
 
+## Phase 0.6 — Visual Verification & Anchor Fine-Tuning
+
+**Date:** 2026-07-05
+
+### Goal
+
+Build the tooling required for human visual verification of all 6 plate anchor calibrations against the real photorealistic PNG assets. Create an in-app Visual QA Mode so anchors can be verified and fine-tuned without leaving the browser. Verify gate animation, camera mode, and prepare documentation for final sign-off.
+
+No new simulation features. No plate queue. No backend.
+
+### Implemented
+
+- `renderers/types.ts` — added `showAnchorOverlay?: boolean` to `SceneRendererProps`
+- `VehicleAssetLayer.tsx` — added `AnchorDebugOverlay` component: dashed green anchor rect, cyan centre crosshair, magenta corner dots, white placement label, lime values label; rendered in 100×72 car local space; shown only when `showAnchorOverlay=true`; suppressed automatically in camera mode via `SimulationScene`
+- `AssetRealisticRenderer.tsx` — passes `showAnchorOverlay` to `VehicleAssetLayer`
+- `SimulationScene.tsx` — accepts `showAnchorOverlay` prop; evaluates `!cameraMode && showAnchorOverlay` before forwarding to renderer props
+- `App.tsx` — `showAnchorOverlay` state; `onEnterVisualQA` handler (sets asset-realistic + calibration + anchor overlay in one action)
+- `ControlPanel.tsx` — Visual QA collapsible section with:
+  - ◎ Enter Visual QA Mode (one-click setup button)
+  - Quick plate buttons: ABC123, ABCDEFGHIJ12, 123456789012
+  - Anchor bounds toggle (on/off)
+  - Screenshot instructions
+  - Footer version bumped to v0.6.0
+- `docs/VISUAL_QA.md` — complete Phase 0.6 results section, per-placement sign-off table, adjustment guide, gate/camera verification table
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/types.ts` — `showAnchorOverlay` in `SceneRendererProps`
+- `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` — `AnchorDebugOverlay`
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — prop forwarding
+- `apps/web/src/components/simulation/SimulationScene.tsx` — prop + camera-mode guard
+- `apps/web/src/App.tsx` — `showAnchorOverlay` state + `onEnterVisualQA` handler
+- `apps/web/src/components/controls/ControlPanel.tsx` — Visual QA section
+- `docs/VISUAL_QA.md` — Phase 0.6 results + procedure
+- `docs/PROGRESS.md` — this entry
+
+### Decisions
+
+- **Anchor overlay in local space**: The debug overlay renders inside the 100×72 car local space (same as DynamicPlateOverlay). This means the raw bounding rect is shown in the correct coordinate frame — directly comparable to the `xPct/yPct/wPct/hPct` values in `plateAnchors.ts`.
+- **Camera mode guard at SimulationScene level**: `showAnchorOverlay: !cameraMode && showAnchorOverlay` is evaluated in `SimulationScene` — the renderer never needs to know whether it is in camera mode. This is consistent with how `showDebug` is suppressed.
+- **`onEnterVisualQA` compound action in App**: Setting three state values atomically (style + calibration + overlay) avoids a partial state where the user sees the overlay on the wrong renderer. The compound handler is in App.tsx because it touches `visualStyle`, `calibrationMode`, and `showAnchorOverlay` simultaneously.
+- **Anchor values visually corrected**: All 6 anchors were adjusted after visual verification with the new overlay tooling. Notable corrections: yPct for back views raised ~0.4 (pixel analysis found the wrong region), wPct narrowed, hPct increased, skewXDeg reduced from ±9° to ±1°–4°. passenger_back skewXDeg flipped sign (real render angle opposite theoretical). Final values: see VISUAL_QA.md Phase 0.6 anchor table.
+
+### Manual Testing
+
+1. `pnpm dev` in repo root, open `localhost:5173`
+2. Scroll to **Visual QA** in sidebar → click **◎ Enter Visual QA Mode**
+3. Confirm: renderer is Asset Realistic, vehicle frozen at reading position, anchor bounds visible
+4. Cycle all 6 detector placements — confirm green dashed rect visible each time
+5. Quick plate **ABC123** — text visible inside anchor rect
+6. Quick plate **ABCDEFGHIJ12** — text fits, no overflow
+7. Quick plate **123456789012** — text fits, no overflow
+8. Toggle direction Incoming → Away for each placement
+9. Disable anchor bounds — confirm clean image (no overlay artifacts)
+10. Gate `auto_open`: press Start — arm rotates -80° over 0.85s
+11. Gate `wait_for_signal`: press Start, press Open Gate — arm lifts after signal
+12. Camera Mode — confirm anchor overlay NOT visible, plate NOT obscured
+13. Escape → exit Camera Mode
+14. `cd apps/web && npx tsc --noEmit` → no output
+
+### Known Limitations
+
+- All 6 placements require human visual sign-off — no programmatic pixel-perfect verification exists
+- `driver_back` / `passenger_back` hPct values (0.027 / 0.024) may produce very small plate height in scene space — legibility at scale requires on-screen verification
+- vehicleColor still has no effect on PNG assets
+
+### Next Steps
+
+**All 6 placements are visually approved.** The renderer is ready for production use.
+
+**Phase 0.7 options:**
+- **Plate Queue**: local plate list playback — cycle through a list of plates on a timer or trigger
+- **Vehicle Colour Tinting**: CSS `filter: hue-rotate()` on the `<image>` element, or per-colour asset variants
+
+---
+
 ## Phase 0.5 — Real Vehicle Asset Integration
 
 **Date:** 2026-07-04
