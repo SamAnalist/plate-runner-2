@@ -75,13 +75,18 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     isRunning: false,
   });
 
-  const rafRef      = useRef<number | null>(null);
-  const timeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTimeRef = useRef<number | null>(null);
-  const stateRef    = useRef(state);
-  const configRef   = useRef(config);
-  stateRef.current  = state;
-  configRef.current = config;
+  const rafRef         = useRef<number | null>(null);
+  // Two separate timer refs to prevent the useEffect cleanup from cancelling
+  // the resume timer when the phase transitions from stopped_at_gate → gate_opening.
+  /** Timer for the pre-open pause (stopBeforeOpenMs, set by useEffect) */
+  const stopTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Timer for the post-open resume (850ms arm + delayAfterOpenMs, set by triggerGateOpen) */
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTimeRef    = useRef<number | null>(null);
+  const stateRef       = useRef(state);
+  const configRef      = useRef(config);
+  stateRef.current     = state;
+  configRef.current    = config;
 
   const cancelLoop = useCallback(() => {
     if (rafRef.current !== null) {
@@ -92,9 +97,13 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
   }, []);
 
   const clearTimer = useCallback(() => {
-    if (timeoutRef.current !== null) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+    if (stopTimerRef.current !== null) {
+      clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+    if (resumeTimerRef.current !== null) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
     }
   }, []);
 
@@ -195,14 +204,16 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
 
   /** Opens the gate visually and schedules vehicle resume.
    *  gateOpenDurationMs is fixed at 850ms (Framer Motion arm animation).
-   *  Vehicle resumes after arm finishes + delayAfterOpenMs. */
+   *  Vehicle resumes after arm finishes + delayAfterOpenMs.
+   *  Uses resumeTimerRef (NOT stopTimerRef) so the useEffect cleanup for the
+   *  stopped_at_gate phase does not accidentally cancel the resume timer. */
   const triggerGateOpen = useCallback(() => {
     const cfg = configRef.current;
     const ARM_ANIMATION_MS = 850;
     const resumeDelay = ARM_ANIMATION_MS + cfg.delayAfterOpenMs;
 
     setState(prev => ({ ...prev, gateOpen: true, phase: 'gate_opening' }));
-    timeoutRef.current = setTimeout(resumeAfterGate, resumeDelay);
+    resumeTimerRef.current = setTimeout(resumeAfterGate, resumeDelay);
   }, [resumeAfterGate]);
 
   /**
@@ -252,10 +263,17 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     if (configRef.current.gateMode !== 'auto_open') return;
 
     const ms = configRef.current.stopBeforeOpenMs;
-    timeoutRef.current = setTimeout(triggerGateOpen, ms);
+    stopTimerRef.current = setTimeout(triggerGateOpen, ms);
 
+    // Cleanup only cancels the stop timer — NOT the resume timer.
+    // If we cancelled resumeTimerRef here, the vehicle would never resume
+    // because this cleanup fires when phase changes to gate_opening (right
+    // after triggerGateOpen sets the resume timer).
     return () => {
-      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+      if (stopTimerRef.current !== null) {
+        clearTimeout(stopTimerRef.current);
+        stopTimerRef.current = null;
+      }
     };
   }, [state.phase, triggerGateOpen]);
 
