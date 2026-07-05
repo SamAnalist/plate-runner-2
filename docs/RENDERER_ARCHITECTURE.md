@@ -1,7 +1,7 @@
 # Renderer Architecture — Plate Runner
 
-**Phase:** 0.3 (renderer separation) + 0.4 (asset-based layer) + 0.4c (per-view assets, gate fix) + 0.5 (real assets, pixel-calibrated anchors)
-**Date:** 2026-07-04
+**Phase:** 0.3 (renderer separation) + 0.4 (asset-based layer) + 0.4c (per-view assets, gate fix) + 0.5 (real assets, pixel-calibrated anchors) + 0.6 (visual QA tooling) + 0.7 (view-aware motion paths)
+**Date:** 2026-07-05
 
 ---
 
@@ -81,18 +81,24 @@ AssetRealisticRenderer
 │     ├── Status LED (green open / red closed)
 │     └── Arm: yellow/black safety stripes — Framer Motion rotate animation
 │
-└── VehicleAssetLayer
-      ├── Ground shadow ellipse
-      ├── Perspective transform group
-      │     translate(pivot) · skewX(deg) · translate(-pivot) · translate(carX,carY) · scale(scaleX,scaleY)
-      │
-      ├── Car body asset
-      │     ASSET_REGISTRY[viewKey].render(palette)   ← SVG prototype today
-      │     <image href={src} .../>                    ← raster PNG/WebP in future
-      │
-      └── DynamicPlateOverlay
-            anchorToLocalRect(anchor, carLW, carLH)   ← percentage → pixels
-            <LicensePlate text={config.plate} .../>   ← safe SVG text, never HTML
+├── VehicleAssetLayer
+│     ├── Ground shadow ellipse
+│     ├── Perspective transform group
+│     │     translate(carX, carY) · scale(scaleX, scaleY)
+│     │     carX derived from getViewAwareX(t, placement)  ← view-aware lateral path
+│     │     carY / scale from getDepthValues(t)
+│     │
+│     ├── Car body asset
+│     │     <image href={src} .../>   ← real PNG (1536×1024, per-view)
+│     │
+│     ├── DynamicPlateOverlay
+│     │     anchorToLocalRect(anchor, carLW, carLH)   ← percentage → pixels
+│     │     <LicensePlate text={config.plate} .../>   ← safe SVG text, never HTML
+│     │
+│     └── AnchorDebugOverlay  [QA only — showAnchorOverlay]
+│
+└── MotionPathDebugOverlay  [QA only — showMotionPathOverlay]
+      Yellow dashed curve + FAR/READ/GATE/EXIT labels + current position
 ```
 
 ### Key invariant

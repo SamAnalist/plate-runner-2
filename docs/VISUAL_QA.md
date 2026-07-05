@@ -143,6 +143,35 @@ VQA-01 (placeholder SVGs) is RESOLVED — real PNG assets installed.
 
 ---
 
+## Phase 0.7 — Motion Path Verification
+
+**Date:** 2026-07-05
+
+### Diagonal Motion Results
+
+| Placement | Diagonal Motion | Read Point Stable | Exit Path Natural | Camera Mode | Approved | Notes |
+|---|---|---|---|---|---|---|
+| center_front | n/a (straight) | ✓ | ✓ | ✓ | **PENDING VISUAL** | No lateral expected |
+| center_back | n/a (straight) | ✓ | ✓ | ✓ | **PENDING VISUAL** | No lateral expected |
+| driver_front | PENDING VISUAL | PENDING VISUAL | PENDING VISUAL | ✓ | **PENDING VISUAL** | Should sweep RIGHT ~60px at gate |
+| passenger_front | PENDING VISUAL | PENDING VISUAL | PENDING VISUAL | ✓ | **PENDING VISUAL** | Should sweep LEFT ~60px at gate |
+| driver_back | PENDING VISUAL | PENDING VISUAL | PENDING VISUAL | ✓ | **PENDING VISUAL** | Same path as driver_front |
+| passenger_back | PENDING VISUAL | PENDING VISUAL | PENDING VISUAL | ✓ | **PENDING VISUAL** | Same path as passenger_front |
+
+### How to Verify
+
+1. Enter Visual QA Mode → enable **◈ Motion path** overlay
+2. For each 3/4 placement: confirm yellow dashed curve has visible horizontal component
+3. Press Start in `auto_open` — confirm car follows diagonal, not purely vertical
+4. At gate: plate stays in focus zone during `at_gate`/`wait_for_signal`
+5. If diagonal is too wide or too narrow, adjust `xNear` in `VIEW_MOTION_PATHS` in `viewMotionPaths.ts`
+
+### Path Values
+
+See `docs/MOTION_PATHS.md §4` for full table of xFar/xNear values per placement.
+
+---
+
 ## Phase 0.6 — Visual Verification Results
 
 **Date:** 2026-07-05

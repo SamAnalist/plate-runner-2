@@ -4,6 +4,80 @@ Format follows `CLAUDE.md § Progress Documentation Format`.
 
 ---
 
+## Phase 0.7 — View-Aware Motion Paths
+
+**Date:** 2026-07-05
+
+### Goal
+
+Make the vehicle movement coherent with each camera angle's asset image.
+3/4-view placements (driver/passenger front/back) now sweep laterally across
+the scene as the vehicle approaches or recedes, creating a diagonal trajectory
+that matches the composition baked into each photorealistic asset.
+
+No plate queue, no backend, no scheduler.
+
+### Implemented
+
+- **NEW** `viewMotionPaths.ts` — `ViewMotionPath` type, `VIEW_MOTION_PATHS` per-placement registry, `getViewAwareX(t, placement)` with easeOut lateral interpolation, `getMotionPathDebugPoints()` for debug overlay
+- `VehicleAssetLayer.tsx` — replaced `getVehicleX()` with `getViewAwareX()`; lateral X now per-placement diagonal
+- `AssetRealisticRenderer.tsx` — `MotionPathDebugOverlay` component (scene-space path curve + key point labels + current position marker); `showMotionPathOverlay` prop
+- `renderers/types.ts` — `showMotionPathOverlay?: boolean` added to `SceneRendererProps`
+- `SimulationScene.tsx` — `showMotionPathOverlay` prop, camera-mode guard
+- `App.tsx` — `showMotionPathOverlay` state
+- `ControlPanel.tsx` — ◈ Motion path toggle in Visual QA section
+- **NEW** `docs/MOTION_PATHS.md` — problem, model, path table, easing, direction handling, gate alignment, known limitations
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/viewMotionPaths.ts` — NEW
+- `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` — `getViewAwareX` replaces `getVehicleX`
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — `MotionPathDebugOverlay`
+- `apps/web/src/components/simulation/renderers/types.ts` — `showMotionPathOverlay`
+- `apps/web/src/components/simulation/SimulationScene.tsx` — prop + camera guard
+- `apps/web/src/App.tsx` — state
+- `apps/web/src/components/controls/ControlPanel.tsx` — toggle
+- `docs/MOTION_PATHS.md` — NEW
+- `docs/PROGRESS.md` — this entry
+- `docs/RENDERER_ARCHITECTURE.md` — updated architecture diagram
+- `docs/VISUAL_QA.md` — motion path QA table
+
+### Decisions
+
+- **Only X is overridden**: Y and scale come from the existing `getDepthValues(t)` depth model — no changes to depth.ts. The lateral path is a pure additive layer on top of the existing perspective.
+- **depth.ts unchanged**: `getVehicleX` continues to be used by other renderers and by the focus zone readability calculation. This avoids breaking 5 other renderers. The view-aware function lives exclusively in the asset-realistic sub-folder.
+- **easeOut for lateral**: Decelerates toward the gate/reading position so the plate is stable while ANPR reads it. Fast sweep at distance (car is small, illegibility doesn't matter), slow approach at reading depth.
+- **Path registry not directional**: `getViewAwareX(t, placement)` is direction-agnostic. The simulation's `vehicleT` naturally handles direction — no duplicate path definitions needed.
+- **MotionPathDebugOverlay in scene space**: Unlike AnchorDebugOverlay (car-local space), the path overlay renders in scene space so the full trajectory from FAR to EXIT is visible across the scene.
+
+### Manual Testing
+
+1. `pnpm dev`, select **Asset Realistic**, **driver_front**, press **Start**
+   - Observe clear rightward lateral sweep as car approaches — not purely vertical
+2. Select **passenger_front** → leftward sweep (mirror)
+3. Select **driver_back** → rightward sweep
+4. Select **passenger_back** → leftward sweep
+5. Select **center_front** and **center_back** → no lateral drift (straight in)
+6. Test **Away** direction for each placement — sweep reverses naturally
+7. `wait_for_signal` mode → car stops, plate position stable at read point
+8. Visual QA → ◈ Motion path ON → confirm yellow dashed curve visible, magenta dot tracks vehicle
+9. Camera Mode → confirm motion path overlay NOT visible
+
+### Known Limitations
+
+- `getPlateReadability` (header badge GOOD/PARTIAL/POOR) still uses `getVehicleX` from depth.ts — for 3/4 views, plate X in scene space now differs by up to ~60px from the readability calc. Minor inaccuracy; visible as slightly off overlap percentages.
+- driver_front and driver_back use identical path values; same for passenger views. Independent calibration may be needed if the physical camera angle differs between front/rear mounting positions.
+- Paths for driver/passenger are currently symmetric — calibration assumed equal left/right camera distance. Adjust `VIEW_MOTION_PATHS` in `viewMotionPaths.ts` if physical asymmetry is found.
+
+### Next Steps
+
+**Phase 0.8 options:**
+- **Plate Queue**: local plate list playback (the user's deferred next step)
+- **Readability fix**: update `getPlateReadability` to use view-aware X for asset-realistic style
+- **Vehicle colour tinting**: CSS `filter: hue-rotate()` on the car image
+
+---
+
 ## Phase 0.6 — Visual Verification & Anchor Fine-Tuning
 
 **Date:** 2026-07-05
