@@ -82,6 +82,35 @@ carCenterX = (roadLeft(t) + roadRight(t)) / 2  [adjusted for detector side]
 
 Local coordinate space: 100 × 72
 
+### Direction ↔ Placement constraint (Phase 1.1)
+
+Each direction constrains which detector placements are valid:
+
+| Direction | Allowed placements | Car face shown |
+|---|---|---|
+| `incoming` | `driver_front`, `center_front`, `passenger_front` | Front fascia |
+| `away`     | `driver_back`,  `center_back`,  `passenger_back`  | Rear fascia  |
+
+**Rationale:** an incoming vehicle is approaching the detector, so the camera sees the front. An away vehicle is receding, so the camera sees the rear. Cross-direction combinations (e.g. `incoming + center_back`) are invalid and must never be rendered.
+
+**Remap on direction change:**
+
+| Current placement | New direction | Remapped placement |
+|---|---|---|
+| `driver_front`    | `away`     | `driver_back`    |
+| `center_front`    | `away`     | `center_back`    |
+| `passenger_front` | `away`     | `passenger_back` |
+| `driver_back`     | `incoming` | `driver_front`   |
+| `center_back`     | `incoming` | `center_front`   |
+| `passenger_back`  | `incoming` | `passenger_front`|
+
+The UI filters placement options to only show the 3 valid for the current direction. App.tsx auto-remaps when direction changes. VehicleAssetLayer has a guardrail that silently remaps any invalid combination before rendering.
+
+Utility functions live in `packages/shared/src/directionPlacement.ts`:
+- `getPlacementsForDirection(direction)`
+- `isPlacementAllowedForDirection(direction, placement)`
+- `remapPlacementForDirection(current, nextDirection)`
+
 ### View by detector placement
 
 | Placement suffix | Car face | Plate |
@@ -300,26 +329,21 @@ Migration will happen incrementally as phases are added. The current 4-phase mod
 
 ## 12. Manual Test Matrix
 
-2 directions × 6 detector placements = 12 canonical test cases.
+> **Updated in Phase 1.1.** The previous 12-case matrix (2 directions × 6 placements) is
+> now invalid — cross-direction combinations are forbidden by business rule.
+> The canonical test set is 6 valid combinations only.
 
-| # | Direction | Placement | Expected car face | Expected plate side |
+| # | Direction | Placement | Expected car face | Expected plate |
 |---|---|---|---|---|
-| 1  | incoming | center_front    | Front, centered | Front plate, center |
-| 2  | incoming | driver_front    | Front, shifted right, +skew | Front plate, slightly right |
-| 3  | incoming | passenger_front | Front, shifted left, −skew | Front plate, slightly left |
-| 4  | incoming | center_back     | Rear, centered | Rear plate, center |
-| 5  | incoming | driver_back     | Rear, shifted right | Rear plate, slightly right |
-| 6  | incoming | passenger_back  | Rear, shifted left | Rear plate, slightly left |
-| 7  | away     | center_front    | Front, centered, shrinking | Front plate, center |
-| 8  | away     | driver_front    | Front, shifted right, shrinking | Front plate |
-| 9  | away     | passenger_front | Front, shifted left, shrinking | Front plate |
-| 10 | away     | center_back     | Rear, centered, shrinking | Rear plate, center |
-| 11 | away     | driver_back     | Rear, shifted right, shrinking | Rear plate |
-| 12 | away     | passenger_back  | Rear, shifted left, shrinking | Rear plate |
+| 1 | incoming | center_front    | Front, centered | Front plate, center |
+| 2 | incoming | driver_front    | Front, shifted right | Front plate, slightly right |
+| 3 | incoming | passenger_front | Front, shifted left  | Front plate, slightly left |
+| 4 | away     | center_back     | Rear, centered, shrinking | Rear plate, center |
+| 5 | away     | driver_back     | Rear, shifted right, shrinking | Rear plate, slightly right |
+| 6 | away     | passenger_back  | Rear, shifted left, shrinking  | Rear plate, slightly left |
 
-**Known adjustment needed**: In cases 4–6 and 10–12 (back placements), the rear plate
-is visible while the car is either approaching or going away. Verify that the plate is legible
-from external camera at the reading position.
+**Remap test:** Switching direction should auto-map the equivalent side position
+(driver ↔ driver, center ↔ center, passenger ↔ passenger).
 
 ---
 

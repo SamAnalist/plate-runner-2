@@ -828,6 +828,57 @@ Remove all legacy renderers and the Visual Style selector. Hardwire `AssetRealis
 
 ---
 
+## Phase 1.1 — Direction ↔ Placement Constraint
+
+### Goal
+
+Enforce that `incoming` only uses front detector placements and `away` only uses rear placements. Add auto-remap when direction changes, UI filtering, and a renderer guardrail.
+
+### Implemented
+
+- Created `packages/shared/src/directionPlacement.ts`:
+  - `PLACEMENTS_BY_DIRECTION` constant
+  - `getPlacementsForDirection(direction)` — returns 3 valid placements
+  - `isPlacementAllowedForDirection(direction, placement)` — boolean guard
+  - `remapPlacementForDirection(current, nextDirection)` — symmetric remap (driver↔driver, etc.)
+- Exported from `packages/shared/src/index.ts`
+- `App.tsx`: `handleConfigChange` intercepts direction changes and auto-remaps placement when invalid
+- `ControlPanel.tsx`: Detector Placement grid now calls `getPlacementsForDirection(config.direction)` — only 3 buttons shown, dynamically labeled
+- `VehicleAssetLayer.tsx`: guardrail computes `safePlacement` before any rendering; used for `getViewAwareX`, asset lookup, and plate anchor lookup
+
+### Files Changed
+
+- `packages/shared/src/directionPlacement.ts` — created
+- `packages/shared/src/index.ts` — added export
+- `apps/web/src/App.tsx` — added `handleConfigChange` with remap logic
+- `apps/web/src/components/controls/ControlPanel.tsx` — filtered placement grid
+- `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` — renderer guardrail
+
+### Decisions
+
+- Mapping utilities live in `packages/shared` so any future backend or test harness can import them
+- `remapPlacementForDirection` preserves the lateral position (driver/center/passenger) and only flips face — the most intuitive behavior for the user
+- The guardrail in `VehicleAssetLayer` is a silent remap, not a crash — the simulation remains functional even if stale config arrives
+
+### Manual Testing
+
+1. `pnpm dev`
+2. With `incoming`: confirm only DRV FRONT / CTR FRONT / PSG FRONT are shown
+3. With `away`: confirm only DRV BACK / CTR BACK / PSG BACK are shown
+4. Select `incoming + driver_front`, switch to `away` → auto-remaps to `driver_back`
+5. Switch back to `incoming` → auto-remaps to `driver_front`
+6. Run full gate scenarios (hidden / open / auto_open / wait_for_signal) with both directions
+
+### Known Limitations
+
+- No type-level enforcement preventing cross-direction config via direct object construction — only runtime guards
+
+### Next Steps
+
+- Plate queue
+
+---
+
 ## Recommended Next Prompts
 
 ### Phase 0.3 — Plate List Playback
