@@ -1,79 +1,52 @@
 /**
- * AssetRealisticRenderer — parking garage / access gate environment.
+ * AssetRealisticRenderer — parking scene renderer with per-POV scene variants.
  *
- * Visual character:
- *   • Concrete ceiling / wall above horizon
- *   • Wet asphalt with subtle texture
- *   • Gate arm: yellow/black safety stripe, heavy gunmetal post
- *   • Vehicle: VehicleAssetLayer (raster image + DynamicPlateOverlay)
- *   • Vignette
+ * Architecture:
+ *   Scene variant is selected from placement via getSceneVariant():
+ *     center_front → CenterFrontScene  (parking entry)
+ *     center_back  → CenterBackScene   (parking exit)
+ *     driver/passenger → GenericScene  (generic interior)
+ *
+ *   Rendering order (back to front):
+ *     1. Scene background (selected variant)
+ *     2. Gate arm + post
+ *     3. Vehicle (or gate before vehicle based on vehicleBehindGate)
+ *     4. Vignette overlay
+ *     5. Motion path debug overlay (QA only)
+ *
+ * Shared SVG defs (referenced by all scene components):
+ *   #arAsphalt — road surface texture pattern
+ *   #arVignette — radial vignette gradient
  *
  * Gate arm animation:
- *   The arm rotates around the pivot point at the top of the post.
- *   Pattern: outer <g transform="translate(pivot)"> + inner <motion.g rotate>
- *   This is reliable across all browsers for SVG CSS transforms (avoids the
- *   transform-origin absolute-px issue with Framer Motion on SVG elements).
- *
- *   Closed:  arm horizontal (0°), blocking the lane.
- *   Open:    arm rotated -80° (pointing nearly straight up).
- *   Transition: 0.85s easeInOut cubic.
+ *   Closed: arm horizontal (0°), blocking lane.
+ *   Open:   arm rotated 84°, pointing nearly straight up.
+ *   Animated via CSS style.transform + transition (not Framer Motion) for
+ *   reliable SVG cross-browser behaviour.
  */
 import type { SceneRendererProps } from './rendererProps';
-import { VehicleAssetLayer } from './VehicleAssetLayer';
+import { VehicleAssetLayer }       from './VehicleAssetLayer';
+import { getSceneVariant }         from './sceneVariants';
+import { CenterFrontScene }        from './scenes/CenterFrontScene';
+import { CenterBackScene }         from './scenes/CenterBackScene';
+import { GenericScene }            from './scenes/GenericScene';
 import {
-  SCENE_W,
-  SCENE_H,
-  VP_X,
-  VP_Y,
-  lerp,
+  SCENE_W, SCENE_H,
+  getDepthValues,
 } from '../../../../utils/depth';
 import {
   getMotionPathDebugPoints,
   getViewAwareX,
 } from './viewMotionPaths';
-import { getDepthValues } from '../../../../utils/depth';
 import type { DetectorPlacement } from '@plate-runner/shared';
 
-// ── Road geometry ──────────────────────────────────────────────────────────
-const RL_FAR        = VP_X - 10;
-const RR_FAR        = VP_X + 10;
-const RL_NEAR       = SCENE_W * 0.175;
-const RR_NEAR       = SCENE_W * 0.825;
-const SHOULDER_NEAR = 55;
-const SHOULDER_FAR  = 5;
-
-// ── Utility ────────────────────────────────────────────────────────────────
-function roadPoints(
-  lFar: number, rFar: number, yFar: number,
-  lNear: number, rNear: number, yNear: number,
-): string {
-  return `${lFar},${yFar} ${rFar},${yFar} ${rNear},${yNear} ${lNear},${yNear}`;
-}
-
-// ── Center dashes ─────────────────────────────────────────────────────────
-function buildCenterDashes() {
-  return Array.from({ length: 9 }, (_, i) => {
-    const t0 = (i + 0.08) / 9;
-    const t1 = (i + 0.45) / 9;
-    const cx = (RL_FAR + RR_FAR) / 2;
-    const nx = (RL_NEAR + RR_NEAR) / 2;
-    return {
-      x0: lerp(cx, nx, t0), y0: lerp(VP_Y, SCENE_H, t0),
-      x1: lerp(cx, nx, t1), y1: lerp(VP_Y, SCENE_H, t1),
-      w:  lerp(0.6, 4.5, (t0 + t1) / 2),
-    };
-  });
-}
-const CENTER_DASHES = buildCenterDashes();
-
-// ── Gate component ────────────────────────────────────────────────────────
+// ── Gate component ────────────────────────────────────────────────────────────
 function AssetGate({
   gateDepth,
   gateOpen,
   gateMode,
 }: Pick<SceneRendererProps, 'gateDepth' | 'gateOpen'> & { gateMode: string }) {
   if (gateMode === 'hidden') return null;
-  // note: gateInitialState is handled by useSimulation — gateOpen starts true when open
 
   const { roadRight, roadWidth, y, scale } = gateDepth;
 
@@ -82,24 +55,19 @@ function AssetGate({
   const postX  = roadRight - postW;
   const postY  = y - postH;
 
-  // Arm geometry — pivot is near the top of the post
   const armLen   = roadWidth * 0.88;
   const armThick = Math.max(3.5, roadWidth * 0.022);
   const pivotX   = postX + postW / 2;
   const pivotY   = postY + postH * 0.14;
 
-  // Gate states:
-  //   closed  →  arm horizontal (0°)  blocking lane
-  //   open    →  arm rotated 84°     pointing nearly straight up
+  // 84° = arm pointing nearly straight up (open), 0° = horizontal (closed)
   const armAngle = gateOpen ? 84 : 0;
 
-  const lightR   = Math.max(2.8, postW * 0.40);
-  const lightCX  = postX + postW / 2;
-  const lightCY  = postY + postH * 0.10;
-  // Soft, camera-friendly indicator colors (not neon)
+  const lightR  = Math.max(2.8, postW * 0.40);
+  const lightCX = postX + postW / 2;
+  const lightCY = postY + postH * 0.10;
   const lightCol = gateOpen ? '#4ade80' : '#f87171';
 
-  // Stripe positions in pivot-local space (arm extends left: x ∈ [-armLen, 0])
   const numStripes = 5;
   const stripes = Array.from({ length: numStripes }, (_, i) => ({
     relX: -armLen + armLen * (0.08 + i * 0.18),
@@ -144,29 +112,12 @@ function AssetGate({
       <circle cx={postX + postW * 0.5} cy={postY + postH * 0.28} r={postW * 0.14} fill="#1a1d22" />
       <circle cx={postX + postW * 0.5} cy={postY + postH * 0.72} r={postW * 0.14} fill="#1a1d22" />
 
-      {/* Status LED — soft, camera-friendly (no neon bleed) */}
+      {/* Status LED */}
       <circle cx={lightCX} cy={lightCY} r={lightR * 2.0} fill={lightCol} opacity={0.08} />
       <circle cx={lightCX} cy={lightCY} r={lightR}       fill={lightCol} opacity={0.75} />
       <circle cx={lightCX - lightR * 0.28} cy={lightCY - lightR * 0.28} r={lightR * 0.32} fill="white" opacity={0.45} />
 
-      {/* ── Gate arm ─────────────────────────────────────────────────────── */}
-      {/*
-       * Rotation pattern (reliable across all browsers for SVG + Framer Motion):
-       *   1. Static <g> translates the coordinate origin to the pivot point.
-       *   2. <motion.g> rotates around (0,0) = the pivot.
-       *   3. All arm geometry is drawn relative to (0,0), arm going LEFT (negative x).
-       *
-       * This avoids the CSS transform-origin absolute-px ambiguity that can cause
-       * Framer Motion rotation to appear wrong on SVG elements in some browsers.
-       *)
-       */}
-      {/*
-       * CSS style.transform + transition is used instead of Framer Motion here.
-       * Framer Motion's animate={{ rotate }} on motion.g inside SVG fights with the
-       * outer SVG transform="" attribute — CSS transitions do not apply to SVG
-       * attributes, only to CSS properties. Using style.transform ensures the
-       * browser animates via the CSS transition engine.
-       */}
+      {/* ── Gate arm — CSS transition for reliable SVG animation ─────────── */}
       <g
         style={{
           transform: `translate(${pivotX}px, ${pivotY}px) rotate(${armAngle}deg)`,
@@ -174,7 +125,7 @@ function AssetGate({
           transformOrigin: '0 0',
         }}
       >
-        {/* Arm body — white, parking barrier style */}
+        {/* Arm body — white parking barrier */}
         <rect
           x={-armLen}
           y={-armThick / 2}
@@ -196,31 +147,18 @@ function AssetGate({
             rx={armThick * 0.3}
           />
         ))}
-        {/* Arm tip reflector at left end (-armLen, 0) */}
+        {/* Arm tip reflector */}
         <circle cx={-armLen} cy={0} r={armThick * 0.95} fill="white"    opacity={0.90} />
         <circle cx={-armLen} cy={0} r={armThick * 0.45} fill={lightCol} opacity={0.65} />
       </g>
 
-      {/* Pivot cap (on top of arm, doesn't rotate) */}
+      {/* Pivot cap (static, on top of arm) */}
       <circle cx={pivotX} cy={pivotY} r={armThick * 1.0} fill="#4a5060" />
     </g>
   );
 }
 
-// ── Motion path debug overlay ──────────────────────────────────────────────
-
-/**
- * MotionPathDebugOverlay — QA-only component, renders in scene space.
- *
- * Colour coding:
- *   Yellow dashed line  = full motion path (xFar → xNear)
- *   Orange dot          = sampled path point
- *   Blue dot            = FAR
- *   Cyan dot            = READ
- *   Red dot             = GATE
- *   White dot           = EXIT
- *   Magenta dot         = current vehicle position
- */
+// ── Motion path debug overlay ─────────────────────────────────────────────────
 function MotionPathDebugOverlay({
   placement,
   vehicleT,
@@ -229,7 +167,6 @@ function MotionPathDebugOverlay({
   vehicleT:  number;
 }) {
   const pts = getMotionPathDebugPoints(placement);
-
   const { y: curY } = getDepthValues(vehicleT);
   const curX = getViewAwareX(vehicleT, placement);
 
@@ -244,7 +181,6 @@ function MotionPathDebugOverlay({
 
   return (
     <g>
-      {/* Path line segments */}
       {pts.map((p, i) => {
         if (i === 0) return null;
         const prev = pts[i - 1];
@@ -258,7 +194,6 @@ function MotionPathDebugOverlay({
         );
       })}
 
-      {/* Sampled key points */}
       {pts.map((p, i) => {
         const r    = p.label ? 5 : 2.5;
         const fill = dotColor(p.label);
@@ -280,12 +215,10 @@ function MotionPathDebugOverlay({
         );
       })}
 
-      {/* Current vehicle position */}
       <circle cx={curX} cy={curY} r={7}   fill="#ff00ff" opacity={0.20} />
       <circle cx={curX} cy={curY} r={4}   fill="#ff00ff" opacity={0.90} />
       <circle cx={curX} cy={curY} r={1.5} fill="white"   opacity={0.95} />
 
-      {/* Header */}
       <rect x={8} y={154} width={240} height={15} fill="rgba(0,0,0,0.60)" rx={2} />
       <text x={12} y={165}
         fill="#f5a623" fontSize={9} fontFamily="monospace" fontWeight="700">
@@ -295,7 +228,7 @@ function MotionPathDebugOverlay({
   );
 }
 
-// ── Main renderer ──────────────────────────────────────────────────────────
+// ── Main renderer ─────────────────────────────────────────────────────────────
 export function AssetRealisticRenderer({
   config,
   vehicleT,
@@ -306,9 +239,7 @@ export function AssetRealisticRenderer({
   showAnchorOverlay = false,
   showMotionPathOverlay = false,
 }: SceneRendererProps) {
-  const road      = roadPoints(RL_FAR, RR_FAR, VP_Y, RL_NEAR, RR_NEAR, SCENE_H);
-  const lShoulder = roadPoints(RL_FAR - SHOULDER_FAR, RL_FAR, VP_Y, RL_NEAR - SHOULDER_NEAR, RL_NEAR, SCENE_H);
-  const rShoulder = roadPoints(RR_FAR, RR_FAR + SHOULDER_FAR, VP_Y, RR_NEAR, RR_NEAR + SHOULDER_NEAR, SCENE_H);
+  const sceneVariant = getSceneVariant(config.detectorPlacement);
 
   const vehicle = (
     <VehicleAssetLayer
@@ -329,76 +260,38 @@ export function AssetRealisticRenderer({
 
   return (
     <>
+      {/* ── Shared SVG defs ─────────────────────────────────────────────────── */}
+      {/*    Referenced by all scene components via url(#arAsphalt) etc.       */}
       <defs>
-        {/* Concrete wall gradient */}
-        <linearGradient id="arWallGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#1d2126" />
-          <stop offset="100%" stopColor="#282c32" />
-        </linearGradient>
-
-        {/* Asphalt surface texture */}
+        {/* Road surface texture — horizontal micro-lines */}
         <pattern id="arAsphalt" x="0" y="0" width="60" height="1" patternUnits="userSpaceOnUse">
           <rect width="60" height="1" fill="transparent" />
           <rect y="0" width="60" height="0.4" fill="rgba(255,255,255,0.012)" />
         </pattern>
 
-        {/* Vignette */}
+        {/* Radial vignette overlay */}
         <radialGradient id="arVignette" cx="50%" cy="50%" r="70%">
           <stop offset="0%"   stopColor="transparent" />
           <stop offset="100%" stopColor="rgba(0,0,0,0.52)" />
         </radialGradient>
-
-        {/* Ground contact shadow under vehicle */}
-        <radialGradient id="arGroundShadow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stopColor="rgba(0,0,0,0.45)" />
-          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-        </radialGradient>
       </defs>
 
-      {/* ── Concrete wall / ceiling (above horizon) ── */}
-      <rect x={0} y={0} width={SCENE_W} height={VP_Y} fill="url(#arWallGrad)" />
-      {[VP_Y - 90, VP_Y - 60, VP_Y - 30].map((wy, i) => (
-        <line key={i} x1={0} y1={wy} x2={SCENE_W} y2={wy}
-              stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
-      ))}
+      {/* ── Scene background ────────────────────────────────────────────────── */}
+      {sceneVariant === 'center_front' && <CenterFrontScene />}
+      {sceneVariant === 'center_back'  && <CenterBackScene  />}
+      {sceneVariant === 'generic'      && <GenericScene     />}
 
-      {/* Utility lighting glows on ceiling */}
-      <ellipse cx={SCENE_W * 0.28} cy={0} rx={80} ry={30} fill="#e8d090" opacity={0.04} />
-      <ellipse cx={SCENE_W * 0.72} cy={0} rx={80} ry={30} fill="#e8d090" opacity={0.04} />
-
-      {/* ── Dark asphalt ground (below horizon) ── */}
-      <rect x={0} y={VP_Y} width={SCENE_W} height={SCENE_H - VP_Y} fill="#171a1e" />
-      <line x1={0} y1={VP_Y} x2={SCENE_W} y2={VP_Y} stroke="#34383e" strokeWidth={1.5} opacity={0.7} />
-
-      {/* ── Road ── */}
-      <polygon points={lShoulder} fill="#141618" />
-      <polygon points={rShoulder} fill="#141618" />
-      <polygon points={road}      fill="#1e2226" />
-      <polygon points={road}      fill="url(#arAsphalt)" opacity={0.6} />
-
-      {/* Road edge lines */}
-      <line x1={RL_FAR} y1={VP_Y} x2={RL_NEAR} y2={SCENE_H}
-            stroke="#d0c890" strokeWidth={1.8} opacity={0.55} />
-      <line x1={RR_FAR} y1={VP_Y} x2={RR_NEAR} y2={SCENE_H}
-            stroke="#d0c890" strokeWidth={1.8} opacity={0.55} />
-
-      {/* Centre-line dashes */}
-      {CENTER_DASHES.map((d, i) => (
-        <line key={i} x1={d.x0} y1={d.y0} x2={d.x1} y2={d.y1}
-              stroke="#c0b878" strokeWidth={d.w} opacity={0.22} />
-      ))}
-
-      {/* ── Z-ordered gate + vehicle ── */}
+      {/* ── Z-ordered gate + vehicle ────────────────────────────────────────── */}
       {vehicleBehindGate
         ? <>{vehicle}{gate}</>
         : <>{gate}{vehicle}</>
       }
 
-      {/* ── Vignette ── */}
+      {/* ── Vignette ────────────────────────────────────────────────────────── */}
       <rect x={0} y={0} width={SCENE_W} height={SCENE_H}
             fill="url(#arVignette)" pointerEvents="none" />
 
-      {/* ── Motion path debug overlay (Visual QA only, hidden in camera mode) ── */}
+      {/* ── Motion path debug overlay (QA only) ─────────────────────────────── */}
       {showMotionPathOverlay && (
         <MotionPathDebugOverlay
           placement={config.detectorPlacement}

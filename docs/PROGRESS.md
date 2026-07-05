@@ -4,6 +4,100 @@ Format follows `CLAUDE.md § Progress Documentation Format`.
 
 ---
 
+## Phase 1.3 — Central Parking Scene Redesign
+
+**Date:** 2026-07-05
+
+### Goal
+
+Replace the single monolithic background with a **scene variants architecture**.
+`center_front` and `center_back` now render fully distinct, realistic parking
+entry/exit environments; all other placements fall back to the previous generic
+interior scene.
+
+### Implemented
+
+- **Scene variants architecture**: `sceneVariants.ts` — `getSceneVariant(placement)`
+  maps any `DetectorPlacement` to one of three scene keys:
+  `center_front`, `center_back`, or `generic`.
+- **`CenterFrontScene`** — parking entry environment:
+  - Overhead concrete ceiling (520 px wide at near, narrows to 20 px at horizon)
+  - Left/right wall side panels, both perspective-correct
+  - Ceiling-to-wall edge highlight lines
+  - Three horizontal depth grid lines on ceiling + both side walls
+  - Wall panel joint lines (four, two per side), perspective-converging
+  - Two fluorescent tube light strips with soft glow halo + near-end ellipses
+  - Semi-arch entrance opening at far wall (VP area)
+  - Green "ENTRADA" signage panel with indicator triangle
+  - Ceiling ambient wash
+  - Floor: same road polygon, yellow edge lines, centre dashes
+  - Floor light pools from overhead tubes (two ellipses)
+  - Stop line at `GATE_T=0.52`
+  - Entry direction arrow (up-pointing toward VP, green tint)
+- **`CenterBackScene`** — parking exit environment:
+  - Identical structure to CenterFrontScene with key differences:
+  - Warm sodium-vapor colour palette (interior parking light tone)
+  - Outdoor daylight glow at horizon center (`cbExitGlow` gradient)
+  - Amber/red "SALIDA" signage
+  - Amber-tinted direction arrow
+  - Slightly warmer floor and road colours
+- **`GenericScene`** — extracted current background (driver/passenger views):
+  - Flat dark concrete wall + asphalt road, no structural detail
+  - Used for all six driver/passenger placements
+- **`AssetRealisticRenderer`** refactored:
+  - Removed inline background SVG
+  - Selects and renders scene via `getSceneVariant`
+  - Keeps shared `<defs>` (`#arAsphalt`, `#arVignette`) referenced by all scenes
+  - Gate, vehicle, vignette, motion path debug: unchanged
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/sceneVariants.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scenes/CenterFrontScene.tsx` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scenes/CenterBackScene.tsx` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scenes/GenericScene.tsx` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — refactored
+
+### Decisions
+
+- **Ceiling geometry derivation**: ceiling edges use the same perspective slope as the
+  road edges (`±250/355 ≈ ±0.704 px/py`), projected above the horizon. At y=0 the
+  ceiling aligns with the near road edges (140 px, 660 px), giving a 520 px → 20 px
+  overhead panel that matches the road's perspective behaviour.
+- **No Three.js**: full SVG 2D composition achieves realistic depth via perspective
+  polygons, gradient fills, and strategic lighting elements.
+- **Scene components are fully self-contained**: each imports its own constants from
+  `depth.ts` and includes its own `<defs>` block (unique IDs to avoid conflicts).
+- **driver/passenger scenes deferred**: generic scene used as fallback. Dedicated
+  angled scenes are a future phase task.
+- **showAnchorOverlay defaults to `true`** (from Phase 1.2): still on for calibration.
+
+### Manual Testing
+
+1. `npm run dev` — set placement to `center_front`, direction `incoming`
+   → Should see concrete ceiling tunnel, green "ENTRADA" sign, entry arrow
+2. Set direction to `away` → auto-remaps to `center_back`
+   → Should see warmer interior, red "SALIDA" sign, exit arrow, outdoor glow at horizon
+3. Set placement to `driver_front` or `passenger_front`
+   → Should see generic dark concrete scene (no architectural detail)
+4. Run a full animation cycle in both entry and exit scenes — gate, vehicle, POV fade
+5. Test all gate modes: `hidden`, `auto_open`, `wait_for_signal`
+
+### Known Limitations
+
+- `driver_front`, `passenger_front`, `driver_back`, `passenger_back` use the
+  generic scene — no angled-POV structure yet (dedicated scenes are a future phase).
+- Ceiling geometry assumes a straight overhead view; angled camera tilt would
+  require per-placement geometric offsets not yet implemented.
+
+### Next Steps
+
+- Phase 1.4: adjust `showAnchorOverlay` back to `false` after plate anchor calibration
+- Phase 1.4+: dedicated scenes for driver/passenger placements (angled camera POV)
+- Phase 1.4+: vehicle colour tinting (hue-rotate filter or per-colour asset variants)
+
+---
+
 ## Phase 0.9 — Gate Behavior & POV Motion Polish
 
 **Date:** 2026-07-05
