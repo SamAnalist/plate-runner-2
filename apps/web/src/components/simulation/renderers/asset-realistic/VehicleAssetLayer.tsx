@@ -185,14 +185,6 @@ export function VehicleAssetLayer({
 
   return (
     <g opacity={povOpacity}>
-      {/* Ground shadow — moves with the vehicle during POV entry/exit */}
-      <ellipse
-        cx={centerX}
-        cy={y + carH * 0.02 + povYOffset}
-        rx={carW * 0.46}
-        ry={carH * 0.09}
-        fill="rgba(0,0,0,0.55)"
-      />
 
       {/* Perspective transform group — depth scale only, no skewX.
           The viewing angle is already embedded in each asset image.

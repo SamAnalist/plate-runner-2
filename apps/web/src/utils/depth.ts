@@ -27,7 +27,7 @@ export const READING_T_AWAY     = GATE_T + 0.06;  // ≈ 0.58
 // within it. Kept here so both Vehicle.tsx and depth utilities stay in sync.
 export const CAR_LW = 100;           // car local width
 export const CAR_LH = 72;            // car local height
-export const CAR_ROAD_FRACTION = 0.62; // car width as fraction of road width
+export const CAR_ROAD_FRACTION = 0.88; // car width as fraction of road width
 
 // Plate rect within car local space
 export const CAR_PLATE_X = 29;

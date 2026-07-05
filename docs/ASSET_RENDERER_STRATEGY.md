@@ -1,8 +1,8 @@
 # Asset Renderer Strategy — Plate Runner
 
-**Phase:** 0.4 → 0.4c → 0.5 (real assets)
-**Date:** 2026-07-04
-**Status:** Architecture complete — 6 per-view raster slots, real photorealistic PNG assets installed (1536×1024), anchors pixel-calibrated
+**Phase:** 0.4 → 0.4c → 0.5 → 1.2 (camera-aware assets)
+**Date:** 2026-07-05
+**Status:** Architecture complete — 6 per-view raster slots, camera-aware LPR/ANPR PNG assets installed (1536×1024). Plate anchors reset to initial estimates for new camera geometry — PENDING VISUAL CALIBRATION.
 
 ---
 
@@ -31,7 +31,7 @@ The original renderers (`ClassicSvgRenderer`, `RealisticRenderer`, etc.) drew th
 
 ## 3. Asset Plan
 
-### Current State (Phase 0.5)
+### Current State (Phase 1.2)
 
 ```
 AssetViewKey = 'center_front' | 'driver_front' | 'passenger_front'
@@ -47,11 +47,11 @@ ASSET_REGISTRY = {
 }
 ```
 
-Real photorealistic 1536×1024 RGB PNG assets. `isPlaceholder` removed. Plate anchors pixel-calibrated against each image in Phase 0.5.
+Camera-aware LPR/ANPR PNG assets (1536×1024 RGB). Virtual camera at 2–3 m height, downward tilt, matching a real parking access/exit camera perspective. Each image contains a blank plate area for the DynamicPlateOverlay. Plate anchors in `plateAnchors.ts` are Phase 1.2 initial estimates — **PENDING VISUAL CALIBRATION** against the new images. See `docs/CAMERA_VIEW_SPEC.md` for calibration workflow.
 
-### Future State (PNG/WebP Assets)
+### Future State (PNG/WebP Asset Update)
 
-When a 3D-rendered or AI-generated vehicle asset is ready:
+When a new or updated vehicle asset is ready:
 
 ```ts
 ASSET_REGISTRY['front'] = {
@@ -129,10 +129,12 @@ Full breakdown: see [`docs/RENDERER_ARCHITECTURE.md`](./RENDERER_ARCHITECTURE.md
 
 When ordering or generating assets for Plate Runner vehicles:
 
-- **Resolution**: 400×288px minimum; 800×576px preferred for retina screens
-- **Background**: Transparent (alpha channel required)
-- **Lighting**: Soft diffuse from above-front; avoid hard shadows that fight the scene background
+- **Camera geometry**: Virtual camera at 2–3 m height, downward tilt of approximately 20–35° from horizontal, aimed at the plate zone as the vehicle stops at the gate
+- **Horizontal positions**: 6 variants — straight-on front, straight-on rear, driver-side front angle, passenger-side front angle, driver-side rear angle, passenger-side rear angle
+- **Resolution**: 1536×1024 px or higher (current pack is 1536×1024)
+- **Background**: Parking environment (lane markings, road surface) or transparent (alpha channel)
+- **Lighting**: Match elevated camera angle — avoid hard ground-shadow artifacts that would be inconsistent with a raised camera viewpoint
 - **Car model**: Generic sedan, no distinctive brand markings
-- **Plate area**: The real vehicle number plate must be either absent or covered by a neutral blank area — the overlay will handle the text
-- **Format**: WebP with alpha (`.webp`); PNG fallback for older browsers
-- **Delivery**: Drop into `apps/web/public/assets/vehicles/` and update `ASSET_REGISTRY`
+- **Plate area**: The real vehicle number plate must be absent or covered by a neutral blank area — the DynamicPlateOverlay handles all plate text rendering
+- **Format**: PNG (current) or WebP with alpha; update `ASSET_REGISTRY` `naturalW/naturalH` if dimensions change
+- **Delivery**: Drop into `apps/web/public/assets/vehicles/main-car/` and run the calibration workflow in `docs/CAMERA_VIEW_SPEC.md §7`

@@ -15,7 +15,9 @@ export default function App() {
   const [config, setConfig]           = useState<SimulationConfig>(DEFAULT_CONFIG);
   const [appMode, setAppMode]         = useState<AppMode>('normal');
   const [showDebug, setShowDebug]     = useState(false);
-  const [showAnchorOverlay, setShowAnchorOverlay]         = useState(false);
+  // Default ON for Phase 1.2 camera-aware asset calibration session.
+  // Set back to false once all plate anchors are visually verified.
+  const [showAnchorOverlay, setShowAnchorOverlay]         = useState(true);
   const [showMotionPathOverlay, setShowMotionPathOverlay] = useState(false);
 
   const simulation = useSimulation(config);

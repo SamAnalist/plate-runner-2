@@ -879,6 +879,74 @@ Enforce that `incoming` only uses front detector placements and `away` only uses
 
 ---
 
+## Phase 1.2 — Camera-Aware Vehicle Asset Integration
+
+**Date:** 2026-07-05
+
+### Goal
+
+Replace the Phase 0.5/0.6 studio-level vehicle PNG assets with a new camera-aware LPR/ANPR asset pack rendered from a virtual camera at 2–3 m height with a downward tilt, matching a real parking access/exit camera perspective. Reset plate anchors to initial estimates for the new geometry. Enable the anchor debug overlay by default so calibration can begin immediately.
+
+No new simulation features. No plate queue. No backend.
+
+### Implemented
+
+- `types.ts` — removed all "placeholder" references; updated file header and AssetViewKey JSDoc to describe camera-aware LPR/ANPR assets; updated `isPlaceholder` field JSDoc to mark it as deprecated/unused pending future cleanup; updated CalibrationNote in PlateAnchor to reference camera-aware images
+- `assetRegistry.tsx` — updated header comment to describe camera-aware LPR/ANPR images (2–3 m height, downward tilt); added note that plate anchors require visual calibration against the new images; removed "Plate blank" section about old studio assets (new images also contain a blank plate area)
+- `plateAnchors.ts` — completely rewritten with initial calibration estimates for camera-aware geometry; all six placements marked "INITIAL CALIBRATION — PENDING VISUAL VERIFICATION"; added calibration history (Phase 0.6 superseded), recalibration workflow, and readability rule
+- `App.tsx` — `showAnchorOverlay` default changed from `false` to `true` for the Phase 1.2 calibration session; added comment explaining the default and when to revert
+- `docs/CAMERA_VIEW_SPEC.md` — NEW: virtual camera description, per-view visual criteria, plate legibility requirements, anchor overlay usage guide, full step-by-step calibration workflow
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/types.ts` — removed placeholder references, updated JSDoc for camera-aware assets, deprecated `isPlaceholder`
+- `apps/web/src/components/simulation/renderers/asset-realistic/assetRegistry.tsx` — updated header for camera-aware asset pack
+- `apps/web/src/components/simulation/renderers/asset-realistic/plateAnchors.ts` — reset anchor values to Phase 1.2 initial estimates, updated calibration history and workflow
+- `apps/web/src/App.tsx` — `showAnchorOverlay` default set to `true`
+- `docs/CAMERA_VIEW_SPEC.md` — NEW
+- `docs/PROGRESS.md` — this entry
+- `docs/ASSET_RENDERER_STRATEGY.md` — updated to reflect camera-aware assets
+
+### Decisions
+
+- **Anchor values are initial estimates, not verified**: The Phase 0.6 anchor values were calibrated against ground-level studio renders and are geometrically wrong for the new camera-aware images (different foreshortening, different plate position in frame). Rather than carry forward incorrect values, all anchors are reset to reasonable initial estimates based on the expected camera-aware geometry. Visual verification using the anchor debug overlay is required before these values are used in production.
+- **`showAnchorOverlay` default-on for calibration session**: Enabling the overlay by default ensures anyone opening the app during Phase 1.2 immediately sees the calibration state. This is explicitly temporary — the comment in App.tsx directs the developer to revert it after verification.
+- **`isPlaceholder` field retained for backwards compatibility**: The field is not used in any ASSET_REGISTRY entries. Removing it from the type definition now could break any external code that references it. It is deprecated in JSDoc and will be removed in a future cleanup.
+- **No asset registry or motion path changes**: The ASSET_REGISTRY `src` paths and `naturalW/naturalH` values are already correct for the new assets. The `viewMotionPaths.ts` paths describe vehicle trajectory — they are asset-agnostic and were not changed.
+
+### Manual Testing
+
+1. `pnpm dev` in `apps/web`, open `http://localhost:5173`
+2. Confirm the anchor overlay is visible by default (green dashed rect on vehicle)
+3. Scroll to **Visual QA** in sidebar → click **Enter Visual QA Mode** — vehicle freezes at reading position
+4. Select each of the 6 detector placements in turn:
+   - Confirm a different camera-aware image is shown for each placement
+   - Confirm the green anchor rect is visible on each image
+5. For each placement, test plates `ABC123`, `ABCDEFGHIJ12`, `123456789012` — plate text should appear inside the anchor rect (exact alignment requires calibration)
+6. Toggle the anchor overlay OFF in the Visual QA section — confirm clean image
+7. Toggle anchor overlay back ON
+8. Test direction Incoming → Away for center_back, driver_back, passenger_back
+9. Enter **Camera Mode** — confirm anchor overlay is NOT visible (suppressed in camera mode)
+10. Press Esc to exit camera mode
+11. Run a full `auto_open` simulation: Start → car approaches → gate opens → car exits
+12. Run a `wait_for_signal` simulation: Start → car stops → press Send Open Signal → gate opens
+13. `pnpm -C apps/web exec tsc --noEmit` → no output (clean)
+
+### Known Limitations
+
+- **All 6 plate anchors are initial estimates.** They are NOT visually verified against the camera-aware images. The simulation will appear functional but plate overlay positions may not align with the plate blank areas in the new images. Visual calibration using the anchor debug overlay is required before relying on this for ANPR/LPR testing.
+- `showAnchorOverlay` is `true` by default — this is intentional for Phase 1.2 but must be reverted to `false` after calibration is complete.
+- `vehicleColor` config has no effect on the PNG assets — colour is baked into the image. Vehicle tinting is a future task.
+
+### Next Steps
+
+1. **Visual anchor calibration**: Open the app, use the anchor debug overlay, and adjust `xPct/yPct/wPct/hPct` in `plateAnchors.ts` for all 6 placements until the green rect covers the plate blank in each camera-aware image. Follow the workflow in `docs/CAMERA_VIEW_SPEC.md §7`.
+2. After calibration: set `showAnchorOverlay` back to `false` in `App.tsx`, commit updated anchor values.
+3. **Plate Queue**: local plate list playback
+4. **Vehicle colour tinting**: CSS `filter: hue-rotate()` on the car `<image>` element
+
+---
+
 ## Recommended Next Prompts
 
 ### Phase 0.3 — Plate List Playback

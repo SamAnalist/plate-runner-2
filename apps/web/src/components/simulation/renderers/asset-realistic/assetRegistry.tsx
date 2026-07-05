@@ -1,14 +1,16 @@
 /**
  * Asset registry — one raster entry per AssetViewKey (= per DetectorPlacement).
  *
- * CURRENT STATE: real photorealistic PNG assets installed.
- * All six views are 1536×1024 RGB images.
+ * CURRENT STATE: camera-aware LPR/ANPR PNG assets installed.
+ *   All six views are 1536×1024 RGB images rendered from a virtual camera at
+ *   2–3 m height with a downward tilt — matching a real parking access/exit
+ *   camera perspective. Each image contains a blank plate area for the
+ *   DynamicPlateOverlay to render live plate text on top of.
+ *
  * Files live at: public/assets/vehicles/main-car/{view}.png
  *
- * PLATE BLANK:
- *   Each asset image contains a blank grey plate area.
- *   The DynamicPlateOverlay renders live plate text on top of that blank.
- *   Plate blank positions are calibrated per-view in plateAnchors.ts.
+ * NOTE: Camera-aware asset pack installed. Plate anchors in plateAnchors.ts
+ *   require visual calibration against these new images.
  *
  * TO UPDATE AN ASSET:
  *   Replace the PNG file and update naturalW/naturalH if dimensions change.

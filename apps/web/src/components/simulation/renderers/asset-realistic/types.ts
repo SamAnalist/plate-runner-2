@@ -2,12 +2,14 @@
  * Types for the asset-based realistic renderer.
  *
  * ARCHITECTURE:
- *   Car body  — raster asset (PNG/WebP) per view. Placeholder SVG files are
- *               served from public/assets/vehicles/main-car/ while real
- *               photorealistic assets are being produced.
+ *   Car body  — camera-aware raster asset (PNG) per view. Images are rendered
+ *               from a virtual camera at 2–3 m height with a downward tilt,
+ *               matching a real parking access/exit camera perspective.
+ *               Six distinct LPR/ANPR-targeted images serve from
+ *               public/assets/vehicles/main-car/.
  *   Plate     — always a separate DynamicPlateOverlay (never baked into asset).
  *
- * AssetViewKey now mirrors DetectorPlacement exactly (6 distinct views).
+ * AssetViewKey mirrors DetectorPlacement exactly (6 distinct views).
  * Each view has its own asset file and its own PlateAnchor.
  */
 import type React from 'react';
@@ -17,14 +19,14 @@ import type { VehicleColor } from '@plate-runner/shared';
 
 /**
  * One view key per detector placement.
- * Each key maps to a distinct car image file AND a distinct plate anchor.
+ * Each key maps to a distinct camera-aware LPR/ANPR asset file AND a distinct plate anchor.
  *
- * center_front / center_back : straight-on front / rear view
- * driver_front / driver_back : 3/4 angle from driver's side (front or rear)
- * passenger_front / passenger_back : 3/4 angle from passenger's side
+ * center_front / center_back   : straight-on front / rear, camera elevated (2–3 m, downward tilt)
+ * driver_front / driver_back   : angled from driver's side (front or rear), camera elevated
+ * passenger_front / passenger_back : angled from passenger's side, camera elevated
  *
- * NOTE: the current ASSET_REGISTRY entries are PLACEHOLDERS.
- * Replace each src with a real photorealistic PNG/WebP when available.
+ * All six images are real camera-aware PNG assets (1536×1024 px).
+ * Plate anchors in plateAnchors.ts must be calibrated against these images.
  */
 export type AssetViewKey =
   | 'center_front'
@@ -49,9 +51,11 @@ export type AssetViewKey =
  * skewYDeg   — SVG skewY. Usually 0; reserved for steep camera angles.
  * side       — which face of the vehicle carries this plate.
  *
- * CALIBRATION NOTE: skewXDeg values are conservative estimates matching the
- * placeholder SVG geometry. When real photorealistic assets are installed,
- * re-calibrate each anchor's skew against the actual image perspective.
+ * CALIBRATION NOTE: skewXDeg values must be calibrated against the camera-aware
+ * LPR/ANPR asset images (2–3 m height, downward tilt). Previous values were derived
+ * from ground-level studio renders and are no longer valid. Use the anchor debug
+ * overlay (Visual QA → Anchor bounds: ON) to re-verify each anchor against the
+ * new camera-aware images before committing updated values.
  */
 export interface PlateAnchor {
   /** Plate left edge as fraction of car width  (0–1) */
@@ -73,7 +77,7 @@ export interface PlateAnchor {
 }
 
 // ─── Car palette ──────────────────────────────────────────────────────────────
-// Retained for SVG fallback / placeholder tinting.
+// Retained for SVG fallback / legacy svg-prototype tinting.
 // Raster asset renderers do NOT use the palette — colour is baked into the image.
 
 export interface CarPalette {
@@ -98,9 +102,8 @@ export const CAR_PALETTES: Record<VehicleColor, CarPalette> = {
 /**
  * Raster asset entry — the current production target.
  *
- * src        — path served from /public (e.g. /assets/vehicles/main-car/center-front.png)
+ * src        — path served from /public (e.g. /assets/vehicles/main-car/center_front.png)
  * naturalW/H — original image pixel dimensions; used for aspect-ratio verification.
- * isPlaceholder — REMOVE this field when a real photorealistic asset is installed.
  *
  * svg-prototype — LEGACY fallback used during Phase 0.4 development only.
  *                 The ASSET_REGISTRY no longer uses svg-prototype entries.
@@ -112,7 +115,11 @@ export type AssetEntry =
       src: string;
       naturalW: number;
       naturalH: number;
-      /** Present on placeholder files. Delete once a real photorealistic PNG/WebP is installed. */
+      /**
+       * @deprecated Unused. Camera-aware LPR/ANPR assets are installed and real.
+       * This field is retained only for backwards compatibility and will be removed
+       * in a future cleanup pass.
+       */
       isPlaceholder?: true;
     }
   | {
