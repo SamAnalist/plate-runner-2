@@ -4,6 +4,161 @@ Format follows `CLAUDE.md § Progress Documentation Format`.
 
 ---
 
+## Phase 0.9 — Gate Behavior & POV Motion Polish
+
+**Date:** 2026-07-05
+
+### Goal
+
+1. Remove Camera Focus Zone from the UI entirely.
+2. Fix vehicle POV entry/exit timing to feel more natural (longer spawn and exit zones).
+3. Redesign gate behavior: auto_open now correctly stops the vehicle; new `gateInitialState` field; proper phase model with stop → wait → open → resume timing.
+4. Redesign gate arm visual: white body with red diagonal stripes (parking barrier style).
+5. Add prominent "Send Open Signal" button for `wait_for_signal` mode.
+6. Update simulation phase model with explicit phases for each gate state.
+7. Document gate behavior comprehensively.
+
+No plate queue. No backend. No scheduler. No asset changes.
+
+### Implemented
+
+**Part 1 — Camera Focus Zone removed from UI:**
+- `ControlPanel.tsx`: removed `focusZone`/`onFocusZoneChange` props and entire Camera Focus Zone section
+- `SimulationScene.tsx`: removed `FocusZoneOverlay` rendering and `focusZone` prop
+- `App.tsx`: removed `focusZone` state, `DEFAULT_FOCUS_ZONE` import, readability badge from header
+- `DebugOverlay.tsx`: removed focus zone rows; shows gate config (gateInitialState, stopMs, delayMs) instead
+- `FocusZoneOverlay.tsx`, `FocusZoneControls.tsx`: retained as legacy files (unused)
+- `FocusZoneConfig` type and `DEFAULT_FOCUS_ZONE` retained in shared package for future API/test use
+
+**Part 2 — POV timing improved:**
+- `viewMotionPaths.ts`: `POV_SPAWN_T` 0.07 → 0.14 (longer horizon entry), `POV_EXIT_T` 0.90 → 0.82 (longer off-screen exit)
+
+**Part 3 — Gate state model redesigned:**
+- `packages/shared/src/types/simulation.ts`: added `GateInitialState = 'open' | 'closed'`, added `gateInitialState`, `stopBeforeOpenMs`, `delayAfterOpenMs` to `SimulationConfig`
+- `useSimulation.ts`: complete rewrite with new phase model: `idle | running | stopped_at_gate | waiting_for_signal | gate_opening | done`. `setTimeout` refs handle stop timer and post-gate delay. `openGate()` now dual-purpose: triggers gate-open + resume sequence when `waiting_for_signal`.
+
+**Part 4 — Gate arm visual:**
+- `AssetRealisticRenderer.tsx`: arm body white (`#f0f0f0`), stripes red (`#cc2222`); LED indicator softened (opacity reduced, halo radius increased to reduce bleed)
+- `Gate.tsx` (classic/realistic renderers): same white/red arm colors
+
+**Part 5 — UI controls:**
+- `ControlPanel.tsx`: new `GateSection` component with visibility/behavior toggle, initial state toggle, timing sliders for `stopBeforeOpenMs`/`delayAfterOpenMs`; prominent "Send Open Signal" button visible only during `waiting_for_signal`; descriptive hint text per scenario
+
+**Part 6 — Simulation phase overlays:**
+- `SimulationScene.tsx`: new overlays for `stopped_at_gate` (orange), `gate_opening` (cyan), in addition to existing `waiting_for_signal` (yellow) and `done` (green)
+
+**Part 7 — Documentation:**
+- `docs/GATE_BEHAVIOR.md` — NEW: full gate scenario guide, state machine, visual spec, test procedure, API readiness
+- `docs/PROGRESS.md` — this entry
+
+### Files Changed
+
+- `packages/shared/src/types/simulation.ts` — `GateInitialState` type, new config fields
+- `apps/web/src/hooks/useSimulation.ts` — new phase model, gate timer logic
+- `apps/web/src/components/simulation/renderers/asset-realistic/viewMotionPaths.ts` — POV_SPAWN_T, POV_EXIT_T
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — white/red arm, soft LED
+- `apps/web/src/components/simulation/Gate.tsx` — white/red arm
+- `apps/web/src/components/simulation/renderers/GateCameraRenderer.tsx` — phase check updated
+- `apps/web/src/components/simulation/SimulationScene.tsx` — removed focus zone, new phase overlays
+- `apps/web/src/components/simulation/DebugOverlay.tsx` — removed focus zone, added gate config fields
+- `apps/web/src/components/controls/ControlPanel.tsx` — removed focus zone, new gate section
+- `apps/web/src/App.tsx` — removed focus zone state and props
+- `docs/GATE_BEHAVIOR.md` — NEW
+- `docs/PROGRESS.md` — this entry
+
+### Decisions
+
+- **`GateMode` unchanged**: kept `'auto_open' | 'wait_for_signal' | 'hidden'` with the `hidden` value. Added `gateInitialState` as a separate orthogonal field. Avoids breaking existing renderer checks (`if gateMode === 'hidden'`).
+- **`stopBeforeOpenMs` as explicit timer**: uses `setTimeout`, not animation frames. This gives reliable timing independent of animation speed.
+- **Gate open duration fixed at 850ms**: Framer Motion gate animation runs at 850ms. The `delayAfterOpenMs` applies *after* the arm animation. The total stop-to-resume time is `stopBeforeOpenMs + 850 + delayAfterOpenMs`.
+- **`openGate()` dual purpose**: when called during `waiting_for_signal`, it triggers the full resume sequence. Otherwise it's a simple visual toggle (override).
+- **Focus zone kept as legacy**: `FocusZoneConfig`, `FocusZoneOverlay`, `FocusZoneControls`, `getPlateReadability` retained for future automated testing and API calibration. Not rendered in the UI.
+
+### Manual Testing
+
+1. `pnpm dev` → select **Asset Realistic**
+2. **Scenario: Hidden** → Gate: Hidden → Start → car passes, no arm
+3. **Scenario: Open** → Gate: Auto Open, Initial: Open → Start → arm raised from start, car passes
+4. **Scenario: Auto Open** → Gate: Auto Open, Initial: Closed, Stop: 2000ms → Start → car stops, waits 2s, arm rises, car exits
+5. **Scenario: Wait Signal** → Gate: Wait Signal, Initial: Closed → Start → car stops, "Send Open Signal" button appears → press it → arm rises, car exits
+6. Test all 6 detector placements
+7. Test **Away** direction for each scenario
+8. Verify arm is **white with red stripes** (not yellow/black)
+9. Camera Mode: "Send Open Signal" button still works; no debug overlays
+
+### Known Limitations
+
+- Gate arm animation duration (850ms) is not configurable from the UI. It's hardcoded in Framer Motion transition.
+- `away` direction with `wait_for_signal` stops at `READING_T_AWAY = 0.58`; the signal button must be pressed to continue.
+- `getPlateReadability` remains in `depth.ts` but is no longer called from the UI.
+
+### Next Steps
+
+- **Vehicle colour tinting**: `filter: hue-rotate()` or CSS filter on the car `<image>` element
+- **Plate Queue**: local plate list playback
+- **API gate signal**: POST endpoint → `openGate()` via WebSocket
+
+---
+
+## Phase 0.8 — POV Entry/Exit Improvement
+
+**Date:** 2026-07-05
+
+### Goal
+
+Make the vehicle appear from outside the camera's field of view (not materialise mid-scene) and disappear naturally off-screen (not vanish abruptly). For `incoming`: car slides in from above the horizon with a fade-in. For `away`: car enters from below the scene and exits at the horizon. No plate queue, no backend, no scheduler.
+
+### Implemented
+
+- `useSimulation.ts` — `startT('incoming')` changed 0.04 → 0.0; `startT('away')` changed 0.96 → 1.0; away done condition updated 0.04 → 0.02
+- `viewMotionPaths.ts` — `POV_SPAWN_T = 0.07`, `POV_EXIT_T = 0.90` constants exported; `getPovOpacity(t)` (fade in/out at horizon and near edge); `getPovYOffset(t, depthY, carH)` (slide car in from above horizon / off bottom of scene); debug SAMPLE_T and LABEL_AT updated to include SPAWN and EXIT key points
+- `VehicleAssetLayer.tsx` — imports `getPovOpacity`, `getPovYOffset`; wraps vehicle and shadow in `<g opacity={povOpacity}>`; applies `povYOffset` to `carY` and shadow `cy`
+- `AssetRealisticRenderer.tsx` — `MotionPathDebugOverlay.dotColor` handles 'SPAWN' label (yellow #ffff44)
+
+### Files Changed
+
+- `apps/web/src/hooks/useSimulation.ts` — POV start positions, away done condition
+- `apps/web/src/components/simulation/renderers/asset-realistic/viewMotionPaths.ts` — POV constants and functions, debug data
+- `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` — apply opacity + Y offset
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — SPAWN dot color
+- `docs/MOTION_PATHS.md` — Phase 0.8 POV section
+- `docs/VISUAL_QA.md` — Phase 0.8 QA table
+- `docs/SIMULATION_SPEC.md` — POV entry/exit behaviour added to §5
+- `docs/PROGRESS.md` — this entry
+
+### Decisions
+
+- **Y offset drives physical exit, opacity drives horizon dissolve**: The yOffset pushes the car off the bottom of the scene so it exits because it drove away, not because of a fade. The opacity handles the horizon entry/exit (far field dissolve) where a physical slide would look incorrect (car is too small at VP_Y).
+- **Direction-agnostic functions**: `getPovOpacity` and `getPovYOffset` are direction-agnostic. For `away` (t: 1→0): the exit zone (t>0.90) becomes the spawn-from-near-edge effect; the entry zone (t<0.07) becomes the horizon-exit fade. No separate code paths needed.
+- **startT = 0.0 / 1.0, not 0.04 / 0.96**: Allows the full fade-in animation to play from the very start. At t=0 opacity=0 and yOffset=-VP_Y so the car is invisible and above the horizon — logically equivalent to "not on screen yet".
+- **Away done at t ≤ 0.02**: By t=0.02 opacity ≈ 0.29 and the car is tiny/barely visible at the vanishing point. Stopping at 0.02 rather than 0.0 avoids a division-by-zero edge case and feels natural.
+
+### Manual Testing
+
+1. `pnpm dev` → `localhost:5173`
+2. Select **Asset Realistic** style, **incoming** direction, any placement → press **Start**
+   - Watch: car is invisible before entering, fades in from above the horizon, drives to gate, then slides off the bottom of the scene with a fade
+3. Switch to **away** direction → press **Start**
+   - Car enters from below (bottom of scene), drives to gate, fades into the horizon distance
+4. Test all 6 placements — entry/exit should look consistent
+5. Test `wait_for_signal`: car stops at reading position, stays fully visible (opacity=1, offset=0 in mid-range)
+6. Visual QA → ◈ Motion path ON → confirm SPAWN (yellow) and EXIT (white) key points visible on path
+7. Camera Mode → entry/exit animation still plays; no overlays visible
+8. Auto-open gate mode → car exits past gate and off the bottom of the scene
+
+### Known Limitations
+
+- The `away` direction entry from the near-edge bottom will be less dramatic at low speed values because the initial off-screen position (yOffset at t=1.0) may be large but the fade is fast.
+- `getPlateReadability` badge (GOOD/PARTIAL/POOR) still uses centred X for 3/4 views — unchanged from Phase 0.7; not regressed.
+
+### Next Steps
+
+- **Vehicle colour tinting**: CSS `filter: hue-rotate()` on the car `<image>` element
+- **Plate Queue**: local plate list playback
+- **Readability fix**: update `getPlateReadability` to use view-aware X for the asset-realistic renderer
+
+---
+
 ## Phase 0.7 — View-Aware Motion Paths
 
 **Date:** 2026-07-05

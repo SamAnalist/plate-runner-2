@@ -259,3 +259,48 @@ No gate regressions in Phase 0.6.
 1. Vehicle colour tinting implementation (vehicleColor does not affect PNG assets)
 2. ANPR camera readability test with real external camera hardware
 3. Optional: re-evaluate readability scores once colour tinting is live
+
+---
+
+## Phase 0.8 — POV Entry/Exit QA
+
+**Date:** 2026-07-05
+
+### How to Test
+
+1. `pnpm dev` → select **Asset Realistic**, **incoming**, any placement
+2. Press **Start** — observe full POV entry/exit cycle:
+   - Vehicle invisible at start (opacity = 0, above horizon)
+   - Fades in and slides down from horizon (t = 0 → 0.07)
+   - Drives normally through scene (t = 0.07 → 0.90)
+   - Slides off bottom of scene with fade (t = 0.90 → 0.98)
+   - Simulation ends — no abrupt disappearance
+3. Switch to **away** direction → repeat:
+   - Vehicle enters from below (slides up into frame from bottom)
+   - Exits at horizon with fade
+4. Enable ◈ Motion path overlay — confirm SPAWN (yellow) and EXIT (white) key points on path
+5. `wait_for_signal`: car stops at reading position (mid-range, opacity = 1, no offset) — still fully readable
+6. Camera Mode: animation plays cleanly, no overlays
+
+### Per-Criterion Sign-off
+
+| Criterion | Status | Notes |
+|---|---|---|
+| Incoming: car enters from off-screen | **PENDING VISUAL** | Should fade/slide from above horizon |
+| Incoming: car exits off bottom of scene | **PENDING VISUAL** | Should slide down and fade out |
+| Away: car enters from bottom of scene | **PENDING VISUAL** | Mirror of incoming exit |
+| Away: car exits at horizon | **PENDING VISUAL** | Should fade into distance |
+| wait_for_signal: plate readable at stop point | **PENDING VISUAL** | No opacity or offset in mid-range |
+| Motion path SPAWN/EXIT key points visible | **PENDING VISUAL** | Yellow SPAWN, white EXIT in overlay |
+| Camera Mode: no overlay artifacts | **PENDING VISUAL** | POV effect still plays, no debug labels |
+| All 6 placements consistent | **PENDING VISUAL** | Entry/exit should look same across placements |
+
+### POV Constants (Phase 0.8)
+
+| Constant | Value | Effect |
+|---|---|---|
+| `POV_SPAWN_T` | 0.07 | Car fully visible from this t onward |
+| `POV_EXIT_T`  | 0.90 | Car begins leaving scene at this t |
+| `startT('incoming')` | 0.0 | Simulation opens before car is on screen |
+| `startT('away')` | 1.0 | Simulation opens below the scene |
+| Away done condition | t ≤ 0.02 | Ends when car is ~29% opacity at horizon |

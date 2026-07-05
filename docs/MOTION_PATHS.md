@@ -179,7 +179,66 @@ Shows the yellow dashed trajectory curve with key points:
 
 | File | Purpose |
 |------|---------|
-| `apps/web/src/components/simulation/renderers/asset-realistic/viewMotionPaths.ts` | Path registry, `getViewAwareX()`, debug data |
-| `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` | Uses `getViewAwareX` instead of `getVehicleX` |
+| `apps/web/src/components/simulation/renderers/asset-realistic/viewMotionPaths.ts` | Path registry, `getViewAwareX()`, POV functions, debug data |
+| `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` | Uses `getViewAwareX`, `getPovOpacity`, `getPovYOffset` |
 | `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` | `MotionPathDebugOverlay` component |
+| `apps/web/src/hooks/useSimulation.ts` | `startT` values updated for POV |
 | `apps/web/src/utils/depth.ts` | Unchanged — `getVehicleX` still used by all other renderers |
+
+---
+
+## 12. Phase 0.8 — POV Entry/Exit Improvement
+
+**Date:** 2026-07-05
+
+### Problem
+
+Before Phase 0.8, the simulation started the vehicle already visible at t=0.04 (near the vanishing point) and ended it abruptly at t=0.98 (car still fully on screen). This broke the illusion that the vehicle was driving through a real camera's field of view.
+
+### Solution
+
+Two functions in `viewMotionPaths.ts` control POV behaviour:
+
+#### `getPovOpacity(t)`
+
+```
+t ∈ [0, POV_SPAWN_T]   →  linear 0 → 1  (fade in from horizon)
+t ∈ [POV_SPAWN_T, POV_EXIT_T]  →  1.0  (fully visible)
+t ∈ [POV_EXIT_T, 1.0]  →  linear 1 → 0  (fade out as car exits frame)
+```
+
+#### `getPovYOffset(t, depthY, carH)`
+
+```
+t < POV_SPAWN_T:
+  progress = t / POV_SPAWN_T
+  yOffset  = lerp(-(depthY + 1), 0, progress)
+  → car slides from just above the horizon down to its normal position
+
+t > POV_EXIT_T:
+  progress = (t − POV_EXIT_T) / (1 − POV_EXIT_T)
+  yOffset  = lerp(0, SCENE_H + 10 − (depthY − carH), progress)
+  → car slides off the bottom of the scene until fully off-screen
+
+otherwise: 0
+```
+
+### Key Constants
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `POV_SPAWN_T` | 0.07 | Vehicle fully visible from this depth onward |
+| `POV_EXIT_T`  | 0.90 | Vehicle begins leaving scene at this depth |
+| `startT('incoming')` | 0.0 | Simulation starts before vehicle is on screen |
+| `startT('away')` | 1.0 | Simulation starts below the visible frame |
+| away done condition | t ≤ 0.02 | Stops after opacity ≈ 0 at horizon |
+
+### Direction Handling
+
+Both functions are direction-agnostic. For `away` (t: 1 → 0):
+- The exit zone (t > 0.90) fires at the start of the run: car enters from below the scene.
+- The spawn zone (t < 0.07) fires at the end: car dissolves into the horizon distance.
+
+### Debug Overlay Changes
+
+The `MotionPathDebugOverlay` SAMPLE_T now includes t=0.00 (FAR), t=0.07 (SPAWN, yellow dot), t=0.90 (EXIT, white dot). SPAWN and EXIT key points are labelled and distinctly coloured so the POV transition zones are immediately visible in Visual QA.

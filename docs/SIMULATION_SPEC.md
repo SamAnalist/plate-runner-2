@@ -97,6 +97,39 @@ Local coordinate space: 100 × 72
 | `center_*`    | 0                 | 0   |
 | `passenger_*` | −10% of roadWidth | −3° |
 
+### POV Entry/Exit (Phase 0.8 — asset-realistic renderer)
+
+The asset-realistic renderer wraps the vehicle in a POV visibility model so it enters and exits the camera frame naturally, without abrupt appearance or disappearance.
+
+#### t-range
+
+```
+startT(incoming) = 0.0   (simulation begins before car is on screen)
+startT(away)     = 1.0   (simulation begins with car below visible frame)
+done (incoming)  = t ≥ 0.98
+done (away)      = t ≤ 0.02
+```
+
+#### Opacity
+
+```
+t < 0.07:   opacity = t / 0.07        (0 → 1, fade in at horizon)
+0.07–0.90:  opacity = 1.0             (fully visible)
+t > 0.90:   opacity = (1 − t) / 0.10 (1 → 0, fade out at near edge)
+```
+
+#### Y offset (slide in/out of frame)
+
+```
+t < 0.07:   yOffset = lerp(−(depthY + 1), 0, t / 0.07)
+               → car slides down from above the horizon into position
+t > 0.90:   yOffset = lerp(0, SCENE_H + 10 − (depthY − carH), (t − 0.90) / 0.10)
+               → car slides off the bottom of the scene
+otherwise:  yOffset = 0
+```
+
+For `away` direction (t: 1→0) these zones are traversed in reverse order — the exit-zone fires on entry (car comes from below) and the spawn-zone fires on exit (car dissolves at horizon).
+
 ---
 
 ## 6. License Plate
