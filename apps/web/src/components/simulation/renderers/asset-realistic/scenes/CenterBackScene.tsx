@@ -205,30 +205,6 @@ export function CenterBackScene() {
         strokeWidth={0.9}
       />
 
-      {/* ── Exit signage panel "SALIDA" ───────────────────────────────────────── */}
-      {/* Amber/red exit sign mounted on ceiling */}
-      <rect x={VP_X - 64} y={50} width={128} height={26}
-            fill="#5c2018" rx={3} />
-      <rect x={VP_X - 64} y={50} width={128} height={26}
-            fill="none" stroke="#8c3024" strokeWidth={0.9} rx={3} />
-      {/* Up-triangle indicator above/inside sign */}
-      <polygon
-        points={`${VP_X - 7},76 ${VP_X + 7},76 ${VP_X},84`}
-        fill="#8c3024" opacity={0.65}
-      />
-      <text
-        x={VP_X} y={66}
-        fill="#f8c8b0"
-        fontSize={11}
-        fontFamily='"JetBrains Mono","Courier New",monospace'
-        fontWeight="700"
-        letterSpacing={2.5}
-        textAnchor="middle"
-        dominantBaseline="middle"
-      >
-        SALIDA
-      </text>
-
       {/* ── Ceiling ambient wash (warm parking interior light) ────────────────── */}
       <ellipse cx={VP_X} cy={12} rx={200} ry={50} fill="#d0b888" opacity={0.020} />
 

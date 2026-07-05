@@ -67,63 +67,54 @@ import {
 export const POV_SPAWN_T = 0.14;
 
 /**
- * t-value at which the vehicle begins to leave the scene.
- * Between POV_EXIT_T and t=0.98 the car slides off the bottom of the scene
- * and fades out — the vehicle naturally exits the camera's frame.
- *
- * Phase 0.9: decreased from 0.90 → 0.82 for a longer, more gradual exit.
+ * t-value at which the vehicle begins to physically exit the scene.
+ * From POV_EXIT_T to t=1.0 the car slides off the bottom of the frame.
+ * Adjust to control when the slide-out starts.
  */
-export const POV_EXIT_T = 0.82;
+export const POV_EXIT_T = 0.75;
 
 /**
- * Vehicle opacity during POV entry and exit.
- *
- *   t < POV_SPAWN_T  →  0 … 1  (fade in from horizon)
- *   POV_SPAWN_T … POV_EXIT_T  →  1.0  (fully visible)
- *   t > POV_EXIT_T   →  1 … 0  (fade out as car exits frame)
- *
- * Direction-agnostic: for `away` (t: 1→0) the fade-in at t≈1 becomes the
- * "entry from the near end" and the fade-out at t≈0 becomes the horizon exit.
+ * t-value (away direction) below which the car is fully visible on entry.
+ * From t=1.0 down to POV_ENTRY_T_AWAY the car slides UP into the scene from
+ * below the bottom edge — mirroring the incoming exit slide.
  */
-export function getPovOpacity(t: number): number {
-  if (t < POV_SPAWN_T) return t / POV_SPAWN_T;
-  if (t > POV_EXIT_T)  return (1 - t) / (1 - POV_EXIT_T);
+export const POV_ENTRY_T_AWAY = 0.85;
+
+/**
+ * Opacity is always 1 — no fade on entry or exit.
+ * The car appears at the horizon naturally (tiny) and exits physically.
+ */
+export function getPovOpacity(_t: number): number {
   return 1;
 }
 
 /**
- * Additional Y offset (scene pixels) to slide the vehicle into / out of frame.
- * Apply to carY (the top-left Y of the car bounding box) and to the shadow cy.
+ * Additional Y offset (scene pixels) to physically slide the car in/out of
+ * the bottom edge of the scene.
  *
- *  Entry (t < POV_SPAWN_T):
- *    Starts with the car just above the scene horizon (y ≈ 0).
- *    Slides into its normal depth position by t = POV_SPAWN_T.
+ * Incoming exit (t > POV_EXIT_T):
+ *   Slides the car DOWN until its top edge clears SCENE_H (fully off-screen).
  *
- *  Exit (t > POV_EXIT_T):
- *    Slides the car downward until its top edge is at SCENE_H + 10 (fully
- *    off the bottom of the scene) by t = 1.0.
+ * Away entry (t > POV_ENTRY_T_AWAY):
+ *   Car starts off-screen below and slides UP into view as t decreases.
+ *   At t=1.0 the car is fully below the frame; at POV_ENTRY_T_AWAY it is
+ *   at its natural depth position with zero offset.
  *
- *  Mid range: 0 — car is fully in frame, no offset applied.
- *
- * @param t        current vehicleT (0–1)
- * @param depthY   bottom-of-car y from getDepthValues(t)
- * @param carH     car height in scene pixels at current depth
+ * @param direction  'incoming' | 'away' — from config.direction
  */
 export function getPovYOffset(
   t: number,
   depthY: number,
   carH: number,
+  direction: 'incoming' | 'away',
 ): number {
-  if (t < POV_SPAWN_T) {
-    // Slide down from just above the horizon to normal position.
-    // At t=0: offset = -(depthY + 1), placing carY just above y=0.
-    const progress = t / POV_SPAWN_T;
-    return lerp(-(depthY + 1), 0, progress);
+  if (direction === 'incoming' && t > POV_EXIT_T) {
+    const progress = Math.min((t - POV_EXIT_T) / (1 - POV_EXIT_T), 1);
+    return lerp(0, SCENE_H + 10 - (depthY - carH), progress);
   }
-  if (t > POV_EXIT_T) {
-    // Slide off the bottom of the scene.
-    // At t=1: offset pushes carY to SCENE_H+10 (fully off-screen).
-    const progress = (t - POV_EXIT_T) / (1 - POV_EXIT_T);
+  if (direction === 'away' && t > POV_ENTRY_T_AWAY) {
+    // progress: 0 when fully on-screen (POV_ENTRY_T_AWAY), 1 when fully off-screen (t=1.0)
+    const progress = Math.min((t - POV_ENTRY_T_AWAY) / (1 - POV_ENTRY_T_AWAY), 1);
     return lerp(0, SCENE_H + 10 - (depthY - carH), progress);
   }
   return 0;

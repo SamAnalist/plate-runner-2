@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type {
   SimulationConfig,
+  SpeedPhases,
   Direction,
   DetectorPlacement,
   GateMode,
@@ -113,20 +114,62 @@ const COLOR_MAP: Record<VehicleColor, string> = {
   green:  '#16a34a',
 };
 
-// ─── Speed slider ──────────────────────────────────────────────────────────
+// ─── Phase speed controls ─────────────────────────────────────────────────
 
-function SpeedSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+interface PhaseSliderProps {
+  label: string;
+  hint: string;
+  value: number;
+  onChange: (v: number) => void;
+}
+
+function PhaseSlider({ label, hint, value, onChange }: PhaseSliderProps) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <div className="flex justify-between items-center">
-        <SectionLabel>Speed</SectionLabel>
-        <span className="text-xs font-mono text-blue-400 font-bold">{value}/10</span>
+        <span className="text-[10px] font-mono text-white/50">{label}</span>
+        <span className="text-[10px] font-mono text-blue-400 font-bold">{value}/10</span>
       </div>
       <input
         type="range" min={1} max={10} step={1} value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-full accent-blue-500 h-1.5 rounded cursor-pointer"
+        className="w-full accent-blue-500 h-1 rounded cursor-pointer"
       />
+      <p className="text-[9px] text-white/22 font-mono leading-snug">{hint}</p>
+    </div>
+  );
+}
+
+function SpeedPhasesSection({
+  config,
+  set,
+}: {
+  config: SimulationConfig;
+  set: <K extends keyof SimulationConfig>(key: K, val: SimulationConfig[K]) => void;
+}) {
+  const isIncoming = config.direction === 'incoming';
+  const key  = isIncoming ? 'speedIncoming' : 'speedAway';
+  const sp   = isIncoming ? config.speedIncoming : config.speedAway;
+  const hint = isIncoming
+    ? ['Entry → approaching gate', 'Decel zone before gate', 'Resuming after gate opens', 'POV slide-out off bottom']
+    : ['Entry from bottom → gate',  'Decel zone before gate', 'Resuming after gate opens', 'Recede toward horizon'];
+
+  function setPhase(field: keyof SpeedPhases, v: number) {
+    set(key, { ...sp, [field]: v });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <SectionLabel>Speed</SectionLabel>
+        <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
+          {isIncoming ? 'Incoming' : 'Away'}
+        </span>
+      </div>
+      <PhaseSlider label="Initial"     hint={hint[0]} value={sp.initial}   onChange={v => setPhase('initial',   v)} />
+      <PhaseSlider label="Stopping"    hint={hint[1]} value={sp.stopping}  onChange={v => setPhase('stopping',  v)} />
+      <PhaseSlider label="After Stop"  hint={hint[2]} value={sp.afterStop} onChange={v => setPhase('afterStop', v)} />
+      <PhaseSlider label="Final / Exit" hint={hint[3]} value={sp.final}    onChange={v => setPhase('final',     v)} />
     </div>
   );
 }
@@ -441,7 +484,7 @@ export function ControlPanel({
         <Divider />
 
         {/* ── Speed ──────────────────────────────────────────────────────── */}
-        <SpeedSlider value={config.speed} onChange={v => set('speed', v)} />
+        <SpeedPhasesSection config={config} set={set} />
 
         <Divider />
 

@@ -31,12 +31,27 @@ import {
   CAR_LW,
   CAR_LH,
   CAR_ROAD_FRACTION,
+  getDepthValues,
+  lerp,
 } from '../../../../utils/depth';
-import { getViewAwareX, getPovOpacity, getPovYOffset } from './viewMotionPaths';
+import { getViewAwareX, getPovYOffset, POV_EXIT_T } from './viewMotionPaths';
 import { ASSET_REGISTRY } from './assetRegistry';
 import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
 import type { AssetViewKey } from './types';
+
+/**
+ * Car width (scene px) at the POV exit point — where the Y slide-out begins.
+ * Used as the anchor for the post-exit shrink so the car narrows as it slides.
+ */
+const EXIT_CAR_W = getDepthValues(POV_EXIT_T).roadWidth * CAR_ROAD_FRACTION;
+
+/**
+ * How much the car shrinks (relative to EXIT_CAR_W) by t=1.0 in incoming mode.
+ * 0.5 = shrinks to 50 % of the exit-point width.
+ * Increase toward 1.0 to reduce the effect; decrease toward 0 for more.
+ */
+const POST_EXIT_SHRINK = 3.5;
 
 interface VehicleAssetLayerProps {
   config: SimulationConfig;
@@ -167,16 +182,19 @@ export function VehicleAssetLayer({
   // Y and scale still come from vehicleDepth (standard depth model).
   const centerX = getViewAwareX(vehicleT, safePlacement);
 
-  const carW  = roadWidth * CAR_ROAD_FRACTION;
+  // Once the Y slide-out begins (POV_EXIT_T) shrink the car as it exits,
+  // so it narrows in sync with the downward slide instead of staying large.
+  const carW = config.direction === 'incoming' && vehicleT > POV_EXIT_T
+    ? lerp(EXIT_CAR_W, EXIT_CAR_W * POST_EXIT_SHRINK, Math.min((vehicleT - POV_EXIT_T) / (1 - POV_EXIT_T), 1))
+    : roadWidth * CAR_ROAD_FRACTION;
   const carH  = carW * (CAR_LH / CAR_LW);
   const carX  = centerX - carW / 2;
   const carY  = y - carH;
   const scaleX = carW / CAR_LW;
   const scaleY = carH / CAR_LH;
 
-  // ── Phase 0.8: POV entry / exit ─────────────────────────────────────────
-  const povOpacity = getPovOpacity(vehicleT);
-  const povYOffset = getPovYOffset(vehicleT, y, carH);
+  // ── Phase 0.8: POV exit — slide off bottom (no opacity change) ──────────
+  const povYOffset = getPovYOffset(vehicleT, y, carH, config.direction);
 
   // ── Asset & plate anchor lookup ─────────────────────────────────────────
   const viewKey = safePlacement as AssetViewKey;
@@ -184,7 +202,7 @@ export function VehicleAssetLayer({
   const anchor  = PLATE_ANCHORS[safePlacement];
 
   return (
-    <g opacity={povOpacity}>
+    <g>
 
       {/* Perspective transform group — depth scale only, no skewX.
           The viewing angle is already embedded in each asset image.

@@ -223,30 +223,6 @@ export function CenterFrontScene() {
         strokeWidth={0.8}
       />
 
-      {/* ── Entry signage panel ───────────────────────────────────────────────── */}
-      {/* Green "ENTRADA" sign, mounted on ceiling at mid-depth */}
-      <rect x={VP_X - 64} y={50} width={128} height={26}
-            fill="#1a5a28" rx={3} />
-      <rect x={VP_X - 64} y={50} width={128} height={26}
-            fill="none" stroke="#278036" strokeWidth={0.9} rx={3} />
-      {/* Down-triangle indicator under sign */}
-      <polygon
-        points={`${VP_X - 7},76 ${VP_X + 7},76 ${VP_X},84`}
-        fill="#278036" opacity={0.65}
-      />
-      <text
-        x={VP_X} y={66}
-        fill="#b8f0c8"
-        fontSize={11}
-        fontFamily='"JetBrains Mono","Courier New",monospace'
-        fontWeight="700"
-        letterSpacing={2.5}
-        textAnchor="middle"
-        dominantBaseline="middle"
-      >
-        ENTRADA
-      </text>
-
       {/* ── Ceiling ambient light wash ────────────────────────────────────────── */}
       <ellipse cx={VP_X} cy={12} rx={200} ry={50} fill="#d0ccac" opacity={0.022} />
 

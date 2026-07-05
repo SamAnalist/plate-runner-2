@@ -25,9 +25,9 @@ export const READING_T_AWAY     = GATE_T + 0.06;  // ≈ 0.58
 // ─── Car & plate coordinate constants ─────────────────────────────────────
 // These define the car's internal SVG coordinate space and plate position
 // within it. Kept here so both Vehicle.tsx and depth utilities stay in sync.
-export const CAR_LW = 100;           // car local width
+export const CAR_LW = 130;           // car local width
 export const CAR_LH = 72;            // car local height
-export const CAR_ROAD_FRACTION = 0.88; // car width as fraction of road width
+export const CAR_ROAD_FRACTION = 0.98; // car width as fraction of road width
 
 // Plate rect within car local space
 export const CAR_PLATE_X = 29;

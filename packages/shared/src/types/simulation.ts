@@ -27,6 +27,23 @@ export type GateInitialState = 'open' | 'closed';
 
 export type VehicleColor = 'blue' | 'white' | 'black' | 'silver' | 'red' | 'green';
 
+/**
+ * Four phase-specific speed values (1–10) for a single direction.
+ *   initial   — entry until the deceleration zone (approaching the gate)
+ *   stopping  — deceleration zone just before the gate stop point
+ *   afterStop — resuming after the gate opens
+ *   final     — exit phase (POV slide-out / horizon recede)
+ *
+ * Speed 5 is calibrated to the visually comfortable rates found during QA.
+ * Below 5 is slower, above 5 is faster.
+ */
+export interface SpeedPhases {
+  initial:   number;
+  stopping:  number;
+  afterStop: number;
+  final:     number;
+}
+
 export interface SimulationConfig {
   plate: string;
   direction: Direction;
@@ -51,7 +68,10 @@ export interface SimulationConfig {
    * resumes moving. Default: 400ms.
    */
   delayAfterOpenMs: number;
-  speed: number; // 1–10
+  /** Phase speeds for the incoming direction (car approaching camera). */
+  speedIncoming: SpeedPhases;
+  /** Phase speeds for the away direction (car receding from camera). */
+  speedAway: SpeedPhases;
   vehicleColor: VehicleColor;
 }
 
@@ -84,7 +104,8 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   gateInitialState: 'closed',
   stopBeforeOpenMs: 2000,
   delayAfterOpenMs: 400,
-  speed: 5,
+  speedIncoming: { initial: 5, stopping: 5, afterStop: 5, final: 5 },
+  speedAway:     { initial: 5, stopping: 5, afterStop: 5, final: 5 },
   vehicleColor: 'blue',
 };
 

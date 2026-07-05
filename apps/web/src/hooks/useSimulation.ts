@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { SimulationConfig } from '@plate-runner/shared';
 import { GATE_T, READING_T_INCOMING, READING_T_AWAY } from '../utils/depth';
+import { POV_EXIT_T } from '../components/simulation/renderers/asset-realistic/viewMotionPaths';
 
 /**
  * Simulation phase state machine:
@@ -43,9 +44,76 @@ export interface SimulationControls {
   closeGate: () => void;
 }
 
-/** Speed 1–10 → t-units per second */
-function speedToRate(speed: number): number {
-  return 0.07 + (speed - 1) * (0.55 / 9);
+/**
+ * Maps a speed value (1–10) to t-units/second using a linear range.
+ * Each phase has its own [min, max] calibrated so speed=5 equals the
+ * comfortable rate found during QA for the incoming direction.
+ */
+function phaseRate(speed: number, min: number, max: number): number {
+  return min + ((speed - 1) / 9) * (max - min);
+}
+
+// ── Per-phase rate ranges ─────────────────────────────────────────────────────
+// speed=5 → comfortable rate (QA baseline for incoming).
+// speed=1 → min  |  speed=10 → max
+//
+// Initial / AfterStop: speed=5 ≈ 0.131 t/s  (old speedToRate(2))
+const R_INITIAL    = { min: 0.033, max: 0.25 };
+const R_AFTER_STOP = { min: 0.033, max: 0.25 };
+// Stopping:           speed=5 ≈ 0.072 t/s  (old speedToRate(1))
+const R_STOPPING   = { min: 0.018, max: 0.14 };
+// Final/exit:         speed=5 ≈ 0.021 t/s  (old finalSpeedToRate(1))
+const R_FINAL      = { min: 0.005, max: 0.04 };
+
+/**
+ * How many t-units before the reading stop point the deceleration zone begins.
+ * Incoming: decel starts at READING_T_INCOMING - DECEL_OFFSET ≈ 0.36
+ * Away:     decel starts at READING_T_AWAY     + DECEL_OFFSET
+ */
+const DECEL_OFFSET = 0.10;
+
+/**
+ * t below which the 'away' exit phase applies (car shrinking toward horizon).
+ * Symmetric to POV_EXIT_T (0.75) on the away side.
+ */
+const FINAL_T_AWAY = 0.25;
+
+/**
+ * Returns the movement rate (t-units/second) for the current vehicle position.
+ * Selects one of four phase-specific speeds from the direction-matching config.
+ *
+ *  incoming phases (t increasing):
+ *    initial   — t < decelStart
+ *    stopping  — decelStart ≤ t < readingT
+ *    afterStop — readingT ≤ t < POV_EXIT_T
+ *    final     — t ≥ POV_EXIT_T
+ *
+ *  away phases (t decreasing):
+ *    initial   — t > decelStart
+ *    stopping  — readingT < t ≤ decelStart
+ *    afterStop — FINAL_T_AWAY < t ≤ readingT
+ *    final     — t ≤ FINAL_T_AWAY
+ */
+function getPhaseRate(
+  t: number,
+  isIncoming: boolean,
+  stopAtT: number,
+  cfg: SimulationConfig,
+): number {
+  const sp = isIncoming ? cfg.speedIncoming : cfg.speedAway;
+  if (isIncoming) {
+    const decelStart = stopAtT - DECEL_OFFSET;
+    if (t < decelStart)   return phaseRate(sp.initial,   R_INITIAL.min,    R_INITIAL.max);
+    if (t < stopAtT)      return phaseRate(sp.stopping,  R_STOPPING.min,   R_STOPPING.max);
+    if (t < POV_EXIT_T)   return phaseRate(sp.afterStop, R_AFTER_STOP.min, R_AFTER_STOP.max);
+    return phaseRate(sp.final, R_FINAL.min, R_FINAL.max);
+  } else {
+    const decelStart = stopAtT + DECEL_OFFSET;
+    if (t > decelStart)    return phaseRate(sp.initial,   R_INITIAL.min,    R_INITIAL.max);
+    if (t > stopAtT)       return phaseRate(sp.stopping,  R_STOPPING.min,   R_STOPPING.max);
+    if (t > FINAL_T_AWAY)  return phaseRate(sp.afterStop, R_AFTER_STOP.min, R_AFTER_STOP.max);
+    return phaseRate(sp.final, R_FINAL.min, R_FINAL.max);
+  }
 }
 
 function startT(direction: SimulationConfig['direction']): number {
@@ -124,6 +192,7 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
 
   const closeGate = useCallback(() => setState(s => ({ ...s, gateOpen: false })), []);
 
+
   // ── rAF loop ───────────────────────────────────────────────────────────────
 
   const animate = useCallback((time: number) => {
@@ -132,7 +201,6 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     lastTimeRef.current = time;
 
     const cfg        = configRef.current;
-    const rate       = speedToRate(cfg.speed);
     const isIncoming = cfg.direction === 'incoming';
     const stopAtT    = readingT(cfg.direction);
     const shouldStop = gateActive(cfg);
@@ -140,6 +208,7 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     setState(prev => {
       let t        = prev.vehicleT;
       let gateOpen = prev.gateOpen;
+      const rate   = getPhaseRate(t, isIncoming, stopAtT, cfg);
 
       if (isIncoming) {
         // Stop at gate if gate is active (visible + closed)
@@ -150,9 +219,9 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
           return { ...prev, vehicleT: stopAtT, phase: newPhase, isRunning: false };
         }
 
-        t = Math.min(t + rate * dt, 0.98);
+        t = Math.min(t + rate * dt, 1);
 
-        if (t >= 0.98) {
+        if (t >= 1) {
           cancelLoop();
           return { ...prev, vehicleT: t, gateOpen, phase: 'done', isRunning: false };
         }
@@ -274,3 +343,6 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
 
   return { state, start, stop, reset, openGate, closeGate };
 }
+
+// Re-export for convenience in components
+export { READING_T_INCOMING, READING_T_AWAY };
