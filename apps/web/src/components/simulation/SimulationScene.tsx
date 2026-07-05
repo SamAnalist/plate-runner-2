@@ -19,7 +19,6 @@ interface Props {
   showDebug?: boolean;
   /** Camera mode: suppress status overlays and debug for a clean capture image */
   cameraMode?: boolean;
-  calibrationMode?: boolean;
   /** Visual QA: show plate anchor bounding rect overlay */
   showAnchorOverlay?: boolean;
   /** Visual QA: show motion path curve + key points overlay */
@@ -31,7 +30,6 @@ export function SimulationScene({
   simulation,
   showDebug = false,
   cameraMode = false,
-  calibrationMode = false,
   showAnchorOverlay = false,
   showMotionPathOverlay = false,
 }: Props) {
@@ -131,14 +129,7 @@ export function SimulationScene({
           </>
         )}
 
-        {!cameraMode && calibrationMode && (
-          <text x={VP_X} y={18} textAnchor="middle"
-            fill="#22d3ee" fontSize={9}
-            fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.16em"
-            opacity={0.8}>
-            CALIBRATION MODE
-          </text>
-        )}
+
       </svg>
 
       {/* ── HTML Debug overlay (not visible in camera mode) ─────────────── */}
@@ -148,7 +139,6 @@ export function SimulationScene({
           vehicleT={vehicleT}
           gateOpen={gateOpen}
           config={config}
-          calibrationMode={calibrationMode}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DEFAULT_CONFIG,
   type SimulationConfig,
@@ -6,43 +6,17 @@ import {
 import { SimulationScene } from './components/simulation/SimulationScene';
 import { ControlPanel } from './components/controls/ControlPanel';
 import { useSimulation } from './hooks/useSimulation';
-import { READING_T_INCOMING, READING_T_AWAY } from './hooks/useSimulation';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
 export default function App() {
   const [config, setConfig]           = useState<SimulationConfig>(DEFAULT_CONFIG);
   const [appMode, setAppMode]         = useState<AppMode>('normal');
-  const [calibrationMode, setCalibrationMode] = useState(false);
   const [showDebug, setShowDebug]     = useState(false);
   const [showAnchorOverlay, setShowAnchorOverlay]         = useState(false);
   const [showMotionPathOverlay, setShowMotionPathOverlay] = useState(false);
 
   const simulation = useSimulation(config);
-
-  // ── Calibration mode: freeze vehicle at reading position ────────────────
-  const handleCalibrationMode = useCallback((enabled: boolean) => {
-    setCalibrationMode(enabled);
-    if (enabled) {
-      const readingT = config.direction === 'incoming'
-        ? READING_T_INCOMING
-        : READING_T_AWAY;
-      simulation.holdAt(readingT);
-    } else {
-      simulation.reset();
-    }
-  }, [config.direction, simulation]);
-
-  // Re-apply holdAt when direction changes while in calibration mode
-  useEffect(() => {
-    if (calibrationMode) {
-      const readingT = config.direction === 'incoming'
-        ? READING_T_INCOMING
-        : READING_T_AWAY;
-      simulation.holdAt(readingT);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.direction, calibrationMode]);
 
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
@@ -96,7 +70,6 @@ export default function App() {
             config={config}
             simulation={simulation}
             showDebug={showDebug}
-            calibrationMode={calibrationMode}
             showAnchorOverlay={showAnchorOverlay}
             showMotionPathOverlay={showMotionPathOverlay}
           />
@@ -108,19 +81,12 @@ export default function App() {
             onConfigChange={setConfig}
             showDebug={showDebug}
             onShowDebugChange={setShowDebug}
-            calibrationMode={calibrationMode}
-            onCalibrationModeChange={handleCalibrationMode}
             onEnterFullscreen={() => setAppMode('fullscreen')}
             onEnterCamera={() => setAppMode('camera')}
             showAnchorOverlay={showAnchorOverlay}
             onShowAnchorOverlayChange={setShowAnchorOverlay}
             showMotionPathOverlay={showMotionPathOverlay}
             onShowMotionPathOverlayChange={setShowMotionPathOverlay}
-            onEnterVisualQA={() => {
-              handleCalibrationMode(true);
-              setShowAnchorOverlay(false);
-              setShowMotionPathOverlay(false);
-            }}
           />
         </aside>
       </div>
@@ -136,7 +102,6 @@ export default function App() {
           simulation={simulation}
           showDebug={!isCameraMode && showDebug}
           cameraMode={isCameraMode}
-          calibrationMode={!isCameraMode && calibrationMode}
         />
       </div>
 

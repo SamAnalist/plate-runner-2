@@ -41,8 +41,6 @@ export interface SimulationControls {
   reset: () => void;
   openGate: () => void;
   closeGate: () => void;
-  /** Freeze vehicle at a specific depth position (used by calibration mode) */
-  holdAt: (t: number) => void;
 }
 
 /** Speed 1–10 → t-units per second */
@@ -125,18 +123,6 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
   }, [cancelLoop, clearTimer]);
 
   const closeGate = useCallback(() => setState(s => ({ ...s, gateOpen: false })), []);
-
-  /** Freeze the vehicle at position t (used by calibration mode) */
-  const holdAt = useCallback((t: number) => {
-    cancelLoop();
-    clearTimer();
-    setState({
-      phase: 'stopped_at_gate',
-      vehicleT: t,
-      gateOpen: false,
-      isRunning: false,
-    });
-  }, [cancelLoop, clearTimer]);
 
   // ── rAF loop ───────────────────────────────────────────────────────────────
 
@@ -286,8 +272,5 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => () => { cancelLoop(); clearTimer(); }, [cancelLoop, clearTimer]);
 
-  return { state, start, stop, reset, openGate, closeGate, holdAt };
+  return { state, start, stop, reset, openGate, closeGate };
 }
-
-// Re-export for convenience in components
-export { READING_T_INCOMING, READING_T_AWAY };

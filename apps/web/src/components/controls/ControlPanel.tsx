@@ -8,7 +8,6 @@ import type {
   VehicleColor,
 } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
-import { READING_T_INCOMING, READING_T_AWAY } from '../../hooks/useSimulation';
 import { PlateInput } from './PlateInput';
 
 interface ControlPanelProps {
@@ -17,16 +16,12 @@ interface ControlPanelProps {
   onConfigChange: (c: SimulationConfig) => void;
   showDebug: boolean;
   onShowDebugChange: (v: boolean) => void;
-  calibrationMode: boolean;
-  onCalibrationModeChange: (v: boolean) => void;
   onEnterFullscreen: () => void;
   onEnterCamera: () => void;
   showAnchorOverlay: boolean;
   onShowAnchorOverlayChange: (v: boolean) => void;
   showMotionPathOverlay: boolean;
   onShowMotionPathOverlayChange: (v: boolean) => void;
-  /** One-click: switch to asset-realistic + calibration freeze */
-  onEnterVisualQA: () => void;
 }
 
 // ─── Shared primitives ─────────────────────────────────────────────────────
@@ -316,64 +311,6 @@ function GateSection({
   );
 }
 
-// ─── Calibration panel ─────────────────────────────────────────────────────
-
-function CalibrationPanel({
-  config,
-  simulation,
-  onConfigChange,
-}: {
-  config: SimulationConfig;
-  simulation: SimulationControls;
-  onConfigChange: (c: SimulationConfig) => void;
-}) {
-  const readingT = config.direction === 'incoming' ? READING_T_INCOMING : READING_T_AWAY;
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      <p className="text-[10px] text-white/40 font-mono leading-snug">
-        Vehicle is frozen at reading position (t≈{readingT.toFixed(2)}).
-        Test different plates to verify legibility.
-      </p>
-
-      <div>
-        <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Quick plates</p>
-        <div className="flex flex-col gap-1.5">
-          {[
-            { label: 'Short (ABC123)',         plate: 'ABC123'       },
-            { label: 'Medium (ABC1234)',        plate: 'ABC1234'      },
-            { label: '12-char (ABCDEFGHIJ12)', plate: 'ABCDEFGHIJ12' },
-            { label: 'Single char (A)',         plate: 'A'            },
-          ].map(({ label, plate }) => (
-            <button
-              key={plate}
-              onClick={() => onConfigChange({ ...config, plate })}
-              className={`
-                px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold
-                border transition-all text-left
-                ${config.plate === plate
-                  ? 'bg-cyan-600/25 border-cyan-500/50 text-cyan-300'
-                  : 'bg-white/4 border-white/10 text-white/45 hover:text-white/70 hover:border-white/22'}
-              `}
-            >
-              <span className="text-white/30 mr-1.5">▶</span>{label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <button
-        onClick={() => simulation.holdAt(readingT)}
-        className="py-1.5 rounded text-[10px] font-mono font-semibold
-          border border-cyan-500/40 text-cyan-400
-          hover:bg-cyan-500/15 transition-colors"
-      >
-        Re-center at reading position
-      </button>
-    </div>
-  );
-}
-
 // ─── Main panel ────────────────────────────────────────────────────────────
 
 export function ControlPanel({
@@ -382,15 +319,12 @@ export function ControlPanel({
   onConfigChange,
   showDebug,
   onShowDebugChange,
-  calibrationMode,
-  onCalibrationModeChange,
   onEnterFullscreen,
   onEnterCamera,
   showAnchorOverlay,
   onShowAnchorOverlayChange,
   showMotionPathOverlay,
   onShowMotionPathOverlayChange,
-  onEnterVisualQA,
 }: ControlPanelProps) {
   const { state, start, stop, reset } = simulation;
 
@@ -553,37 +487,6 @@ export function ControlPanel({
         <Divider />
 
         {/* ── Calibration Mode ───────────────────────────────────────────── */}
-        <CollapsibleSection
-          title="Calibration Mode"
-          badge={calibrationMode ? 'ON' : undefined}
-          defaultOpen={calibrationMode}
-        >
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => onCalibrationModeChange(!calibrationMode)}
-              className={`
-                w-full py-2 rounded text-xs font-mono font-bold
-                border transition-all
-                ${calibrationMode
-                  ? 'bg-cyan-600/30 border-cyan-500/50 text-cyan-300'
-                  : 'bg-white/5 border-white/15 text-white/50 hover:text-white/75 hover:border-white/28'}
-              `}
-            >
-              {calibrationMode ? 'Exit Calibration' : 'Enter Calibration'}
-            </button>
-
-            {calibrationMode && (
-              <CalibrationPanel
-                config={config}
-                simulation={simulation}
-                onConfigChange={onConfigChange}
-              />
-            )}
-          </div>
-        </CollapsibleSection>
-
-        <Divider />
-
         {/* ── Visual QA ──────────────────────────────────────────────────── */}
         <CollapsibleSection
           title="Visual QA"
@@ -591,18 +494,6 @@ export function ControlPanel({
           defaultOpen={false}
         >
           <div className="flex flex-col gap-3">
-            <button
-              onClick={onEnterVisualQA}
-              className="w-full py-2 rounded text-xs font-mono font-bold
-                bg-green-700/30 border border-green-500/40 text-green-300
-                hover:bg-green-600/40 transition-colors"
-            >
-              ◎ Enter Visual QA Mode
-            </button>
-            <p className="text-[9px] text-white/30 font-mono leading-snug -mt-1">
-              Switches to Asset Realistic + freezes at reading pos
-            </p>
-
             <div>
               <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Quick plates</p>
               <div className="flex flex-col gap-1">

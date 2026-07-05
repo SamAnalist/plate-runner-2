@@ -6,7 +6,6 @@ interface DebugOverlayProps {
   vehicleT: number;
   gateOpen: boolean;
   config: SimulationConfig;
-  calibrationMode: boolean;
 }
 
 const PHASE_COLOR: Record<SimulationPhase, string> = {
@@ -23,7 +22,6 @@ export function DebugOverlay({
   vehicleT,
   gateOpen,
   config,
-  calibrationMode,
 }: DebugOverlayProps) {
   return (
     <div
@@ -34,9 +32,6 @@ export function DebugOverlay({
     >
       <div className="text-white/30 uppercase tracking-widest text-[8px] mb-1 border-b border-white/10 pb-1">
         DEBUG
-        {calibrationMode && (
-          <span className="ml-2 text-cyan-400 text-[8px]">• CALIBRATION</span>
-        )}
       </div>
 
       <Row label="phase"    value={phase}                     valueClass={PHASE_COLOR[phase]} />
