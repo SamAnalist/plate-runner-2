@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   DEFAULT_CONFIG,
   type SimulationConfig,
+  remapPlacementForDirection,
+  isPlacementAllowedForDirection,
 } from '@plate-runner/shared';
 import { SimulationScene } from './components/simulation/SimulationScene';
 import { ControlPanel } from './components/controls/ControlPanel';
@@ -17,6 +19,26 @@ export default function App() {
   const [showMotionPathOverlay, setShowMotionPathOverlay] = useState(false);
 
   const simulation = useSimulation(config);
+
+  /**
+   * Config change interceptor — auto-remaps detectorPlacement when direction
+   * changes so the combination is always valid (incoming→front, away→back).
+   */
+  function handleConfigChange(next: SimulationConfig) {
+    if (
+      next.direction !== config.direction &&
+      !isPlacementAllowedForDirection(next.direction, next.detectorPlacement)
+    ) {
+      next = {
+        ...next,
+        detectorPlacement: remapPlacementForDirection(
+          next.detectorPlacement,
+          next.direction,
+        ),
+      };
+    }
+    setConfig(next);
+  }
 
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
@@ -78,7 +100,7 @@ export default function App() {
           <ControlPanel
             config={config}
             simulation={simulation}
-            onConfigChange={setConfig}
+            onConfigChange={handleConfigChange}
             showDebug={showDebug}
             onShowDebugChange={setShowDebug}
             onEnterFullscreen={() => setAppMode('fullscreen')}

@@ -22,6 +22,10 @@
  *   variants) is a future phase task.
  */
 import type { SimulationConfig } from '@plate-runner/shared';
+import {
+  isPlacementAllowedForDirection,
+  remapPlacementForDirection,
+} from '@plate-runner/shared';
 import type { DepthValues } from '../../../../utils/depth';
 import {
   CAR_LW,
@@ -147,10 +151,21 @@ export function VehicleAssetLayer({
 }: VehicleAssetLayerProps) {
   const { roadWidth, y } = vehicleDepth;
 
+  // ── Guardrail: resolve a safe placement before any rendering ────────────
+  // If placement is invalid for the current direction (should not happen after
+  // UI filtering, but defends against stale config or future API calls),
+  // silently remap to the equivalent valid placement.
+  const safePlacement = isPlacementAllowedForDirection(
+    config.direction,
+    config.detectorPlacement,
+  )
+    ? config.detectorPlacement
+    : remapPlacementForDirection(config.detectorPlacement, config.direction);
+
   // ── Scene-space car dimensions ──────────────────────────────────────────
   // View-aware X: driver/passenger views sweep laterally as the car approaches.
   // Y and scale still come from vehicleDepth (standard depth model).
-  const centerX = getViewAwareX(vehicleT, config.detectorPlacement);
+  const centerX = getViewAwareX(vehicleT, safePlacement);
 
   const carW  = roadWidth * CAR_ROAD_FRACTION;
   const carH  = carW * (CAR_LH / CAR_LW);
@@ -160,18 +175,13 @@ export function VehicleAssetLayer({
   const scaleY = carH / CAR_LH;
 
   // ── Phase 0.8: POV entry / exit ─────────────────────────────────────────
-  // Opacity fades in at horizon (t < POV_SPAWN_T) and out at near edge
-  // (t > POV_EXIT_T), so the vehicle never abruptly appears or vanishes.
-  // The Y offset slides the car from just above the horizon into frame
-  // (entry) and off the bottom of the scene (exit).
   const povOpacity = getPovOpacity(vehicleT);
   const povYOffset = getPovYOffset(vehicleT, y, carH);
 
   // ── Asset & plate anchor lookup ─────────────────────────────────────────
-  // detectorPlacement is exactly AssetViewKey — no translation needed.
-  const viewKey = config.detectorPlacement as AssetViewKey;
+  const viewKey = safePlacement as AssetViewKey;
   const asset   = ASSET_REGISTRY[viewKey];
-  const anchor  = PLATE_ANCHORS[config.detectorPlacement];
+  const anchor  = PLATE_ANCHORS[safePlacement];
 
   return (
     <g opacity={povOpacity}>

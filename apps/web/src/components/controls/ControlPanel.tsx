@@ -8,6 +8,7 @@ import type {
   VehicleColor,
 } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
+import { getPlacementsForDirection } from '@plate-runner/shared';
 import { PlateInput } from './PlateInput';
 
 interface ControlPanelProps {
@@ -380,32 +381,31 @@ export function ControlPanel({
           <SectionLabel>Detector Placement</SectionLabel>
           <div className="grid grid-cols-3 gap-1 text-center">
             {(
-              [
-                ['driver_front',    'DRV\nFRONT'],
-                ['center_front',    'CTR\nFRONT'],
-                ['passenger_front', 'PSG\nFRONT'],
-                ['driver_back',     'DRV\nBACK' ],
-                ['center_back',     'CTR\nBACK' ],
-                ['passenger_back',  'PSG\nBACK' ],
-              ] as [DetectorPlacement, string][]
-            ).map(([val, lbl]) => (
-              <button
-                key={val}
-                onClick={() => set('detectorPlacement', val)}
-                className={`
-                  py-2 rounded text-[10px] font-mono font-semibold leading-snug
-                  border transition-all whitespace-pre-line
-                  ${config.detectorPlacement === val
-                    ? 'bg-blue-600/80 border-blue-500/70 text-white'
-                    : 'bg-white/5 border-white/12 text-white/45 hover:text-white/75 hover:border-white/25'}
-                `}
-              >
-                {lbl}
-              </button>
-            ))}
+              (getPlacementsForDirection(config.direction) as DetectorPlacement[]).map(val => {
+                const isFront = val.endsWith('_front');
+                const side    = val.split('_')[0].toUpperCase().slice(0, 3);
+                const face    = isFront ? 'FRONT' : 'BACK';
+                const lbl     = `${side}\n${face}`;
+                return (
+                  <button
+                    key={val}
+                    onClick={() => set('detectorPlacement', val)}
+                    className={`
+                      py-2 rounded text-[10px] font-mono font-semibold leading-snug
+                      border transition-all whitespace-pre-line
+                      ${config.detectorPlacement === val
+                        ? 'bg-blue-600/80 border-blue-500/70 text-white'
+                        : 'bg-white/5 border-white/12 text-white/45 hover:text-white/75 hover:border-white/25'}
+                    `}
+                  >
+                    {lbl}
+                  </button>
+                );
+              })
+            )}
           </div>
           <p className="mt-1.5 text-[10px] text-white/30 font-mono leading-snug">
-            {config.detectorPlacement.endsWith('_front')
+            {config.direction === 'incoming'
               ? 'Front face visible — front plate'
               : 'Rear face visible — rear plate'}
           </p>
