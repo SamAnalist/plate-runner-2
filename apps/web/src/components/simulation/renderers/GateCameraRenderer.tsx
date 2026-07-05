@@ -34,7 +34,7 @@ export function GateCameraRenderer({
   phase,
   vehicleBehindGate,
 }: SceneRendererProps) {
-  const plateRect = phase === 'at_gate'
+  const plateRect = (phase === 'stopped_at_gate' || phase === 'waiting_for_signal' || phase === 'gate_opening')
     ? getPlateSceneRect(vehicleT, config.detectorPlacement)
     : null;
 

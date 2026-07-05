@@ -74,6 +74,7 @@ function AssetGate({
   gateMode,
 }: Pick<SceneRendererProps, 'gateDepth' | 'gateOpen'> & { gateMode: string }) {
   if (gateMode === 'hidden') return null;
+  // note: gateInitialState is handled by useSimulation — gateOpen starts true when open
 
   const { roadRight, roadWidth, y, scale } = gateDepth;
 
@@ -96,7 +97,8 @@ function AssetGate({
   const lightR   = Math.max(2.8, postW * 0.40);
   const lightCX  = postX + postW / 2;
   const lightCY  = postY + postH * 0.10;
-  const lightCol = gateOpen ? '#22c55e' : '#ef4444';
+  // Soft, camera-friendly indicator colors (not neon)
+  const lightCol = gateOpen ? '#4ade80' : '#f87171';
 
   // Stripe positions in pivot-local space (arm extends left: x ∈ [-armLen, 0])
   const numStripes = 5;
@@ -143,10 +145,10 @@ function AssetGate({
       <circle cx={postX + postW * 0.5} cy={postY + postH * 0.28} r={postW * 0.14} fill="#1a1d22" />
       <circle cx={postX + postW * 0.5} cy={postY + postH * 0.72} r={postW * 0.14} fill="#1a1d22" />
 
-      {/* Status LED */}
-      <circle cx={lightCX} cy={lightCY} r={lightR * 1.6} fill={lightCol} opacity={0.15} />
-      <circle cx={lightCX} cy={lightCY} r={lightR}       fill={lightCol} opacity={0.92} />
-      <circle cx={lightCX - lightR * 0.28} cy={lightCY - lightR * 0.28} r={lightR * 0.32} fill="white" opacity={0.55} />
+      {/* Status LED — soft, camera-friendly (no neon bleed) */}
+      <circle cx={lightCX} cy={lightCY} r={lightR * 2.0} fill={lightCol} opacity={0.08} />
+      <circle cx={lightCX} cy={lightCY} r={lightR}       fill={lightCol} opacity={0.75} />
+      <circle cx={lightCX - lightR * 0.28} cy={lightCY - lightR * 0.28} r={lightR * 0.32} fill="white" opacity={0.45} />
 
       {/* ── Gate arm ─────────────────────────────────────────────────────── */}
       {/*
@@ -164,16 +166,16 @@ function AssetGate({
           animate={{ rotate: armAngle }}
           transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
         >
-          {/* Arm body — yellow, extends left from pivot */}
+          {/* Arm body — white, parking barrier style */}
           <rect
             x={-armLen}
             y={-armThick / 2}
             width={armLen}
             height={armThick}
-            fill="#f0b800"
-            rx={armThick * 0.5}
+            fill="#f0f0f0"
+            rx={armThick * 0.4}
           />
-          {/* Black diagonal safety stripes */}
+          {/* Red diagonal safety stripes */}
           {stripes.map((s, i) => (
             <rect
               key={i}
@@ -181,14 +183,14 @@ function AssetGate({
               y={-armThick / 2}
               width={s.w}
               height={armThick}
-              fill="#111"
-              opacity={0.55}
-              rx={armThick * 0.35}
+              fill="#cc2222"
+              opacity={0.80}
+              rx={armThick * 0.3}
             />
           ))}
           {/* Arm tip reflector at left end (-armLen, 0) */}
-          <circle cx={-armLen} cy={0} r={armThick * 0.95} fill="white"   opacity={0.85} />
-          <circle cx={-armLen} cy={0} r={armThick * 0.45} fill={lightCol} opacity={0.70} />
+          <circle cx={-armLen} cy={0} r={armThick * 0.95} fill="white"    opacity={0.90} />
+          <circle cx={-armLen} cy={0} r={armThick * 0.45} fill={lightCol} opacity={0.65} />
         </motion.g>
       </g>
 
@@ -225,10 +227,11 @@ function MotionPathDebugOverlay({
   const curX = getViewAwareX(vehicleT, placement);
 
   function dotColor(label: string) {
-    if (label === 'READ') return '#00ffcc';
-    if (label === 'GATE') return '#ff4444';
-    if (label === 'EXIT') return '#ffffff';
-    if (label === 'FAR')  return '#88aaff';
+    if (label === 'READ')  return '#00ffcc';
+    if (label === 'GATE')  return '#ff4444';
+    if (label === 'EXIT')  return '#ffffff';
+    if (label === 'FAR')   return '#88aaff';
+    if (label === 'SPAWN') return '#ffff44';
     return '#f5a623';
   }
 

@@ -38,7 +38,8 @@ export function Gate({ gateDepth, gateOpen, gateMode }: GateProps) {
   const lightR    = Math.max(2.5, postW * 0.42);
   const lightCX   = postX + postW / 2;
   const lightCY   = postY + postH * 0.10;
-  const lightColor = gateOpen ? '#22c55e' : '#ef4444';
+  // Soft indicator — camera-friendly (no neon bleed)
+  const lightColor = gateOpen ? '#4ade80' : '#f87171';
 
   // ── Stripes on arm (safety reflective bands) ─────────────────────────────
   const numStripes = 5;
@@ -107,17 +108,17 @@ export function Gate({ gateDepth, gateOpen, gateMode }: GateProps) {
         animate={{ rotate: armAngle }}
         transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
       >
-        {/* Arm body */}
+        {/* Arm body — white parking barrier */}
         <rect
           x={armTipX}
           y={pivotY - armThick / 2}
           width={armLen}
           height={armThick}
-          fill={gateOpen ? '#22c55e' : '#ef4444'}
-          rx={armThick * 0.5}
+          fill="#f0f0f0"
+          rx={armThick * 0.4}
         />
 
-        {/* White safety stripes */}
+        {/* Red safety stripes */}
         {stripes.map((s, i) => (
           <rect
             key={i}
@@ -125,9 +126,9 @@ export function Gate({ gateDepth, gateOpen, gateMode }: GateProps) {
             y={pivotY - armThick / 2}
             width={s.w}
             height={armThick}
-            fill="white"
-            opacity={0.35}
-            rx={armThick * 0.4}
+            fill="#cc2222"
+            opacity={0.80}
+            rx={armThick * 0.3}
           />
         ))}
 
