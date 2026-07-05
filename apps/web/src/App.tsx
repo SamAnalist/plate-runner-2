@@ -21,6 +21,7 @@ export default function App() {
   const [calibrationMode, setCalibrationMode] = useState(false);
   const [showDebug, setShowDebug]     = useState(false);
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('classic');
+  const [showAnchorOverlay, setShowAnchorOverlay] = useState(false);
 
   const simulation = useSimulation(config);
 
@@ -122,6 +123,7 @@ export default function App() {
             visualStyle={visualStyle}
             showDebug={showDebug}
             calibrationMode={calibrationMode}
+            showAnchorOverlay={showAnchorOverlay}
           />
         </main>
         <aside className="w-72 shrink-0 border-l border-white/8 overflow-y-auto">
@@ -139,6 +141,13 @@ export default function App() {
             onEnterCamera={() => setAppMode('camera')}
             visualStyle={visualStyle}
             onVisualStyleChange={setVisualStyle}
+            showAnchorOverlay={showAnchorOverlay}
+            onShowAnchorOverlayChange={setShowAnchorOverlay}
+            onEnterVisualQA={() => {
+              setVisualStyle('asset-realistic');
+              handleCalibrationMode(true);
+              setShowAnchorOverlay(true);
+            }}
           />
         </aside>
       </div>

@@ -39,6 +39,8 @@ interface Props {
   /** Camera mode: suppress status overlays and debug for a clean capture image */
   cameraMode?: boolean;
   calibrationMode?: boolean;
+  /** Visual QA: show anchor bounding rect in asset-realistic renderer */
+  showAnchorOverlay?: boolean;
 }
 
 export function SimulationScene({
@@ -49,6 +51,7 @@ export function SimulationScene({
   showDebug = false,
   cameraMode = false,
   calibrationMode = false,
+  showAnchorOverlay = false,
 }: Props) {
   const { state } = simulation;
   const { vehicleT, gateOpen, phase } = state;
@@ -72,6 +75,8 @@ export function SimulationScene({
     gateOpen,
     phase,
     vehicleBehindGate,
+    // Anchor overlay is suppressed in camera mode regardless of caller intent
+    showAnchorOverlay: !cameraMode && showAnchorOverlay,
   };
 
   return (

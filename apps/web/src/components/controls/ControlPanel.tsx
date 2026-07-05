@@ -28,6 +28,10 @@ interface ControlPanelProps {
   onEnterCamera: () => void;
   visualStyle: VisualStyle;
   onVisualStyleChange: (s: VisualStyle) => void;
+  showAnchorOverlay: boolean;
+  onShowAnchorOverlayChange: (v: boolean) => void;
+  /** One-click: switch to asset-realistic + calibration + anchor overlay */
+  onEnterVisualQA: () => void;
 }
 
 // ─── Shared primitives ─────────────────────────────────────────────────────
@@ -210,6 +214,9 @@ export function ControlPanel({
   onEnterCamera,
   visualStyle,
   onVisualStyleChange,
+  showAnchorOverlay,
+  onShowAnchorOverlayChange,
+  onEnterVisualQA,
 }: ControlPanelProps) {
   const { state, start, stop, reset, openGate, closeGate } = simulation;
 
@@ -478,6 +485,84 @@ export function ControlPanel({
 
         <Divider />
 
+        {/* ── Visual QA ──────────────────────────────────────────────────── */}
+        <CollapsibleSection
+          title="Visual QA"
+          badge={visualStyle === 'asset-realistic' && showAnchorOverlay ? 'ON' : undefined}
+          defaultOpen={false}
+        >
+          <div className="flex flex-col gap-3">
+            {/* One-click QA setup */}
+            <button
+              onClick={onEnterVisualQA}
+              className="w-full py-2 rounded text-xs font-mono font-bold
+                bg-green-700/30 border border-green-500/40 text-green-300
+                hover:bg-green-600/40 transition-colors"
+            >
+              ◎ Enter Visual QA Mode
+            </button>
+            <p className="text-[9px] text-white/30 font-mono leading-snug -mt-1">
+              Switches to Asset Realistic + freezes at reading pos + shows anchor bounds
+            </p>
+
+            {/* Quick plate buttons */}
+            <div>
+              <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Quick plates</p>
+              <div className="flex flex-col gap-1">
+                {[
+                  { label: 'ABC123',        plate: 'ABC123'        },
+                  { label: 'ABCDEFGHIJ12',  plate: 'ABCDEFGHIJ12'  },
+                  { label: '123456789012',  plate: '123456789012'  },
+                ].map(({ label, plate }) => (
+                  <button
+                    key={plate}
+                    onClick={() => onConfigChange({ ...config, plate })}
+                    className={`
+                      px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold
+                      border transition-all text-left tracking-wider
+                      ${config.plate === plate
+                        ? 'bg-green-600/25 border-green-500/50 text-green-300'
+                        : 'bg-white/4 border-white/10 text-white/45 hover:text-white/70 hover:border-white/22'}
+                    `}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Anchor bounds toggle */}
+            <div>
+              <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Overlays</p>
+              <button
+                onClick={() => onShowAnchorOverlayChange(!showAnchorOverlay)}
+                className={`
+                  w-full py-1.5 rounded text-xs font-mono font-semibold
+                  border transition-all
+                  ${showAnchorOverlay
+                    ? 'bg-green-600/25 border-green-500/45 text-green-300'
+                    : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
+                `}
+              >
+                {showAnchorOverlay ? 'Anchor bounds: ON' : 'Anchor bounds: OFF'}
+              </button>
+              <p className="mt-1 text-[9px] text-white/25 font-mono leading-snug">
+                Only visible in Asset Realistic renderer, hidden in Camera Mode
+              </p>
+            </div>
+
+            {/* Screenshot instruction */}
+            <div className="mt-1 border border-white/8 rounded p-2">
+              <p className="text-[9px] text-white/30 font-mono leading-relaxed">
+                <span className="text-white/50">Screenshot:</span> Cmd+Shift+4 (Mac) or
+                Win+Shift+S (Windows). Cycle all 6 placements and both directions.
+              </p>
+            </div>
+          </div>
+        </CollapsibleSection>
+
+        <Divider />
+
         {/* ── View modes ─────────────────────────────────────────────────── */}
         <div>
           <SectionLabel>View Modes</SectionLabel>
@@ -520,7 +605,7 @@ export function ControlPanel({
       {/* Footer */}
       <div className="px-4 py-3 border-t border-white/8 shrink-0">
         <p className="text-[10px] font-mono text-white/20 leading-snug">
-          v0.3.0 — Visual Redesign Sprint
+          v0.6.0 — Visual QA Mode
         </p>
       </div>
     </div>

@@ -200,6 +200,7 @@ export function AssetRealisticRenderer({
   gateDepth,
   gateOpen,
   vehicleBehindGate,
+  showAnchorOverlay = false,
 }: SceneRendererProps) {
   const road      = roadPoints(RL_FAR, RR_FAR, VP_Y, RL_NEAR, RR_NEAR, SCENE_H);
   const lShoulder = roadPoints(RL_FAR - SHOULDER_FAR, RL_FAR, VP_Y, RL_NEAR - SHOULDER_NEAR, RL_NEAR, SCENE_H);
@@ -210,6 +211,7 @@ export function AssetRealisticRenderer({
       config={config}
       vehicleT={vehicleT}
       vehicleDepth={vehicleDepth}
+      showAnchorOverlay={showAnchorOverlay}
     />
   );
 

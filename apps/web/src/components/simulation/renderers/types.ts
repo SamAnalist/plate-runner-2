@@ -27,4 +27,10 @@ export interface SceneRendererProps {
   gateOpen: boolean;
   phase: SimulationPhase;
   vehicleBehindGate: boolean;
+  /**
+   * Visual QA: when true, the asset-realistic renderer draws the plate anchor
+   * bounding rect, centre crosshair, and per-view label as an SVG overlay.
+   * Has no effect on other renderers. Must be false/absent in camera mode.
+   */
+  showAnchorOverlay?: boolean;
 }

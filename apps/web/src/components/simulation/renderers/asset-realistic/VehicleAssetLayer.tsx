@@ -8,6 +8,7 @@
  *   3. Inside the transformed group:
  *        a. Render the car body from the asset registry (raster <image>)
  *        b. Render DynamicPlateOverlay at the per-view plate anchor
+ *        c. Optionally render AnchorDebugOverlay (Visual QA only)
  *   4. Render the ground shadow beneath the car
  *
  * Asset selection:
@@ -16,12 +17,9 @@
  *   are genuinely distinct visual angles, not the same image with a skew.
  *
  * Vehicle colour:
- *   PLACEHOLDER LIMITATION: the current placeholder SVG assets are grayscale /
- *   single-colour schematics. The vehicleColor config does not change the
- *   asset image in placeholder mode — colour is acknowledged but not applied.
- *   When real photorealistic assets arrive (one per view, in a neutral colour),
- *   a CSS/SVG hue-rotate filter can be added here to tint the image, OR
- *   per-colour asset variants can be registered (6 views × 6 colours = 36 files).
+ *   PNG assets are single-colour renders — vehicleColor config is acknowledged
+ *   but not applied. Colour tinting (hue-rotate filter or per-colour asset
+ *   variants) is a future phase task.
  */
 import type { SimulationConfig } from '@plate-runner/shared';
 import type { DepthValues } from '../../../../utils/depth';
@@ -32,7 +30,7 @@ import {
   CAR_ROAD_FRACTION,
 } from '../../../../utils/depth';
 import { ASSET_REGISTRY } from './assetRegistry';
-import { PLATE_ANCHORS } from './plateAnchors';
+import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
 import type { AssetViewKey } from './types';
 
@@ -40,12 +38,112 @@ interface VehicleAssetLayerProps {
   config: SimulationConfig;
   vehicleT: number;
   vehicleDepth: DepthValues;
+  /** Visual QA mode: render plate anchor bounding rect + centre marker + label */
+  showAnchorOverlay?: boolean;
+}
+
+/**
+ * AnchorDebugOverlay — QA-only SVG group.
+ *
+ * Renders inside the car's 100×72 local coordinate space (same space as
+ * DynamicPlateOverlay) so coordinates match the anchor values directly.
+ *
+ * Shows:
+ *   • Green semi-transparent rect   = raw anchor bounding box (before skew)
+ *   • Cyan centre crosshair         = (cx, cy) of the anchor
+ *   • Magenta corner dots           = anchor corners
+ *   • White label                   = placement key + xPct/yPct/wPct/hPct
+ */
+function AnchorDebugOverlay({
+  viewKey,
+  carLW = CAR_LW,
+  carLH = CAR_LH,
+}: {
+  viewKey: AssetViewKey;
+  carLW?: number;
+  carLH?: number;
+}) {
+  const anchor = PLATE_ANCHORS[viewKey];
+  const rect   = anchorToLocalRect(anchor, carLW, carLH);
+  const cx     = rect.x + rect.w / 2;
+  const cy     = rect.y + rect.h / 2;
+
+  const hairLen = Math.max(rect.w, rect.h) * 0.28;
+  const dotR    = 0.5;
+  const lw      = 0.3;           // stroke-width in local units
+  const fontSize = 2.4;
+
+  return (
+    <g>
+      {/* Anchor bounding rect */}
+      <rect
+        x={rect.x} y={rect.y}
+        width={rect.w} height={rect.h}
+        fill="rgba(0,255,120,0.12)"
+        stroke="#00ff88"
+        strokeWidth={lw}
+        strokeDasharray={`${lw * 3} ${lw * 2}`}
+      />
+
+      {/* Centre crosshair */}
+      <line x1={cx - hairLen} y1={cy} x2={cx + hairLen} y2={cy}
+            stroke="#22ffee" strokeWidth={lw * 0.8} />
+      <line x1={cx} y1={cy - hairLen} x2={cx} y2={cy + hairLen}
+            stroke="#22ffee" strokeWidth={lw * 0.8} />
+      <circle cx={cx} cy={cy} r={dotR * 1.2} fill="#22ffee" />
+
+      {/* Corner dots */}
+      <circle cx={rect.x}            cy={rect.y}            r={dotR} fill="#ff44aa" />
+      <circle cx={rect.x + rect.w}   cy={rect.y}            r={dotR} fill="#ff44aa" />
+      <circle cx={rect.x}            cy={rect.y + rect.h}   r={dotR} fill="#ff44aa" />
+      <circle cx={rect.x + rect.w}   cy={rect.y + rect.h}   r={dotR} fill="#ff44aa" />
+
+      {/* Label — placement key above the rect */}
+      <rect
+        x={rect.x} y={rect.y - fontSize * 1.4}
+        width={rect.w} height={fontSize * 1.3}
+        fill="rgba(0,0,0,0.60)"
+        rx={0.5}
+      />
+      <text
+        x={rect.x + rect.w / 2}
+        y={rect.y - fontSize * 0.35}
+        fill="#ffffff"
+        fontSize={fontSize}
+        fontFamily="monospace"
+        textAnchor="middle"
+        dominantBaseline="middle"
+      >
+        {viewKey}
+      </text>
+
+      {/* Values label — below the rect */}
+      <rect
+        x={rect.x} y={rect.y + rect.h + 0.2}
+        width={rect.w} height={fontSize * 1.3}
+        fill="rgba(0,0,0,0.60)"
+        rx={0.5}
+      />
+      <text
+        x={rect.x + rect.w / 2}
+        y={rect.y + rect.h + fontSize * 0.9}
+        fill="#aaffcc"
+        fontSize={fontSize * 0.8}
+        fontFamily="monospace"
+        textAnchor="middle"
+        dominantBaseline="middle"
+      >
+        {`x:${anchor.xPct.toFixed(3)} y:${anchor.yPct.toFixed(3)} w:${anchor.wPct.toFixed(3)} h:${anchor.hPct.toFixed(3)} skX:${anchor.skewXDeg}`}
+      </text>
+    </g>
+  );
 }
 
 export function VehicleAssetLayer({
   config,
   vehicleT,
   vehicleDepth,
+  showAnchorOverlay = false,
 }: VehicleAssetLayerProps) {
   const { roadWidth, y } = vehicleDepth;
 
@@ -102,6 +200,11 @@ export function VehicleAssetLayer({
           carLW={CAR_LW}
           carLH={CAR_LH}
         />
+
+        {/* Anchor debug overlay — Visual QA only, never in production / camera mode */}
+        {showAnchorOverlay && (
+          <AnchorDebugOverlay viewKey={viewKey} />
+        )}
       </g>
     </g>
   );
