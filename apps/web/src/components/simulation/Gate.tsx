@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import type { GateMode } from '@plate-runner/shared';
 import type { DepthValues } from '../../utils/depth';
 
@@ -28,8 +27,8 @@ export function Gate({ gateDepth, gateOpen, gateMode }: GateProps) {
   const pivotX = postX + postW / 2;
   const pivotY = postY + postH * 0.14;
 
-  // Rotation: 0° = closed (horizontal), −76° = open (arm nearly vertical)
-  const armAngle = gateOpen ? -76 : 0;
+  // Rotation: 0° = closed (horizontal), 85° = open (arm nearly vertical)
+  const armAngle = gateOpen ? 85 : 0;
 
   // ── Status light ──────────────────────────────────────────────────────────
   const lightR    = Math.max(2.5, postW * 0.42);
@@ -97,42 +96,37 @@ export function Gate({ gateDepth, gateOpen, gateMode }: GateProps) {
         opacity={0.55}
       />
 
-      {/* ── Parking arm — translate-at-pivot pattern (reliable SVG rotation) ── */}
-      {/* Static group moves origin to the pivot; motion.g rotates around (0,0). */}
-      <g transform={`translate(${pivotX}, ${pivotY})`}>
-        <motion.g
-          animate={{ rotate: armAngle }}
-          transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
-        >
-          {/* Arm extends LEFT from pivot (negative x). */}
-          {/* Arm body — white parking barrier */}
+      {/* CSS style.transform + transition — same pattern as AssetRealisticRenderer */}
+      <g
+        style={{
+          transform: `translate(${pivotX}px, ${pivotY}px) rotate(${armAngle}deg)`,
+          transition: 'transform 0.85s cubic-bezier(0.4, 0, 0.2, 1)',
+          transformOrigin: '0 0',
+        }}
+      >
+        {/* Arm extends LEFT from pivot (negative x). */}
+        <rect
+          x={-armLen}
+          y={-armThick / 2}
+          width={armLen}
+          height={armThick}
+          fill="#f0f0f0"
+          rx={armThick * 0.4}
+        />
+        {stripes.map((s, i) => (
           <rect
-            x={-armLen}
+            key={i}
+            x={s.relX}
             y={-armThick / 2}
-            width={armLen}
+            width={s.w}
             height={armThick}
-            fill="#f0f0f0"
-            rx={armThick * 0.4}
+            fill="#cc2222"
+            opacity={0.80}
+            rx={armThick * 0.3}
           />
-
-          {/* Red safety stripes (pivot-local coords) */}
-          {stripes.map((s, i) => (
-            <rect
-              key={i}
-              x={s.relX}
-              y={-armThick / 2}
-              width={s.w}
-              height={armThick}
-              fill="#cc2222"
-              opacity={0.80}
-              rx={armThick * 0.3}
-            />
-          ))}
-
-          {/* Arm tip cap at left end (-armLen) */}
-          <circle cx={-armLen} cy={0} r={armThick * 0.9}  fill="white" opacity={0.85} />
-          <circle cx={-armLen} cy={0} r={armThick * 0.45} fill={lightColor} opacity={0.65} />
-        </motion.g>
+        ))}
+        <circle cx={-armLen} cy={0} r={armThick * 0.9}  fill="white"      opacity={0.85} />
+        <circle cx={-armLen} cy={0} r={armThick * 0.45} fill={lightColor} opacity={0.65} />
       </g>
 
       {/* ── Pivot cap (covers arm attachment, does not rotate) ── */}

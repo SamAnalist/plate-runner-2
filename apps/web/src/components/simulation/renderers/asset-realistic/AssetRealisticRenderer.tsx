@@ -18,7 +18,6 @@
  *   Open:    arm rotated -80° (pointing nearly straight up).
  *   Transition: 0.85s easeInOut cubic.
  */
-import { motion } from 'framer-motion';
 import type { SceneRendererProps } from '../types';
 import { VehicleAssetLayer } from './VehicleAssetLayer';
 import {
@@ -91,8 +90,8 @@ function AssetGate({
 
   // Gate states:
   //   closed  →  arm horizontal (0°)  blocking lane
-  //   open    →  arm rotated -80°     pointing nearly straight up
-  const armAngle = gateOpen ? -80 : 0;
+  //   open    →  arm rotated 84°     pointing nearly straight up
+  const armAngle = gateOpen ? 84 : 0;
 
   const lightR   = Math.max(2.8, postW * 0.40);
   const lightCX  = postX + postW / 2;
@@ -161,37 +160,45 @@ function AssetGate({
        * Framer Motion rotation to appear wrong on SVG elements in some browsers.
        *)
        */}
-      <g transform={`translate(${pivotX}, ${pivotY})`}>
-        <motion.g
-          animate={{ rotate: armAngle }}
-          transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
-        >
-          {/* Arm body — white, parking barrier style */}
+      {/*
+       * CSS style.transform + transition is used instead of Framer Motion here.
+       * Framer Motion's animate={{ rotate }} on motion.g inside SVG fights with the
+       * outer SVG transform="" attribute — CSS transitions do not apply to SVG
+       * attributes, only to CSS properties. Using style.transform ensures the
+       * browser animates via the CSS transition engine.
+       */}
+      <g
+        style={{
+          transform: `translate(${pivotX}px, ${pivotY}px) rotate(${armAngle}deg)`,
+          transition: 'transform 0.85s cubic-bezier(0.4, 0, 0.2, 1)',
+          transformOrigin: '0 0',
+        }}
+      >
+        {/* Arm body — white, parking barrier style */}
+        <rect
+          x={-armLen}
+          y={-armThick / 2}
+          width={armLen}
+          height={armThick}
+          fill="#f0f0f0"
+          rx={armThick * 0.4}
+        />
+        {/* Red diagonal safety stripes */}
+        {stripes.map((s, i) => (
           <rect
-            x={-armLen}
+            key={i}
+            x={s.relX}
             y={-armThick / 2}
-            width={armLen}
+            width={s.w}
             height={armThick}
-            fill="#f0f0f0"
-            rx={armThick * 0.4}
+            fill="#cc2222"
+            opacity={0.80}
+            rx={armThick * 0.3}
           />
-          {/* Red diagonal safety stripes */}
-          {stripes.map((s, i) => (
-            <rect
-              key={i}
-              x={s.relX}
-              y={-armThick / 2}
-              width={s.w}
-              height={armThick}
-              fill="#cc2222"
-              opacity={0.80}
-              rx={armThick * 0.3}
-            />
-          ))}
-          {/* Arm tip reflector at left end (-armLen, 0) */}
-          <circle cx={-armLen} cy={0} r={armThick * 0.95} fill="white"    opacity={0.90} />
-          <circle cx={-armLen} cy={0} r={armThick * 0.45} fill={lightCol} opacity={0.65} />
-        </motion.g>
+        ))}
+        {/* Arm tip reflector at left end (-armLen, 0) */}
+        <circle cx={-armLen} cy={0} r={armThick * 0.95} fill="white"    opacity={0.90} />
+        <circle cx={-armLen} cy={0} r={armThick * 0.45} fill={lightCol} opacity={0.65} />
       </g>
 
       {/* Pivot cap (on top of arm, doesn't rotate) */}

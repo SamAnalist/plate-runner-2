@@ -28,7 +28,7 @@ import {
   CAR_LH,
   CAR_ROAD_FRACTION,
 } from '../../../../utils/depth';
-import { getViewAwareX } from './viewMotionPaths';
+import { getViewAwareX, getPovOpacity, getPovYOffset } from './viewMotionPaths';
 import { ASSET_REGISTRY } from './assetRegistry';
 import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
@@ -159,6 +159,14 @@ export function VehicleAssetLayer({
   const scaleX = carW / CAR_LW;
   const scaleY = carH / CAR_LH;
 
+  // ── Phase 0.8: POV entry / exit ─────────────────────────────────────────
+  // Opacity fades in at horizon (t < POV_SPAWN_T) and out at near edge
+  // (t > POV_EXIT_T), so the vehicle never abruptly appears or vanishes.
+  // The Y offset slides the car from just above the horizon into frame
+  // (entry) and off the bottom of the scene (exit).
+  const povOpacity = getPovOpacity(vehicleT);
+  const povYOffset = getPovYOffset(vehicleT, y, carH);
+
   // ── Asset & plate anchor lookup ─────────────────────────────────────────
   // detectorPlacement is exactly AssetViewKey — no translation needed.
   const viewKey = config.detectorPlacement as AssetViewKey;
@@ -166,19 +174,20 @@ export function VehicleAssetLayer({
   const anchor  = PLATE_ANCHORS[config.detectorPlacement];
 
   return (
-    <g>
-      {/* Ground shadow */}
+    <g opacity={povOpacity}>
+      {/* Ground shadow — moves with the vehicle during POV entry/exit */}
       <ellipse
         cx={centerX}
-        cy={y + carH * 0.02}
+        cy={y + carH * 0.02 + povYOffset}
         rx={carW * 0.46}
         ry={carH * 0.09}
         fill="rgba(0,0,0,0.55)"
       />
 
       {/* Perspective transform group — depth scale only, no skewX.
-          The viewing angle is already embedded in each asset image. */}
-      <g transform={`translate(${carX}, ${carY}) scale(${scaleX}, ${scaleY})`}>
+          The viewing angle is already embedded in each asset image.
+          povYOffset slides the car in/out of the scene vertically. */}
+      <g transform={`translate(${carX}, ${carY + povYOffset}) scale(${scaleX}, ${scaleY})`}>
 
         {/* Car body asset (raster image) */}
         {asset.type === 'raster' && (
