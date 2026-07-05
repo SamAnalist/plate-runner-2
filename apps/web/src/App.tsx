@@ -1,22 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   DEFAULT_CONFIG,
-  DEFAULT_FOCUS_ZONE,
   type SimulationConfig,
-  type FocusZoneConfig,
 } from '@plate-runner/shared';
 import { SimulationScene } from './components/simulation/SimulationScene';
 import { ControlPanel } from './components/controls/ControlPanel';
 import { useSimulation } from './hooks/useSimulation';
 import { READING_T_INCOMING, READING_T_AWAY } from './hooks/useSimulation';
-import { getPlateReadability } from './utils/depth';
 import type { VisualStyle } from './components/simulation/renderers/types';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
 export default function App() {
   const [config, setConfig]           = useState<SimulationConfig>(DEFAULT_CONFIG);
-  const [focusZone, setFocusZone]     = useState<FocusZoneConfig>(DEFAULT_FOCUS_ZONE);
   const [appMode, setAppMode]         = useState<AppMode>('normal');
   const [calibrationMode, setCalibrationMode] = useState(false);
   const [showDebug, setShowDebug]     = useState(false);
@@ -61,14 +57,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [appMode]);
 
-  // ── Live readability for header badge ────────────────────────────────────
-  const readability = getPlateReadability(
-    simulation.state.vehicleT,
-    config.detectorPlacement,
-    focusZone,
-  );
-
-  const isExpanded = appMode === 'fullscreen' || appMode === 'camera';
+  const isExpanded  = appMode === 'fullscreen' || appMode === 'camera';
   const isCameraMode = appMode === 'camera';
 
   // ─── Normal layout ───────────────────────────────────────────────────────
@@ -82,7 +71,7 @@ export default function App() {
             Plate Runner
           </span>
           <span className="text-[10px] text-white/25 font-mono bg-white/5 px-1.5 py-0.5 rounded">
-            v0.2
+            v0.9
           </span>
         </div>
 
@@ -99,18 +88,6 @@ export default function App() {
             <span className="text-white/50">detector:</span>{' '}
             <span className="text-white/60">{config.detectorPlacement}</span>
           </span>
-          {/* Live readability badge */}
-          {focusZone.enabled && (
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
-              readability.readability === 'good'    ? 'bg-emerald-500/20 text-emerald-400' :
-              readability.readability === 'partial' ? 'bg-yellow-500/20 text-yellow-400' :
-              'bg-red-500/20 text-red-400'
-            }`}>
-              {readability.readability === 'good'    ? '● GOOD' :
-               readability.readability === 'partial' ? '◐ PARTIAL' :
-               '○ POOR'}
-            </span>
-          )}
         </div>
       </header>
 
@@ -120,7 +97,6 @@ export default function App() {
           <SimulationScene
             config={config}
             simulation={simulation}
-            focusZone={focusZone}
             visualStyle={visualStyle}
             showDebug={showDebug}
             calibrationMode={calibrationMode}
@@ -132,9 +108,7 @@ export default function App() {
           <ControlPanel
             config={config}
             simulation={simulation}
-            focusZone={focusZone}
             onConfigChange={setConfig}
-            onFocusZoneChange={setFocusZone}
             showDebug={showDebug}
             onShowDebugChange={setShowDebug}
             calibrationMode={calibrationMode}
@@ -162,12 +136,10 @@ export default function App() {
   // ─── Expanded layout (Fullscreen / Camera Mode) ──────────────────────────
   const expandedLayout = (
     <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
-      {/* Simulation fills the screen */}
       <div className="w-full h-full flex items-center justify-center p-0">
         <SimulationScene
           config={config}
           simulation={simulation}
-          focusZone={focusZone}
           visualStyle={visualStyle}
           showDebug={!isCameraMode && showDebug}
           cameraMode={isCameraMode}
@@ -175,7 +147,7 @@ export default function App() {
         />
       </div>
 
-      {/* Exit button — always visible, minimal in camera mode */}
+      {/* Exit button */}
       <button
         onClick={() => setAppMode('normal')}
         className={`
@@ -189,7 +161,6 @@ export default function App() {
         {isCameraMode ? 'EXIT' : '✕ Exit'}
       </button>
 
-      {/* Mode badge */}
       {!isCameraMode && (
         <div className="absolute top-3 left-3 z-20
           bg-black/50 border border-white/15 rounded px-2.5 py-1.5
@@ -199,7 +170,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Status info overlay for fullscreen mode (bottom-right) */}
       {!isCameraMode && (
         <div className="absolute bottom-3 right-3 z-20
           bg-black/50 border border-white/12 rounded px-2.5 py-1.5
@@ -216,7 +186,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Keyboard hint */}
       {!isCameraMode && (
         <p className="absolute bottom-3 left-3 z-20 text-[9px] font-mono text-white/20">
           Press Esc to exit

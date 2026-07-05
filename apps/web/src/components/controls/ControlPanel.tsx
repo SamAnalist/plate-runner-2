@@ -1,25 +1,22 @@
 import { useState } from 'react';
 import type {
   SimulationConfig,
-  FocusZoneConfig,
   Direction,
   DetectorPlacement,
   GateMode,
+  GateInitialState,
   VehicleColor,
 } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
 import { READING_T_INCOMING, READING_T_AWAY } from '../../hooks/useSimulation';
 import { PlateInput } from './PlateInput';
-import { FocusZoneControls } from './FocusZoneControls';
 import type { VisualStyle } from '../simulation/renderers/types';
 import { VISUAL_STYLE_LABELS } from '../simulation/renderers/types';
 
 interface ControlPanelProps {
   config: SimulationConfig;
   simulation: SimulationControls;
-  focusZone: FocusZoneConfig;
   onConfigChange: (c: SimulationConfig) => void;
-  onFocusZoneChange: (fz: FocusZoneConfig) => void;
   showDebug: boolean;
   onShowDebugChange: (v: boolean) => void;
   calibrationMode: boolean;
@@ -142,6 +139,187 @@ function SpeedSlider({ value, onChange }: { value: number; onChange: (v: number)
   );
 }
 
+// ─── Duration input ────────────────────────────────────────────────────────
+
+function DurationInput({
+  label,
+  valueMs,
+  onChange,
+  min = 100,
+  max = 10000,
+  step = 100,
+}: {
+  label: string;
+  valueMs: number;
+  onChange: (ms: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex justify-between items-center">
+        <span className="text-[10px] text-white/40 font-mono">{label}</span>
+        <span className="text-[10px] font-mono text-blue-400 font-bold">{valueMs}ms</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={valueMs}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full accent-blue-500 h-1 rounded cursor-pointer"
+      />
+    </div>
+  );
+}
+
+// ─── Gate section ──────────────────────────────────────────────────────────
+
+function GateSection({
+  config,
+  onConfigChange,
+  simulation,
+}: {
+  config: SimulationConfig;
+  onConfigChange: (c: SimulationConfig) => void;
+  simulation: SimulationControls;
+}) {
+  function set<K extends keyof SimulationConfig>(key: K, val: SimulationConfig[K]) {
+    onConfigChange({ ...config, [key]: val });
+  }
+
+  const { state, openGate, closeGate } = simulation;
+  const isAtGate  = state.phase === 'stopped_at_gate' || state.phase === 'gate_opening';
+  const isWaiting = state.phase === 'waiting_for_signal';
+  const gateVisible = config.gateMode !== 'hidden';
+  const gateClosed  = config.gateInitialState === 'closed';
+  const isAutoOpen  = config.gateMode === 'auto_open';
+
+  return (
+    <div className="flex flex-col gap-3">
+
+      {/* ── Visibility ─────────────────────────────────────────────────── */}
+      <div>
+        <SectionLabel>Gate</SectionLabel>
+        <ToggleGroup<GateMode>
+          options={[
+            { value: 'hidden',          label: 'Hidden'       },
+            { value: 'auto_open',       label: 'Auto Open'    },
+            { value: 'wait_for_signal', label: 'Wait Signal'  },
+          ]}
+          value={config.gateMode}
+          onChange={v => set('gateMode', v)}
+        />
+        <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
+          {config.gateMode === 'hidden'
+            ? 'Gate not shown — vehicle passes without stopping.'
+            : config.gateMode === 'auto_open'
+            ? 'Vehicle stops at gate, arm rises automatically.'
+            : 'Vehicle stops; Send Signal button triggers the arm.'}
+        </p>
+      </div>
+
+      {/* ── Initial state (only when gate is visible) ─────────────────── */}
+      {gateVisible && (
+        <div>
+          <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1.5">
+            Initial State
+          </p>
+          <ToggleGroup<GateInitialState>
+            options={[
+              { value: 'closed', label: 'Closed' },
+              { value: 'open',   label: 'Open'   },
+            ]}
+            value={config.gateInitialState}
+            onChange={v => set('gateInitialState', v)}
+          />
+          {config.gateInitialState === 'open' && (
+            <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
+              Gate starts open — vehicle passes through without stopping.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Auto-open timings ─────────────────────────────────────────── */}
+      {gateVisible && gateClosed && isAutoOpen && (
+        <div className="flex flex-col gap-2">
+          <p className="text-[10px] text-white/35 uppercase tracking-[0.16em]">Timings</p>
+          <DurationInput
+            label="Stop before opening"
+            valueMs={config.stopBeforeOpenMs}
+            onChange={v => set('stopBeforeOpenMs', v)}
+            min={200} max={8000} step={200}
+          />
+          <DurationInput
+            label="Delay after arm rises"
+            valueMs={config.delayAfterOpenMs}
+            onChange={v => set('delayAfterOpenMs', v)}
+            min={0} max={3000} step={100}
+          />
+        </div>
+      )}
+
+      {/* ── Status indicator ──────────────────────────────────────────── */}
+      {gateVisible && (
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full transition-colors ${
+            state.gateOpen ? 'bg-emerald-400' : 'bg-red-500'}`} />
+          <span className="text-[10px] font-mono text-white/40">
+            Arm: {state.gateOpen ? 'OPEN' : 'CLOSED'}
+          </span>
+          {isAtGate && (
+            <span className="ml-auto text-[10px] font-mono text-orange-400 animate-pulse">
+              STOPPED
+            </span>
+          )}
+          {isWaiting && (
+            <span className="ml-auto text-[10px] font-mono text-yellow-400 animate-pulse">
+              WAITING
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Send Open Signal — prominent, only when waiting_for_signal ── */}
+      {isWaiting && (
+        <button
+          onClick={openGate}
+          className="w-full py-2.5 rounded text-sm font-mono font-bold
+            bg-yellow-500/20 border-2 border-yellow-400/70 text-yellow-300
+            hover:bg-yellow-500/35 hover:border-yellow-300 transition-all
+            animate-pulse"
+        >
+          ⬆ Send Open Signal
+        </button>
+      )}
+
+      {/* ── Manual gate override ──────────────────────────────────────── */}
+      {gateVisible && !isWaiting && (
+        <div>
+          <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1.5">
+            Manual Override
+          </p>
+          <div className="flex gap-2">
+            <button onClick={openGate} disabled={state.gateOpen}
+              className="flex-1 py-1.5 rounded text-xs font-mono font-semibold
+                border border-emerald-500/40 text-emerald-400
+                disabled:opacity-30 disabled:cursor-not-allowed
+                hover:bg-emerald-500/15 transition-colors">
+              Open
+            </button>
+            <button onClick={closeGate} disabled={!state.gateOpen}
+              className="flex-1 py-1.5 rounded text-xs font-mono font-semibold
+                border border-red-500/40 text-red-400
+                disabled:opacity-30 disabled:cursor-not-allowed
+                hover:bg-red-500/15 transition-colors">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Calibration panel ─────────────────────────────────────────────────────
 
 function CalibrationPanel({
@@ -166,10 +344,10 @@ function CalibrationPanel({
         <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Quick plates</p>
         <div className="flex flex-col gap-1.5">
           {[
-            { label: 'Short (ABC123)',       plate: 'ABC123'      },
-            { label: 'Medium (ABC 1234)',     plate: 'ABC1234'     },
+            { label: 'Short (ABC123)',         plate: 'ABC123'       },
+            { label: 'Medium (ABC1234)',        plate: 'ABC1234'      },
             { label: '12-char (ABCDEFGHIJ12)', plate: 'ABCDEFGHIJ12' },
-            { label: 'Single char (A)',       plate: 'A'           },
+            { label: 'Single char (A)',         plate: 'A'            },
           ].map(({ label, plate }) => (
             <button
               key={plate}
@@ -205,9 +383,7 @@ function CalibrationPanel({
 export function ControlPanel({
   config,
   simulation,
-  focusZone,
   onConfigChange,
-  onFocusZoneChange,
   showDebug,
   onShowDebugChange,
   calibrationMode,
@@ -222,14 +398,23 @@ export function ControlPanel({
   onShowMotionPathOverlayChange,
   onEnterVisualQA,
 }: ControlPanelProps) {
-  const { state, start, stop, reset, openGate, closeGate } = simulation;
+  const { state, start, stop, reset } = simulation;
 
   function set<K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) {
     onConfigChange({ ...config, [key]: value });
   }
 
   const isRunning = state.isRunning;
-  const isAtGate  = state.phase === 'at_gate';
+  const isAtGate  = state.phase === 'stopped_at_gate' || state.phase === 'waiting_for_signal';
+  const isGateOpening = state.phase === 'gate_opening';
+
+  const phaseLabel =
+    state.phase === 'running'            ? 'Running'            :
+    state.phase === 'stopped_at_gate'    ? 'Stopped at gate'    :
+    state.phase === 'waiting_for_signal' ? 'Waiting for signal' :
+    state.phase === 'gate_opening'       ? 'Gate opening'       :
+    state.phase === 'done'               ? 'Vehicle passed'     :
+    'Idle';
 
   return (
     <div className="flex flex-col h-full bg-[#0f1117]">
@@ -324,61 +509,14 @@ export function ControlPanel({
 
         <Divider />
 
-        {/* ── Gate Mode ──────────────────────────────────────────────────── */}
-        <div>
-          <SectionLabel>Gate Mode</SectionLabel>
-          <ToggleGroup<GateMode>
-            options={[
-              { value: 'auto_open',       label: 'Auto Open'    },
-              { value: 'wait_for_signal', label: 'Wait Signal'  },
-              { value: 'hidden',          label: 'Hidden'       },
-            ]}
-            value={config.gateMode}
-            onChange={v => set('gateMode', v)}
-          />
-          <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
-            {config.gateMode === 'wait_for_signal'
-              ? 'Vehicle stops at gate and waits for Open Gate signal'
-              : config.gateMode === 'auto_open'
-              ? 'Gate opens automatically as vehicle approaches'
-              : 'Gate is hidden'}
-          </p>
-        </div>
+        {/* ── Gate ───────────────────────────────────────────────────────── */}
+        <GateSection
+          config={config}
+          onConfigChange={onConfigChange}
+          simulation={simulation}
+        />
 
         <Divider />
-
-        {/* ── Gate manual override ───────────────────────────────────────── */}
-        {config.gateMode !== 'hidden' && (
-          <>
-            <div>
-              <SectionLabel>Gate Override</SectionLabel>
-              <div className="flex gap-2">
-                <button onClick={openGate}  disabled={state.gateOpen}
-                  className="flex-1 py-1.5 rounded text-xs font-mono font-semibold
-                    border border-emerald-500/40 text-emerald-400
-                    disabled:opacity-30 disabled:cursor-not-allowed
-                    hover:bg-emerald-500/15 transition-colors">
-                  Open Gate
-                </button>
-                <button onClick={closeGate} disabled={!state.gateOpen}
-                  className="flex-1 py-1.5 rounded text-xs font-mono font-semibold
-                    border border-red-500/40 text-red-400
-                    disabled:opacity-30 disabled:cursor-not-allowed
-                    hover:bg-red-500/15 transition-colors">
-                  Close Gate
-                </button>
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full transition-colors ${
-                  state.gateOpen ? 'bg-emerald-400' : 'bg-red-500'}`} />
-                <span className="text-[10px] font-mono text-white/40">
-                  Gate is {state.gateOpen ? 'OPEN' : 'CLOSED'}
-                </span>
-              </div>
-            </div>
-            <Divider />
-          </>
-        )}
 
         {/* ── Vehicle Color ──────────────────────────────────────────────── */}
         <div>
@@ -398,7 +536,7 @@ export function ControlPanel({
 
         <Divider />
 
-        {/* ── Speed ───────────────────────────────��──────────────────────── */}
+        {/* ── Speed ──────────────────────────────────────────────────────── */}
         <SpeedSlider value={config.speed} onChange={v => set('speed', v)} />
 
         <Divider />
@@ -408,24 +546,23 @@ export function ControlPanel({
           <SectionLabel>Playback</SectionLabel>
           <div className="mb-3 flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full transition-colors ${
-              isRunning     ? 'bg-emerald-400 animate-pulse' :
-              isAtGate      ? 'bg-yellow-400' :
+              isRunning      ? 'bg-emerald-400 animate-pulse' :
+              isAtGate       ? 'bg-yellow-400' :
+              isGateOpening  ? 'bg-cyan-400 animate-pulse' :
               state.phase === 'done' ? 'bg-blue-400' : 'bg-white/20'}`} />
             <span className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
-              {isRunning     ? 'Running' :
-               isAtGate      ? 'Waiting for signal' :
-               state.phase === 'done' ? 'Vehicle passed' : 'Idle'}
+              {phaseLabel}
             </span>
             <span className="ml-auto text-[10px] font-mono text-white/25">
               t={state.vehicleT.toFixed(3)}
             </span>
           </div>
           <div className="flex gap-2">
-            {!isRunning ? (
+            {!isRunning && !isGateOpening ? (
               <button onClick={start}
                 className="flex-1 py-2 rounded-md text-sm font-mono font-bold
                   bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/60 transition-colors">
-                {state.phase === 'done' || state.phase === 'at_gate' ? 'Restart' : 'Start'}
+                {state.phase === 'done' || isAtGate ? 'Restart' : 'Start'}
               </button>
             ) : (
               <button onClick={stop}
@@ -441,19 +578,7 @@ export function ControlPanel({
               Reset
             </button>
           </div>
-          {isAtGate && (
-            <p className="mt-2 text-[10px] font-mono text-yellow-400/70 leading-snug">
-              Vehicle waiting for signal. Use Gate Override to open, or press Restart.
-            </p>
-          )}
         </div>
-
-        <Divider />
-
-        {/* ── Focus Zone ─────────────────────────────────────────────────── */}
-        <CollapsibleSection title="Camera Focus Zone" badge="CAM" defaultOpen={false}>
-          <FocusZoneControls focusZone={focusZone} onChange={onFocusZoneChange} />
-        </CollapsibleSection>
 
         <Divider />
 
@@ -496,7 +621,6 @@ export function ControlPanel({
           defaultOpen={false}
         >
           <div className="flex flex-col gap-3">
-            {/* One-click QA setup */}
             <button
               onClick={onEnterVisualQA}
               className="w-full py-2 rounded text-xs font-mono font-bold
@@ -506,10 +630,9 @@ export function ControlPanel({
               ◎ Enter Visual QA Mode
             </button>
             <p className="text-[9px] text-white/30 font-mono leading-snug -mt-1">
-              Switches to Asset Realistic + freezes at reading pos + shows anchor bounds
+              Switches to Asset Realistic + freezes at reading pos
             </p>
 
-            {/* Quick plate buttons */}
             <div>
               <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Quick plates</p>
               <div className="flex flex-col gap-1">
@@ -535,7 +658,6 @@ export function ControlPanel({
               </div>
             </div>
 
-            {/* Overlays */}
             <div>
               <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Overlays</p>
               <div className="flex flex-col gap-1">
@@ -566,14 +688,6 @@ export function ControlPanel({
               </div>
               <p className="mt-1 text-[9px] text-white/25 font-mono leading-snug">
                 Asset Realistic only · hidden in Camera Mode
-              </p>
-            </div>
-
-            {/* Screenshot instruction */}
-            <div className="mt-1 border border-white/8 rounded p-2">
-              <p className="text-[9px] text-white/30 font-mono leading-relaxed">
-                <span className="text-white/50">Screenshot:</span> Cmd+Shift+4 (Mac) or
-                Win+Shift+S (Windows). Cycle all 6 placements and both directions.
               </p>
             </div>
           </div>
@@ -623,7 +737,7 @@ export function ControlPanel({
       {/* Footer */}
       <div className="px-4 py-3 border-t border-white/8 shrink-0">
         <p className="text-[10px] font-mono text-white/20 leading-snug">
-          v0.6.0 — Visual QA Mode
+          v0.9.0 — Gate Behavior + POV Motion
         </p>
       </div>
     </div>
