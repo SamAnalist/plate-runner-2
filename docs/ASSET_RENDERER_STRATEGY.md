@@ -1,8 +1,8 @@
 # Asset Renderer Strategy — Plate Runner
 
-**Phase:** 0.4
-**Date:** 2026-07-03
-**Status:** Prototype complete — SVG prototype car, PNG/WebP slot ready
+**Phase:** 0.4 → 0.4c (corrected)
+**Date:** 2026-07-04
+**Status:** Architecture complete — 6 per-view raster slots, placeholder SVGs installed, photorealistic assets NOT YET PRODUCED
 
 ---
 
@@ -31,18 +31,29 @@ The original renderers (`ClassicSvgRenderer`, `RealisticRenderer`, etc.) drew th
 
 ## 3. Asset Plan
 
-### Current State (Phase 0.4)
+### Current State (Phase 0.4c)
 
 ```
-AssetViewKey = 'front' | 'rear'
+AssetViewKey = 'center_front' | 'driver_front' | 'passenger_front'
+             | 'center_back'  | 'driver_back'  | 'passenger_back'
 
 ASSET_REGISTRY = {
-  front: { type: 'svg-prototype', render: AssetCarFront }
-  rear:  { type: 'svg-prototype', render: AssetCarRear  }
+  center_front:    { type: 'raster', src: '/assets/vehicles/main-car/center-front.svg',    isPlaceholder: true }
+  driver_front:    { type: 'raster', src: '/assets/vehicles/main-car/driver-front.svg',    isPlaceholder: true }
+  passenger_front: { type: 'raster', src: '/assets/vehicles/main-car/passenger-front.svg', isPlaceholder: true }
+  center_back:     { type: 'raster', src: '/assets/vehicles/main-car/center-back.svg',     isPlaceholder: true }
+  driver_back:     { type: 'raster', src: '/assets/vehicles/main-car/driver-back.svg',     isPlaceholder: true }
+  passenger_back:  { type: 'raster', src: '/assets/vehicles/main-car/passenger-back.svg',  isPlaceholder: true }
 }
 ```
 
-Both SVG prototypes are drawn in a **100 × 72 unit local coordinate space**. The car body is a curved sedan silhouette path with multi-layer metallic sheen, headlights/tail-lights, tyre detail, grille, and door character lines. **No plate is drawn inside the prototype** — this is a hard architectural rule.
+Each placeholder SVG shows a **schematic car from the correct angle**:
+- Front views (blue): symmetric (center) or trapezoidal 3/4 body (driver/passenger)
+- Rear views (red): same geometry, tail-light details
+- Each SVG has the plate area outlined in yellow at the correct anchor position
+- All are labelled "PLACEHOLDER" and the view key abbreviation (CF, DF, PF, CB, DB, PB)
+
+**The SVG prototypes (`AssetCarFront`/`AssetCarRear`) are removed from the registry.** They are no longer used. The `svg-prototype` union member is retained in `AssetEntry` as a deprecated type only.
 
 ### Future State (PNG/WebP Assets)
 

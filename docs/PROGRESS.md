@@ -4,6 +4,85 @@ Format follows `CLAUDE.md § Progress Documentation Format`.
 
 ---
 
+## Phase 0.4c — Asset Renderer Visual Correction
+
+**Date:** 2026-07-04
+
+### Goal
+
+Correct the architecture gaps exposed during review of Phase 0.4:
+- `AssetViewKey` only had `front`/`rear` — now 6 keys matching `DetectorPlacement` exactly
+- All views used the same asset via skewX — now each has its own file slot
+- Plate anchors were shared — now 6 independent anchors with per-view `skewXDeg`
+- Gate arm rotation used `transformOrigin` absolute-px (unreliable SVG+CSS) — fixed
+- SVG prototype car remained in registry as "asset" — replaced with raster entries
+
+Phase 0.4 created the architecture. Phase 0.4c makes that architecture real and honest
+about what is a placeholder versus production-ready.
+
+### What Was NOT Fixed (by design)
+
+The placeholder SVG files are schematic diagrams, not photorealistic images.
+**No visual realism was added in this phase.** The system is structurally ready
+for real assets. Realism requires an external asset production step — see
+`docs/ASSET_RENDERER_STRATEGY.md §3` for exact specifications.
+
+### Implemented
+
+- `types.ts` — `AssetViewKey` extended to 6 values; `PlateAnchor` gains `rotateDeg`, `skewXDeg`, `skewYDeg`, `side`; `AssetEntry.svg-prototype` deprecated
+- `assetRegistry.tsx` — 6 raster entries (one per view), all pointing to SVG placeholder files; SVG prototype components removed from registry
+- `plateAnchors.ts` — 6 independent anchors with `skewXDeg=±7°` for driver/passenger 3/4 views
+- `DynamicPlateOverlay.tsx` — applies `rotate/skewX/skewY` SVG transform around plate centre
+- `VehicleAssetLayer.tsx` — uses `config.detectorPlacement` directly as `AssetViewKey`; no skewX in depth transform
+- `AssetRealisticRenderer.tsx` — gate arm: translate-at-pivot + `motion.g` rotate pattern (reliable cross-browser)
+- `public/assets/vehicles/main-car/` — 6 schematic placeholder SVG files (front=blue, back=red; symmetric vs 3/4 trapezoid)
+- `docs/VISUAL_QA.md` — NEW: honest per-placement visual QA table; gate evaluation; known issues; asset production checklist
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/types.ts` — extended
+- `apps/web/src/components/simulation/renderers/asset-realistic/assetRegistry.tsx` — rewritten
+- `apps/web/src/components/simulation/renderers/asset-realistic/plateAnchors.ts` — rewritten
+- `apps/web/src/components/simulation/renderers/asset-realistic/DynamicPlateOverlay.tsx` — add transform
+- `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` — use placement as view key
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — gate arm fix
+- `apps/web/public/assets/vehicles/main-car/*.svg` — 6 NEW placeholder files
+- `docs/VISUAL_QA.md` — NEW
+- `docs/PROGRESS.md` — this entry
+
+### Decisions
+
+- **`AssetViewKey = DetectorPlacement`**: The cleanest possible mapping — no translation layer, no resolveViewKey function needed. Pass the placement string directly as the registry key.
+- **Remove `resolveViewKey`**: The function was a stopgap from when only 2 views existed. With 6 distinct view keys it is deleted entirely.
+- **`skewX` removed from depth transform**: Angle is baked into each asset image. The 3° skew that existed before was too small to distinguish views and is now superseded by distinct images.
+- **Placeholder SVGs not PNG**: SVG files served as static assets load correctly in `<image href="...">`. Switching to PNG requires only updating `src` in the registry.
+- **Gate arm: translate-then-rotate**: Framer Motion's `transformOrigin` with absolute px values is ambiguous for SVG elements across browsers. The translate-to-pivot pattern eliminates all ambiguity.
+- **`isPlaceholder: true` flag**: Acts as a TODO marker in the registry. Remove when real assets are installed.
+
+### Manual Testing
+
+1. Select **Asset Realistic** renderer
+2. Cycle all 6 detector placements — confirm each shows a DIFFERENT image (trapezoid vs symmetric, blue vs red)
+3. Test `ABCDEFGHIJ12` (12 chars) — confirm plate fits in all 6 views
+4. Press **Start** in `auto_open` mode — gate arm must physically rotate up
+5. Press **Start** in `wait_for_signal` mode — car stops, arm stays down, press **Open Gate**, arm lifts
+6. Enable **Camera Mode** — plate area not obscured by overlays
+7. `cd apps/web && npx tsc --noEmit` → no output (clean)
+
+### Known Limitations
+
+- All 6 assets are schematic placeholder SVGs — **not photorealistic** — realism score 2/10
+- `vehicleColor` config does not affect asset appearance (placeholders are single colour)
+- Plate `skewXDeg=±7°` values are calibrated against placeholders; re-calibrate when real assets arrive
+- Contact shadow ellipse does not account for 3/4 view perspective
+
+### Next Steps
+
+**Phase 0.5 — Real Asset Production**
+Produce or source photorealistic PNG/WebP renders for all 6 views (transparent background, 900×600 px, neutral body colour). Install, calibrate plate anchors, re-run VISUAL_QA.md checklist.
+
+---
+
 ## Phase 0.4 — Asset-Based Renderer Strategy
 
 **Date:** 2026-07-03

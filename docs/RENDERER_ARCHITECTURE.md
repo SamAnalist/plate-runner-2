@@ -1,7 +1,7 @@
 # Renderer Architecture — Plate Runner
 
-**Phase:** 0.3 (renderer separation) + 0.4 (asset-based layer)
-**Date:** 2026-07-03
+**Phase:** 0.3 (renderer separation) + 0.4 (asset-based layer) + 0.4c (per-view assets, gate fix)
+**Date:** 2026-07-04
 
 ---
 
@@ -127,17 +127,30 @@ All renderers share the same depth utilities from `utils/depth.ts`:
 
 ## 7. Animation
 
-All gate arm animation uses **Framer Motion**:
+All gate arm animation uses **Framer Motion** with the translate-at-pivot pattern:
 
 ```tsx
-<motion.g
-  style={{ transformOrigin: `${pivotX}px ${pivotY}px` }}
-  animate={{ rotate: gateOpen ? -76 : 0 }}
-  transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
->
+{/* Static group: moves origin to the pivot point */}
+<g transform={`translate(${pivotX}, ${pivotY})`}>
+  {/* Framer Motion: rotates around (0,0) = the pivot */}
+  <motion.g
+    animate={{ rotate: gateOpen ? -80 : 0 }}
+    transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
+  >
+    {/* Arm drawn from pivot, extending LEFT (negative x) */}
+    <rect x={-armLen} y={-armThick/2} width={armLen} height={armThick} fill="#f0b800" />
+  </motion.g>
+</g>
 ```
 
-Gate arm rotation is the only animated element in the renderers. Vehicle movement is driven by `vehicleT` — a value updated by `useSimulation`, not by Framer Motion.
+**Why this pattern:** Framer Motion's `style={{ transformOrigin: '${px}px ${py}px' }}` uses absolute
+SVG viewport coordinates for CSS `transform-origin`. The interaction between CSS `transform-origin`
+and SVG element geometry is inconsistent across browsers when using absolute px values. The
+translate-then-rotate pattern is always unambiguous: the `motion.g` always rotates around (0,0)
+in its own local space, which has been translated to the physical pivot point.
+
+Gate arm rotation is the only animated element in the renderers. Vehicle movement is driven by
+`vehicleT` — a value updated by `useSimulation`, not by Framer Motion.
 
 ---
 
@@ -156,9 +169,35 @@ Each renderer prefixes its gradient and pattern IDs to avoid collisions when mul
 
 ---
 
-## 9. Extension Points
+## 9. Asset View Model (Phase 0.4c)
+
+`AssetViewKey` is now identical to `DetectorPlacement`:
+
+```ts
+type AssetViewKey =
+  | 'center_front' | 'driver_front' | 'passenger_front'
+  | 'center_back'  | 'driver_back'  | 'passenger_back';
+```
+
+Each key maps to:
+1. A file in `ASSET_REGISTRY` → car body image
+2. An anchor in `PLATE_ANCHORS` → plate position + per-view skew
+
+`VehicleAssetLayer` uses `config.detectorPlacement` as the key directly (no translation). The former `resolveViewKey(isFrontView)` function has been deleted.
+
+### Per-view plate skew
+
+```ts
+center_front/back:    skewXDeg = 0    (symmetric, no perspective distortion)
+driver_front/back:    skewXDeg = -7   (left edge recedes — driver-side camera)
+passenger_front/back: skewXDeg = +7   (right edge recedes — passenger-side camera)
+```
+
+Values are calibrated against placeholder SVG geometry. Re-calibrate when real photorealistic assets are installed.
+
+## 10. Extension Points
 
 - **New visual style**: add to `VisualStyle` union, add label to `VISUAL_STYLE_LABELS`, add entry to `RENDERERS` record, create `MyRenderer.tsx` implementing `SceneRendererProps`.
-- **New car view**: add to `AssetViewKey`, add `AssetEntry` to `ASSET_REGISTRY`, add `PlateAnchor` to `PLATE_ANCHORS`.
-- **New vehicle color**: add to `CAR_PALETTES` in `types.ts`.
-- **Raster asset swap**: update `ASSET_REGISTRY[viewKey]` to `{ type: 'raster', src, naturalW, naturalH }`.
+- **Install real car asset**: update `ASSET_REGISTRY[viewKey].src` to the real PNG path, delete `isPlaceholder`, re-calibrate `PLATE_ANCHORS[placement].skewXDeg`.
+- **New vehicle color**: implement hue-rotate filter in `VehicleAssetLayer` OR commission per-colour asset variants and expand `ASSET_REGISTRY` key scheme.
+- **New camera angle (e.g. overhead front)**: extend `AssetViewKey`, add matching `DetectorPlacement`, add file + anchor entries.
