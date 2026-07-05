@@ -7,14 +7,16 @@ export type VisualStyle =
   | 'realistic'
   | 'gate-camera'
   | 'overhead'
-  | 'cinematic';
+  | 'cinematic'
+  | 'asset-realistic';
 
 export const VISUAL_STYLE_LABELS: Record<VisualStyle, string> = {
-  classic:         'Classic SVG',
-  realistic:       'Realistic 2D',
-  'gate-camera':   'Gate Camera',
-  overhead:        'Overhead 2.5D',
-  cinematic:       'Cinematic Night',
+  classic:            'Classic SVG',
+  realistic:          'Realistic 2D',
+  'gate-camera':      'Gate Camera',
+  overhead:           'Overhead 2.5D',
+  cinematic:          'Cinematic Night',
+  'asset-realistic':  'Asset Realistic',
 };
 
 export interface SceneRendererProps {

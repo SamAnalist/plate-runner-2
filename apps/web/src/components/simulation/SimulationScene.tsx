@@ -18,14 +18,16 @@ import { RealisticRenderer } from './renderers/RealisticRenderer';
 import { GateCameraRenderer } from './renderers/GateCameraRenderer';
 import { OverheadRenderer } from './renderers/OverheadRenderer';
 import { CinematicRenderer } from './renderers/CinematicRenderer';
+import { AssetRealisticRenderer } from './renderers/asset-realistic/AssetRealisticRenderer';
 import type React from 'react';
 
 const RENDERERS: Record<VisualStyle, React.FC<SceneRendererProps>> = {
-  classic:         ClassicSvgRenderer,
-  realistic:       RealisticRenderer,
-  'gate-camera':   GateCameraRenderer,
-  overhead:        OverheadRenderer,
-  cinematic:       CinematicRenderer,
+  classic:            ClassicSvgRenderer,
+  realistic:          RealisticRenderer,
+  'gate-camera':      GateCameraRenderer,
+  overhead:           OverheadRenderer,
+  cinematic:          CinematicRenderer,
+  'asset-realistic':  AssetRealisticRenderer,
 };
 
 interface Props {
