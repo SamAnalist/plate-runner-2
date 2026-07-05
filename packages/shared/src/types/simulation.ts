@@ -12,11 +12,18 @@ export type DetectorPlacement =
   | 'passenger_back';
 
 /**
- * auto_open     — Gate opens automatically when vehicle approaches.
- * wait_for_signal — Gate stays closed; vehicle stops and waits for a manual/API signal.
- * hidden        — Gate is not rendered in the scene.
+ * auto_open       — Gate starts closed; vehicle stops, waits, gate opens automatically.
+ * wait_for_signal — Gate starts closed; vehicle stops and waits for a manual/API signal.
+ * hidden          — Gate is not rendered in the scene.
  */
 export type GateMode = 'auto_open' | 'wait_for_signal' | 'hidden';
+
+/**
+ * Initial visual state of the gate arm at the start of a simulation run.
+ *   open   — Arm starts raised (80°); vehicle passes without stopping.
+ *   closed — Arm starts horizontal; gate behavior (auto_open / wait_for_signal) applies.
+ */
+export type GateInitialState = 'open' | 'closed';
 
 export type VehicleColor = 'blue' | 'white' | 'black' | 'silver' | 'red' | 'green';
 
@@ -24,7 +31,26 @@ export interface SimulationConfig {
   plate: string;
   direction: Direction;
   detectorPlacement: DetectorPlacement;
+  /** Visibility and behavior mode of the gate. */
   gateMode: GateMode;
+  /**
+   * Initial state of the gate arm when a run starts.
+   * Only applies when gateMode !== 'hidden'.
+   *   open   — Arm starts raised; vehicle passes through without stopping.
+   *   closed — Arm starts down; gateMode behavior (auto_open / wait_for_signal) is applied.
+   */
+  gateInitialState: GateInitialState;
+  /**
+   * How long (ms) the vehicle waits at the gate before the arm starts rising.
+   * Only used when gateMode === 'auto_open' and gateInitialState === 'closed'.
+   * Default: 2000ms.
+   */
+  stopBeforeOpenMs: number;
+  /**
+   * How long (ms) to wait after the gate arm finishes opening before the vehicle
+   * resumes moving. Default: 400ms.
+   */
+  delayAfterOpenMs: number;
   speed: number; // 1–10
   vehicleColor: VehicleColor;
 }
@@ -55,6 +81,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   direction: 'incoming',
   detectorPlacement: 'center_front',
   gateMode: 'auto_open',
+  gateInitialState: 'closed',
+  stopBeforeOpenMs: 2000,
+  delayAfterOpenMs: 400,
   speed: 5,
   vehicleColor: 'blue',
 };
