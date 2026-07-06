@@ -84,9 +84,9 @@ const ARR_HH   = ARR_H  * 0.43;   // head height ≈ 33
 const ARR_HW   = ARR_RW * 0.18;   // head half-width ≈ 32
 const ARR_BW   = ARR_RW * 0.065;  // body half-width ≈ 12
 
-const ARR_TIP_Y  = ARR_Y - ARR_H / 2;   // upward tip (toward VP)
-const ARR_BASE_Y = ARR_Y + ARR_H / 2;
-const ARR_HBAS_Y = ARR_TIP_Y + ARR_HH;  // head/body junction
+const ARR_TIP_Y  = ARR_Y + ARR_H / 2;   // downward tip (toward camera / bottom)
+const ARR_BASE_Y = ARR_Y - ARR_H / 2;
+const ARR_HBAS_Y = ARR_TIP_Y - ARR_HH;  // head/body junction (above tip)
 
 // ─── Centre-line dashes ───────────────────────────────────────────────────────
 const CENTER_DASHES = Array.from({ length: 9 }, (_, i) => {

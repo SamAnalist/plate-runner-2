@@ -53,32 +53,12 @@ import {
   getDepthValues,
   lerp,
 } from '../../../../utils/depth';
+import { INCOMING, AWAY } from '../../../../config/sceneParams';
 
-// ─── POV entry / exit ─────────────────────────────────────────────────────────
-
-/**
- * t-value at which the vehicle is fully visible after entering the scene.
- * Between t=0 and POV_SPAWN_T the car fades in and slides down from above
- * the horizon — simulating the vehicle appearing from outside the camera's
- * field of view.
- *
- * Phase 0.9: increased from 0.07 → 0.14 for a more natural, slower horizon entry.
- */
-export const POV_SPAWN_T = 0.14;
-
-/**
- * t-value at which the vehicle begins to physically exit the scene.
- * From POV_EXIT_T to t=1.0 the car slides off the bottom of the frame.
- * Adjust to control when the slide-out starts.
- */
-export const POV_EXIT_T = 0.75;
-
-/**
- * t-value (away direction) below which the car is fully visible on entry.
- * From t=1.0 down to POV_ENTRY_T_AWAY the car slides UP into the scene from
- * below the bottom edge — mirroring the incoming exit slide.
- */
-export const POV_ENTRY_T_AWAY = 0.85;
+// ─── POV entry / exit (sourced from sceneParams.ts) ──────────────────────────
+export const POV_SPAWN_T      = INCOMING.spawnT;
+export const POV_EXIT_T       = GATE_T;          // always in sync with gate
+export const POV_ENTRY_T_AWAY = AWAY.entryT;
 
 /**
  * Opacity is always 1 — no fade on entry or exit.
@@ -145,18 +125,18 @@ export interface ViewMotionPath {
 
 // ─── Path registry ─────────────────────────────────────────────────────────
 
+// Lateral offsets sourced from sceneParams.ts
+// _front placements use INCOMING.lateral, _back placements use AWAY.lateral
+const IL = INCOMING.lateral;
+const AL = AWAY.lateral;
+
 export const VIEW_MOTION_PATHS: Record<DetectorPlacement, ViewMotionPath> = {
-  // Straight-on — no lateral sweep needed
-  center_front:    { xFar: VP_X,     xNear: VP_X      },
-  center_back:     { xFar: VP_X,     xNear: VP_X      },
-
-  // Driver-side: camera on the LEFT → car appears to drift RIGHT as it nears
-  driver_front:    { xFar: VP_X + 8, xNear: VP_X + 75 },
-  driver_back:     { xFar: VP_X + 8, xNear: VP_X + 75 },
-
-  // Passenger-side: mirror of driver
-  passenger_front: { xFar: VP_X - 8, xNear: VP_X - 75 },
-  passenger_back:  { xFar: VP_X - 8, xNear: VP_X - 75 },
+  center_front:    { xFar: VP_X + IL.center.xFar,    xNear: VP_X + IL.center.xNear    },
+  center_back:     { xFar: VP_X + AL.center.xFar,    xNear: VP_X + AL.center.xNear    },
+  driver_front:    { xFar: VP_X + IL.driver.xFar,    xNear: VP_X + IL.driver.xNear    },
+  driver_back:     { xFar: VP_X + AL.driver.xFar,    xNear: VP_X + AL.driver.xNear    },
+  passenger_front: { xFar: VP_X + IL.passenger.xFar, xNear: VP_X + IL.passenger.xNear },
+  passenger_back:  { xFar: VP_X + AL.passenger.xFar, xNear: VP_X + AL.passenger.xNear },
 };
 
 // ─── Main function ────────────────────────────────────────────────────────────

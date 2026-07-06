@@ -27,10 +27,10 @@ import type { PlateAnchor } from './types';
 // Straight-on frontal view. Camera elevated ~2–3 m, downward tilt.
 // INITIAL CALIBRATION — PENDING VISUAL VERIFICATION
 const CENTER_FRONT: PlateAnchor = {
-  xPct:      0.430,
-  yPct:      0.640,
-  wPct:      0.160,
-  hPct:      0.095,
+  xPct:      0.445,
+  yPct:      0.680,
+  wPct:      0.100,
+  hPct:      0.080,
   rotateDeg: 0,
   skewXDeg:  0,
   skewYDeg:  0,
@@ -69,10 +69,10 @@ const PASSENGER_FRONT: PlateAnchor = {
 // Straight-on rear view. Camera elevated ~2–3 m, downward tilt.
 // INITIAL CALIBRATION — PENDING VISUAL VERIFICATION
 const CENTER_BACK: PlateAnchor = {
-  xPct:      0.405,
-  yPct:      0.620,
-  wPct:      0.185,
-  hPct:      0.095,
+  xPct:      0.445,
+  yPct:      0.580,
+  wPct:      0.115,
+  hPct:      0.085,
   rotateDeg: 0,
   skewXDeg:  0,
   skewYDeg:  0,

@@ -1,4 +1,5 @@
 import type { DetectorPlacement, FocusZoneConfig } from '@plate-runner/shared';
+import { INCOMING, AWAY } from '../config/sceneParams';
 
 // ─── Scene dimensions (SVG viewBox) ───────────────────────────────────────
 export const SCENE_W = 800;
@@ -14,13 +15,11 @@ const ROAD_R_FAR  = VP_X + 10;        // 410
 const ROAD_L_NEAR = SCENE_W * 0.175;  // 140
 const ROAD_R_NEAR = SCENE_W * 0.825;  // 660
 
-// ─── Gate & reading positions ──────────────────────────────────────────────
-/** Depth t at which the gate sits in the scene */
-export const GATE_T = 0.52;
-/** Vehicle stops here when incoming + wait_for_signal; also calibration hold point */
-export const READING_T_INCOMING = GATE_T - 0.06;  // ≈ 0.46
-/** Vehicle stops here when away + wait_for_signal */
-export const READING_T_AWAY     = GATE_T + 0.06;  // ≈ 0.58
+// ─── Gate & reading positions (sourced from sceneParams.ts) ──────────────
+export const GATE_T          = INCOMING.gateT;
+export const GATE_T_BACK     = AWAY.gateT;
+export const READING_T_INCOMING = INCOMING.readingT;
+export const READING_T_AWAY     = AWAY.readingT;
 
 // ─── Car & plate coordinate constants ─────────────────────────────────────
 // These define the car's internal SVG coordinate space and plate position
@@ -33,7 +32,7 @@ export const CAR_ROAD_FRACTION = 0.98; // car width as fraction of road width
 export const CAR_PLATE_X = 29;
 export const CAR_PLATE_Y = 54;
 export const CAR_PLATE_W = 42;
-export const CAR_PLATE_H = 13;
+export const CAR_PLATE_H = 19;
 
 // ─── Core math ────────────────────────────────────────────────────────────
 export function lerp(a: number, b: number, t: number): number {

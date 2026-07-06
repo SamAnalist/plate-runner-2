@@ -31,27 +31,39 @@ import {
   CAR_LW,
   CAR_LH,
   CAR_ROAD_FRACTION,
-  getDepthValues,
   lerp,
 } from '../../../../utils/depth';
-import { getViewAwareX, getPovYOffset, POV_EXIT_T } from './viewMotionPaths';
+import { getViewAwareX, getPovYOffset } from './viewMotionPaths';
 import { ASSET_REGISTRY } from './assetRegistry';
 import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
 import type { AssetViewKey } from './types';
+import { INCOMING, AWAY } from '../../../../config/sceneParams';
+import { GATE_T, GATE_T_BACK, READING_T_INCOMING, READING_T_AWAY } from '../../../../utils/depth';
 
 /**
- * Car width (scene px) at the POV exit point — where the Y slide-out begins.
- * Used as the anchor for the post-exit shrink so the car narrows as it slides.
+ * Returns a car size multiplier for the current depth t and direction,
+ * interpolating smoothly between phase boundary scale values from sceneParams.
  */
-const EXIT_CAR_W = getDepthValues(POV_EXIT_T).roadWidth * CAR_ROAD_FRACTION;
-
-/**
- * How much the car shrinks (relative to EXIT_CAR_W) by t=1.0 in incoming mode.
- * 0.5 = shrinks to 50 % of the exit-point width.
- * Increase toward 1.0 to reduce the effect; decrease toward 0 for more.
- */
-const POST_EXIT_SHRINK = 3.5;
+function getCarScale(t: number, direction: 'incoming' | 'away'): number {
+  if (direction === 'incoming') {
+    const sc = INCOMING.carScale;
+    const decelStart = READING_T_INCOMING - INCOMING.decelOffset;
+    if (t <= decelStart)      return sc.initial;
+    if (t <= READING_T_INCOMING) return lerp(sc.initial,   sc.stopping,  (t - decelStart) / (READING_T_INCOMING - decelStart));
+    if (t <= GATE_T)          return lerp(sc.stopping,  sc.afterStop, (t - READING_T_INCOMING) / (GATE_T - READING_T_INCOMING));
+    // final phase: gate → 1.0
+    return lerp(sc.afterStop, sc.final, Math.min((t - GATE_T) / (1 - GATE_T), 1));
+  } else {
+    const sc = AWAY.carScale;
+    const decelStart = READING_T_AWAY + AWAY.decelOffset;
+    if (t >= decelStart)      return sc.initial;
+    if (t >= READING_T_AWAY)  return lerp(sc.initial,   sc.stopping,  (decelStart - t) / (decelStart - READING_T_AWAY));
+    if (t >= GATE_T_BACK)     return lerp(sc.stopping,  sc.afterStop, (READING_T_AWAY - t) / (READING_T_AWAY - GATE_T_BACK));
+    // final phase: gateT_back → 0
+    return lerp(sc.afterStop, sc.final, Math.min((GATE_T_BACK - t) / GATE_T_BACK, 1));
+  }
+}
 
 interface VehicleAssetLayerProps {
   config: SimulationConfig;
@@ -182,11 +194,9 @@ export function VehicleAssetLayer({
   // Y and scale still come from vehicleDepth (standard depth model).
   const centerX = getViewAwareX(vehicleT, safePlacement);
 
-  // Once the Y slide-out begins (POV_EXIT_T) shrink the car as it exits,
-  // so it narrows in sync with the downward slide instead of staying large.
-  const carW = config.direction === 'incoming' && vehicleT > POV_EXIT_T
-    ? lerp(EXIT_CAR_W, EXIT_CAR_W * POST_EXIT_SHRINK, Math.min((vehicleT - POV_EXIT_T) / (1 - POV_EXIT_T), 1))
-    : roadWidth * CAR_ROAD_FRACTION;
+  // Car size = natural depth width × per-phase scale from sceneParams.
+  const carScale = getCarScale(vehicleT, config.direction);
+  const carW     = roadWidth * CAR_ROAD_FRACTION * carScale;
   const carH  = carW * (CAR_LH / CAR_LW);
   const carX  = centerX - carW / 2;
   const carY  = y - carH;

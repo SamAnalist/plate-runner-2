@@ -8,6 +8,7 @@ import {
   VP_X,
   VP_Y,
   GATE_T,
+  GATE_T_BACK,
   getDepthValues,
 } from '../../utils/depth';
 import { AssetRealisticRenderer } from './renderers/asset-realistic/AssetRealisticRenderer';
@@ -36,11 +37,12 @@ export function SimulationScene({
   const { state } = simulation;
   const { vehicleT, gateOpen, phase } = state;
 
-  const gateDepth    = useMemo(() => getDepthValues(GATE_T), []);
+  const activeGateT  = config.direction === 'away' ? GATE_T_BACK : GATE_T;
+  const gateDepth    = useMemo(() => getDepthValues(activeGateT), [activeGateT]);
   const vehicleDepth = getDepthValues(vehicleT);
 
   // Z-ordering: vehicle behind gate (farther from camera) → draw first
-  const vehicleBehindGate = vehicleT < GATE_T;
+  const vehicleBehindGate = vehicleT < activeGateT;
 
   const rendererProps: SceneRendererProps = {
     config,

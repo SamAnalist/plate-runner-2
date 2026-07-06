@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import type { SimulationConfig } from '@plate-runner/shared';
 import { GATE_T, READING_T_INCOMING, READING_T_AWAY } from '../utils/depth';
 import { POV_EXIT_T } from '../components/simulation/renderers/asset-realistic/viewMotionPaths';
+import { INCOMING as IC, AWAY as AW } from '../config/sceneParams';
 
 /**
  * Simulation phase state machine:
@@ -53,30 +54,22 @@ function phaseRate(speed: number, min: number, max: number): number {
   return min + ((speed - 1) / 9) * (max - min);
 }
 
-// ── Per-phase rate ranges ─────────────────────────────────────────────────────
-// speed=5 → comfortable rate (QA baseline for incoming).
-// speed=1 → min  |  speed=10 → max
-//
-// Initial / AfterStop: speed=5 ≈ 0.131 t/s  (old speedToRate(2))
-const R_INITIAL    = { min: 0.033, max: 0.25 };
-const R_AFTER_STOP = { min: 0.033, max: 0.25 };
-// Stopping:           speed=5 ≈ 0.072 t/s  (old speedToRate(1))
-const R_STOPPING   = { min: 0.018, max: 0.14 };
-// Final/exit:         speed=5 ≈ 0.021 t/s  (old finalSpeedToRate(1))
-const R_FINAL      = { min: 0.005, max: 0.04 };
+// ── Per-phase rate ranges (sourced from sceneParams.ts) ───────────────────────
+// Incoming speed ranges
+const RI_INITIAL    = IC.speed.initial;
+const RI_STOPPING   = IC.speed.stopping;
+const RI_AFTER_STOP = IC.speed.afterStop;
+const RI_FINAL      = IC.speed.final;
 
-/**
- * How many t-units before the reading stop point the deceleration zone begins.
- * Incoming: decel starts at READING_T_INCOMING - DECEL_OFFSET ≈ 0.36
- * Away:     decel starts at READING_T_AWAY     + DECEL_OFFSET
- */
-const DECEL_OFFSET = 0.10;
+// Away speed ranges
+const RA_INITIAL    = AW.speed.initial;
+const RA_STOPPING   = AW.speed.stopping;
+const RA_AFTER_STOP = AW.speed.afterStop;
+const RA_FINAL      = AW.speed.final;
 
-/**
- * t below which the 'away' exit phase applies (car shrinking toward horizon).
- * Symmetric to POV_EXIT_T (0.75) on the away side.
- */
-const FINAL_T_AWAY = 0.25;
+const INCOMING_DECEL_OFFSET = IC.decelOffset;
+const AWAY_DECEL_OFFSET     = AW.decelOffset;
+const FINAL_T_AWAY          = AW.finalT;
 
 /**
  * Returns the movement rate (t-units/second) for the current vehicle position.
@@ -102,17 +95,17 @@ function getPhaseRate(
 ): number {
   const sp = isIncoming ? cfg.speedIncoming : cfg.speedAway;
   if (isIncoming) {
-    const decelStart = stopAtT - DECEL_OFFSET;
-    if (t < decelStart)   return phaseRate(sp.initial,   R_INITIAL.min,    R_INITIAL.max);
-    if (t < stopAtT)      return phaseRate(sp.stopping,  R_STOPPING.min,   R_STOPPING.max);
-    if (t < POV_EXIT_T)   return phaseRate(sp.afterStop, R_AFTER_STOP.min, R_AFTER_STOP.max);
-    return phaseRate(sp.final, R_FINAL.min, R_FINAL.max);
+    const decelStart = stopAtT - INCOMING_DECEL_OFFSET;
+    if (t < decelStart)   return phaseRate(sp.initial,   RI_INITIAL.min,    RI_INITIAL.max);
+    if (t < stopAtT)      return phaseRate(sp.stopping,  RI_STOPPING.min,   RI_STOPPING.max);
+    if (t < POV_EXIT_T)   return phaseRate(sp.afterStop, RI_AFTER_STOP.min, RI_AFTER_STOP.max);
+    return phaseRate(sp.final, RI_FINAL.min, RI_FINAL.max);
   } else {
-    const decelStart = stopAtT + DECEL_OFFSET;
-    if (t > decelStart)    return phaseRate(sp.initial,   R_INITIAL.min,    R_INITIAL.max);
-    if (t > stopAtT)       return phaseRate(sp.stopping,  R_STOPPING.min,   R_STOPPING.max);
-    if (t > FINAL_T_AWAY)  return phaseRate(sp.afterStop, R_AFTER_STOP.min, R_AFTER_STOP.max);
-    return phaseRate(sp.final, R_FINAL.min, R_FINAL.max);
+    const decelStart = stopAtT + AWAY_DECEL_OFFSET;
+    if (t > decelStart)    return phaseRate(sp.initial,   RA_INITIAL.min,    RA_INITIAL.max);
+    if (t > stopAtT)       return phaseRate(sp.stopping,  RA_STOPPING.min,   RA_STOPPING.max);
+    if (t > FINAL_T_AWAY)  return phaseRate(sp.afterStop, RA_AFTER_STOP.min, RA_AFTER_STOP.max);
+    return phaseRate(sp.final, RA_FINAL.min, RA_FINAL.max);
   }
 }
 
@@ -227,7 +220,7 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
         }
       } else {
         // Away direction: vehicle moves from near → far
-        if (shouldStop && !gateOpen && t <= stopAtT && t > GATE_T - 0.01) {
+        if (shouldStop && !gateOpen && t <= stopAtT) {
           cancelLoop();
           const newPhase: SimulationPhase =
             cfg.gateMode === 'wait_for_signal' ? 'waiting_for_signal' : 'stopped_at_gate';

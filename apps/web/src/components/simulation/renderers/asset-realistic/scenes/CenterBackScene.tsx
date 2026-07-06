@@ -17,7 +17,7 @@
  *   #arAsphalt — road surface texture pattern
  */
 import {
-  SCENE_W, SCENE_H, VP_X, VP_Y, GATE_T, lerp,
+  SCENE_W, SCENE_H, VP_X, VP_Y, GATE_T_BACK, lerp,
 } from '../../../../../utils/depth';
 
 // ─── Road geometry constants ─────────────────────────────────────────────────
@@ -54,13 +54,13 @@ const TUBE_R_X1 = VP_X + 2;   const TUBE_R_Y1 = VP_Y;
 const TUBE_R_X2 = VP_X + 57;  const TUBE_R_Y2 = 0;
 
 // ─── Gate / stop-line ────────────────────────────────────────────────────────
-const GATE_Y  = Math.round(lerp(VP_Y, SCENE_H, GATE_T));
-const GATE_RL = Math.round(lerp(RL_FAR, RL_NEAR, GATE_T));
-const GATE_RR = Math.round(lerp(RR_FAR, RR_NEAR, GATE_T));
+const GATE_Y  = Math.round(lerp(VP_Y, SCENE_H, GATE_T_BACK));
+const GATE_RL = Math.round(lerp(RL_FAR, RL_NEAR, GATE_T_BACK));
+const GATE_RR = Math.round(lerp(RR_FAR, RR_NEAR, GATE_T_BACK));
 
 // ─── Exit direction arrow ─────────────────────────────────────────────────────
 // Same position as entry arrow. Up-pointing (toward VP) = exit direction in this lane.
-const ARR_T    = 0.32;
+const ARR_T    = 0.72;
 const ARR_Y    = lerp(VP_Y, SCENE_H, ARR_T);
 const ARR_RW   = lerp(RR_FAR - RL_FAR, RR_NEAR - RL_NEAR, ARR_T);
 const ARR_H    = ARR_RW * 0.42;
