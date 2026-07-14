@@ -47,13 +47,13 @@
 
 import type { DetectorPlacement } from '@plate-runner/shared';
 import {
-  VP_X,
   SCENE_H,
   GATE_T,
   getDepthValues,
   lerp,
 } from '../../../../utils/depth';
 import { INCOMING, AWAY } from '../../../../config/sceneParams';
+import { getSceneConfig }  from './scene-configs/getSceneConfig';
 
 // ─── POV entry / exit (sourced from sceneParams.ts) ──────────────────────────
 export const POV_SPAWN_T      = INCOMING.spawnT;
@@ -123,21 +123,24 @@ export interface ViewMotionPath {
   xNear: number;
 }
 
-// ─── Path registry ─────────────────────────────────────────────────────────
+// ─── Path registry ────────────────────────────────────────────────────────────
+// Sourced from per-scene configs (scene-configs/*.config.ts).
+// driver_front uses a genuinely diagonal path (xFar=785, xNear=382).
+// All other scenes retain their previous centred/offset values.
 
-// Lateral offsets sourced from sceneParams.ts
-// _front placements use INCOMING.lateral, _back placements use AWAY.lateral
-const IL = INCOMING.lateral;
-const AL = AWAY.lateral;
-
-export const VIEW_MOTION_PATHS: Record<DetectorPlacement, ViewMotionPath> = {
-  center_front:    { xFar: VP_X + IL.center.xFar,    xNear: VP_X + IL.center.xNear    },
-  center_back:     { xFar: VP_X + AL.center.xFar,    xNear: VP_X + AL.center.xNear    },
-  driver_front:    { xFar: VP_X + IL.driver.xFar,    xNear: VP_X + IL.driver.xNear    },
-  driver_back:     { xFar: VP_X + AL.driver.xFar,    xNear: VP_X + AL.driver.xNear    },
-  passenger_front: { xFar: VP_X + IL.passenger.xFar, xNear: VP_X + IL.passenger.xNear },
-  passenger_back:  { xFar: VP_X + AL.passenger.xFar, xNear: VP_X + AL.passenger.xNear },
-};
+export const VIEW_MOTION_PATHS: Record<DetectorPlacement, ViewMotionPath> = (() => {
+  const placements: DetectorPlacement[] = [
+    'center_front', 'center_back',
+    'driver_front', 'driver_back',
+    'passenger_front', 'passenger_back',
+  ];
+  return Object.fromEntries(
+    placements.map(p => {
+      const cfg = getSceneConfig(p);
+      return [p, { xFar: cfg.vehicle.xFar, xNear: cfg.vehicle.xNear }];
+    }),
+  ) as Record<DetectorPlacement, ViewMotionPath>;
+})();
 
 // ─── Main function ────────────────────────────────────────────────────────────
 
