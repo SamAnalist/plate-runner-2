@@ -21,6 +21,12 @@ export interface SceneVehicleMotionConfig {
   /** Deceleration zone (t-units): car starts slowing this far before readingT */
   decelOffset: number;
   /**
+   * t below which the 'final' speed phase applies (away direction only).
+   * Below this t the car recedes toward the horizon at its final (slow) speed.
+   * Set to 0 for incoming scenes — never reached in normal flow.
+   */
+  finalT: number;
+  /**
    * Vehicle center X at t≈0 (vanishing-point depth — car tiny, far from camera).
    * For diagonal scenes this is the road center at the horizon; for centered
    * scenes it equals VP_X (400).

@@ -19,6 +19,7 @@ export const passengerBackConfig: SceneRenderConfig = {
     readingT:    AWAY.readingT,
     gateT:       AWAY.gateT,
     decelOffset: AWAY.decelOffset,
+    finalT:      AWAY.finalT,   // 0.30
     // Passenger-side offset: camera right → car appears left of centre.
     xFar:  VP_X + AWAY.lateral.passenger.xFar,    // 392
     xNear: VP_X + AWAY.lateral.passenger.xNear,   // 325

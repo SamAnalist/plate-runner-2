@@ -39,29 +39,30 @@ import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
 import type { AssetViewKey } from './types';
 import { INCOMING, AWAY } from '../../../../config/sceneParams';
-import { GATE_T, GATE_T_BACK, READING_T_INCOMING, READING_T_AWAY } from '../../../../utils/depth';
+import { getSceneConfig } from './scene-configs/getSceneConfig';
+import type { DetectorPlacement } from '@plate-runner/shared';
 
 /**
- * Returns a car size multiplier for the current depth t and direction,
- * interpolating smoothly between phase boundary scale values from sceneParams.
+ * Returns a car size multiplier for the current depth t and placement,
+ * interpolating smoothly between phase boundary scale values.
+ * All timing thresholds are read from the per-scene config.
  */
-function getCarScale(t: number, direction: 'incoming' | 'away'): number {
+function getCarScale(t: number, direction: 'incoming' | 'away', placement: DetectorPlacement): number {
+  const sceneV = getSceneConfig(placement).vehicle;
   if (direction === 'incoming') {
-    const sc = INCOMING.carScale;
-    const decelStart = READING_T_INCOMING - INCOMING.decelOffset;
-    if (t <= decelStart)      return sc.initial;
-    if (t <= READING_T_INCOMING) return lerp(sc.initial,   sc.stopping,  (t - decelStart) / (READING_T_INCOMING - decelStart));
-    if (t <= GATE_T)          return lerp(sc.stopping,  sc.afterStop, (t - READING_T_INCOMING) / (GATE_T - READING_T_INCOMING));
-    // final phase: gate → 1.0
-    return lerp(sc.afterStop, sc.final, Math.min((t - GATE_T) / (1 - GATE_T), 1));
+    const sc         = INCOMING.carScale;
+    const decelStart = sceneV.readingT - sceneV.decelOffset;
+    if (t <= decelStart)        return sc.initial;
+    if (t <= sceneV.readingT)   return lerp(sc.initial,   sc.stopping,  (t - decelStart)         / (sceneV.readingT - decelStart));
+    if (t <= sceneV.gateT)      return lerp(sc.stopping,  sc.afterStop, (t - sceneV.readingT)    / (sceneV.gateT - sceneV.readingT));
+    return lerp(sc.afterStop, sc.final, Math.min((t - sceneV.gateT) / (1 - sceneV.gateT), 1));
   } else {
-    const sc = AWAY.carScale;
-    const decelStart = READING_T_AWAY + AWAY.decelOffset;
-    if (t >= decelStart)      return sc.initial;
-    if (t >= READING_T_AWAY)  return lerp(sc.initial,   sc.stopping,  (decelStart - t) / (decelStart - READING_T_AWAY));
-    if (t >= GATE_T_BACK)     return lerp(sc.stopping,  sc.afterStop, (READING_T_AWAY - t) / (READING_T_AWAY - GATE_T_BACK));
-    // final phase: gateT_back → 0
-    return lerp(sc.afterStop, sc.final, Math.min((GATE_T_BACK - t) / GATE_T_BACK, 1));
+    const sc         = AWAY.carScale;
+    const decelStart = sceneV.readingT + sceneV.decelOffset;
+    if (t >= decelStart)        return sc.initial;
+    if (t >= sceneV.readingT)   return lerp(sc.initial,   sc.stopping,  (decelStart - t)         / (decelStart - sceneV.readingT));
+    if (t >= sceneV.gateT)      return lerp(sc.stopping,  sc.afterStop, (sceneV.readingT - t)    / (sceneV.readingT - sceneV.gateT));
+    return lerp(sc.afterStop, sc.final, Math.min((sceneV.gateT - t) / sceneV.gateT, 1));
   }
 }
 
@@ -195,7 +196,7 @@ export function VehicleAssetLayer({
   const centerX = getViewAwareX(vehicleT, safePlacement);
 
   // Car size = natural depth width × per-phase scale from sceneParams.
-  const carScale = getCarScale(vehicleT, config.direction);
+  const carScale = getCarScale(vehicleT, config.direction, safePlacement);
   const carW     = roadWidth * CAR_ROAD_FRACTION * carScale;
   const carH  = carW * (CAR_LH / CAR_LW);
   const carX  = centerX - carW / 2;

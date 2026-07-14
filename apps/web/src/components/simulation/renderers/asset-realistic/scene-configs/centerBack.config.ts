@@ -16,6 +16,7 @@ export const centerBackConfig: SceneRenderConfig = {
     readingT:    AWAY.readingT,
     gateT:       AWAY.gateT,
     decelOffset: AWAY.decelOffset,
+    finalT:      AWAY.finalT,   // 0.30 — below this t, car uses final (slow) speed
     xFar:  VP_X + AWAY.lateral.center.xFar,   // 400
     xNear: VP_X + AWAY.lateral.center.xNear,  // 400
   },

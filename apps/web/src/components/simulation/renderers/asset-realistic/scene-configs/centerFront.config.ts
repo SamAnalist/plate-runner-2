@@ -17,6 +17,7 @@ export const centerFrontConfig: SceneRenderConfig = {
     readingT:    INCOMING.readingT,
     gateT:       INCOMING.gateT,
     decelOffset: INCOMING.decelOffset,
+    finalT:      0,   // incoming — never used
     // Centered road — no lateral sweep.
     xFar:  VP_X + INCOMING.lateral.center.xFar,   // 400
     xNear: VP_X + INCOMING.lateral.center.xNear,  // 400

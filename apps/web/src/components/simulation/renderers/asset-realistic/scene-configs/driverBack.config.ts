@@ -22,6 +22,7 @@ export const driverBackConfig: SceneRenderConfig = {
     readingT:    AWAY.readingT,
     gateT:       AWAY.gateT,
     decelOffset: AWAY.decelOffset,
+    finalT:      AWAY.finalT,   // 0.30
     // Driver-side offset: camera left → car appears right of centre.
     xFar:  VP_X + AWAY.lateral.driver.xFar,    // 408
     xNear: VP_X + AWAY.lateral.driver.xNear,   // 475

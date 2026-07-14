@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { SimulationConfig } from '@plate-runner/shared';
-import { GATE_T, READING_T_INCOMING, READING_T_AWAY } from '../utils/depth';
-import { POV_EXIT_T } from '../components/simulation/renderers/asset-realistic/viewMotionPaths';
+import { READING_T_INCOMING, READING_T_AWAY } from '../utils/depth';
+import { getSceneConfig } from '../components/simulation/renderers/asset-realistic/scene-configs/getSceneConfig';
 import { INCOMING as IC, AWAY as AW } from '../config/sceneParams';
 
 /**
@@ -67,10 +67,6 @@ const RA_STOPPING   = AW.speed.stopping;
 const RA_AFTER_STOP = AW.speed.afterStop;
 const RA_FINAL      = AW.speed.final;
 
-const INCOMING_DECEL_OFFSET = IC.decelOffset;
-const AWAY_DECEL_OFFSET     = AW.decelOffset;
-const FINAL_T_AWAY          = AW.finalT;
-
 /**
  * Returns the movement rate (t-units/second) for the current vehicle position.
  * Selects one of four phase-specific speeds from the direction-matching config.
@@ -78,33 +74,38 @@ const FINAL_T_AWAY          = AW.finalT;
  *  incoming phases (t increasing):
  *    initial   — t < decelStart
  *    stopping  — decelStart ≤ t < readingT
- *    afterStop — readingT ≤ t < POV_EXIT_T
- *    final     — t ≥ POV_EXIT_T
+ *    afterStop — readingT ≤ t < gateT
+ *    final     — t ≥ gateT
  *
  *  away phases (t decreasing):
  *    initial   — t > decelStart
  *    stopping  — readingT < t ≤ decelStart
- *    afterStop — FINAL_T_AWAY < t ≤ readingT
- *    final     — t ≤ FINAL_T_AWAY
+ *    afterStop — finalT < t ≤ readingT
+ *    final     — t ≤ finalT
+ *
+ * All timing thresholds come from the per-scene config — no global constants.
  */
 function getPhaseRate(
   t: number,
   isIncoming: boolean,
   stopAtT: number,
+  decelOffset: number,
+  gateT: number,
+  finalT: number,
   cfg: SimulationConfig,
 ): number {
   const sp = isIncoming ? cfg.speedIncoming : cfg.speedAway;
   if (isIncoming) {
-    const decelStart = stopAtT - INCOMING_DECEL_OFFSET;
-    if (t < decelStart)   return phaseRate(sp.initial,   RI_INITIAL.min,    RI_INITIAL.max);
-    if (t < stopAtT)      return phaseRate(sp.stopping,  RI_STOPPING.min,   RI_STOPPING.max);
-    if (t < POV_EXIT_T)   return phaseRate(sp.afterStop, RI_AFTER_STOP.min, RI_AFTER_STOP.max);
+    const decelStart = stopAtT - decelOffset;
+    if (t < decelStart) return phaseRate(sp.initial,   RI_INITIAL.min,    RI_INITIAL.max);
+    if (t < stopAtT)    return phaseRate(sp.stopping,  RI_STOPPING.min,   RI_STOPPING.max);
+    if (t < gateT)      return phaseRate(sp.afterStop, RI_AFTER_STOP.min, RI_AFTER_STOP.max);
     return phaseRate(sp.final, RI_FINAL.min, RI_FINAL.max);
   } else {
-    const decelStart = stopAtT + AWAY_DECEL_OFFSET;
-    if (t > decelStart)    return phaseRate(sp.initial,   RA_INITIAL.min,    RA_INITIAL.max);
-    if (t > stopAtT)       return phaseRate(sp.stopping,  RA_STOPPING.min,   RA_STOPPING.max);
-    if (t > FINAL_T_AWAY)  return phaseRate(sp.afterStop, RA_AFTER_STOP.min, RA_AFTER_STOP.max);
+    const decelStart = stopAtT + decelOffset;
+    if (t > decelStart) return phaseRate(sp.initial,   RA_INITIAL.min,    RA_INITIAL.max);
+    if (t > stopAtT)    return phaseRate(sp.stopping,  RA_STOPPING.min,   RA_STOPPING.max);
+    if (t > finalT)     return phaseRate(sp.afterStop, RA_AFTER_STOP.min, RA_AFTER_STOP.max);
     return phaseRate(sp.final, RA_FINAL.min, RA_FINAL.max);
   }
 }
@@ -121,10 +122,6 @@ function gateActive(config: SimulationConfig): boolean {
   return config.gateMode !== 'hidden' && config.gateInitialState === 'closed';
 }
 
-/** t-value at which the vehicle stops at the gate (direction-aware) */
-function readingT(direction: SimulationConfig['direction']): number {
-  return direction === 'incoming' ? READING_T_INCOMING : READING_T_AWAY;
-}
 
 export function useSimulation(config: SimulationConfig): SimulationControls {
   const [state, setState] = useState<SimulationState>({
@@ -195,17 +192,22 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
 
     const cfg        = configRef.current;
     const isIncoming = cfg.direction === 'incoming';
-    const stopAtT    = readingT(cfg.direction);
     const shouldStop = gateActive(cfg);
+
+    // Per-scene timing — each placement has its own readingT, gateT, decelOffset, finalT
+    const sceneConfig  = getSceneConfig(cfg.detectorPlacement);
+    const sceneV       = sceneConfig.vehicle;
+    const sceneGateT   = sceneConfig.gate.t;
+    const stopAtT      = sceneV.readingT;
 
     setState(prev => {
       let t        = prev.vehicleT;
       let gateOpen = prev.gateOpen;
-      const rate   = getPhaseRate(t, isIncoming, stopAtT, cfg);
+      const rate   = getPhaseRate(t, isIncoming, stopAtT, sceneV.decelOffset, sceneGateT, sceneV.finalT, cfg);
 
       if (isIncoming) {
         // Stop at gate if gate is active (visible + closed)
-        if (shouldStop && !gateOpen && t >= stopAtT && t < GATE_T + 0.01) {
+        if (shouldStop && !gateOpen && t >= stopAtT && t < sceneGateT + 0.01) {
           cancelLoop();
           const newPhase: SimulationPhase =
             cfg.gateMode === 'wait_for_signal' ? 'waiting_for_signal' : 'stopped_at_gate';

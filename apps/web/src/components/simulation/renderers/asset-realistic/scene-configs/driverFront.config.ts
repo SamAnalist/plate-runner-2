@@ -24,13 +24,13 @@ import { INCOMING }               from '../../../../../config/sceneParams';
 import { VP_X, SCENE_W, lerp }    from '../../../../../utils/depth';
 
 // ── DriverFrontScene road constants (must match DriverFrontScene.tsx) ─────────
-const DF_RL_FAR  = VP_X + 320;          // 720
-const DF_RR_FAR  = VP_X + 450;          // 850
-const DF_RL_NEAR = SCENE_W * 0.125;     // 100
+const DF_RL_FAR  = VP_X + 370;          // 720
+const DF_RR_FAR  = VP_X + 408;          // 850
+const DF_RL_NEAR = SCENE_W * 0.105;     // 100
 const DF_RR_NEAR = SCENE_W * 0.830;     // 664
 
 // Road center at horizon and near edge — defines the diagonal vehicle path
-const DF_CX_FAR  = (DF_RL_FAR + DF_RR_FAR) / 2;    // 785
+const DF_CX_FAR  = (DF_RL_FAR + DF_RR_FAR) / 2 ;    // 785
 const DF_CX_NEAR = (DF_RL_NEAR + DF_RR_NEAR) / 2;   // 382
 
 // Gate road right at GATE_T — used as explicit gate post anchor
@@ -46,6 +46,7 @@ export const driverFrontConfig: SceneRenderConfig = {
     readingT:    INCOMING.readingT,
     gateT:       INCOMING.gateT,
     decelOffset: INCOMING.decelOffset,
+    finalT:      0,   // incoming — never used
     // Diagonal road center — car sweeps right-to-left as it approaches camera.
     xFar:  DF_CX_FAR,    // 785 — horizon, upper-right
     xNear: DF_CX_NEAR,   // 382 — near edge, lower-left
