@@ -1041,6 +1041,134 @@ No new simulation features. No plate queue. No backend.
 
 ---
 
+## Phase 1.4 — Diagonal Parking Scene Variants
+
+**Date:** 2026-07-14
+
+### Goal
+
+Extend the scene variants architecture to cover all six `DetectorPlacement` values
+with dedicated, realistic parking environments. Replace the `GenericScene` fallback
+used for driver/passenger placements with four new diagonal-POV scenes.
+
+### Implemented
+
+- **`DriverFrontScene`** — parking entry (incoming), camera on driver/left side:
+  - Asymmetric ceiling: near-left at x=60 (camera flush with left wall), near-right at x=660
+  - Left wall: thin near wedge; right wall: full dominant panel
+  - Tube lights swept LEFT toward camera
+  - Near-camera structural column on left edge (x=0–16)
+  - Floor light pools offset left (cx≈320–330)
+  - Green entry arrow at road center, stop line at `GATE_T`
+  - Cool grey palette (#0f1115 → #181c21) matching CenterFrontScene
+
+- **`PassengerFrontScene`** — parking entry (incoming), camera on passenger/right side:
+  - Mirror of DriverFrontScene
+  - Near-right ceiling at x=740, near-left at x=140
+  - Right wall: thin wedge; left wall: full panel
+  - Tube lights swept RIGHT; structural column on right edge
+  - Floor light pools offset right (cx≈470–490)
+
+- **`DriverBackScene`** — parking exit (away), camera on driver/left side:
+  - Same geometry as DriverFrontScene
+  - Warm sodium-vapor palette (#13110c → #1e1a13) matching CenterBackScene
+  - Outdoor daylight glow at horizon (`dbExitGlow`, slightly right-offset)
+  - Amber exit arrow, stop line at `GATE_T_BACK`
+
+- **`PassengerBackScene`** — parking exit (away), camera on passenger/right side:
+  - Mirror of DriverBackScene
+  - Same warm palette
+  - Outdoor daylight glow (`pbExitGlow`, slightly left-offset)
+
+- **`sceneVariants.ts`** — simplified to a direct 1-to-1 cast:
+  - `SceneVariantKey` now includes all 6 placements
+  - `getSceneVariant()` returns the placement directly (no more 'generic' fallback)
+
+- **`AssetRealisticRenderer.tsx`** — imports and renders all 6 scene components;
+  removed `GenericScene` import (no longer used)
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/scenes/DriverFrontScene.tsx` — NEW
+- `apps/web/src/components/simulation/renderers/asset-realistic/scenes/PassengerFrontScene.tsx` — NEW
+- `apps/web/src/components/simulation/renderers/asset-realistic/scenes/DriverBackScene.tsx` — NEW
+- `apps/web/src/components/simulation/renderers/asset-realistic/scenes/PassengerBackScene.tsx` — NEW
+- `apps/web/src/components/simulation/renderers/asset-realistic/sceneVariants.ts` — extended to 6-key 1-to-1 mapping
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — imports 4 new scenes, renders all 6
+- `docs/SCENE_VARIANTS.md` — fully updated (v2.0): all 6 scenes, geometry derivation, gate integration notes
+- `docs/PROGRESS.md` — this entry
+
+### Decisions
+
+- **Asymmetric near-ceiling edge, not VP shift**: The road VP (400) is preserved so the
+  vehicle depth model (depth.ts) remains unchanged. The diagonal effect comes from
+  pulling only the ceiling near-edge to one side (CL_NEAR_X=60 for driver scenes,
+  CR_NEAR_X=740 for passenger scenes). This avoids breaking vehicle alignment.
+- **Road far edges stay consistent**: At the horizon (y=145) both road and ceiling
+  align at RL_FAR=390 / RR_FAR=410, preventing a visible seam between road and ceiling.
+- **Tube light sweep**: Tube near-ends are shifted toward the camera side (left for
+  driver, right for passenger) to reinforce the diagonal perspective without requiring
+  a full 3D recomputation.
+- **Near-camera column element**: A 16px structural pillar strip on the camera-side
+  edge adds depth realism — the camera is mounted near a column in a real garage.
+- **Gate remains scene-independent**: `AssetGate` uses `roadRight(gateT)` which is the
+  same for all scenes. No per-scene gate offset is needed.
+- **`GenericScene` retained but unused**: Not deleted in case it is needed for reference
+  or edge cases. Safe to delete once all diagonal scenes are visually verified.
+
+### Manual Testing
+
+1. `pnpm dev` in `apps/web`, open `http://localhost:5173`
+2. Set direction: **incoming**, placement: **driver_front**
+   - Confirm: asymmetric garage interior — left wall narrow (thin wedge), right wall dominant
+   - Tube lights pull toward left side near the camera
+   - Left-edge column detail visible
+3. Set placement: **passenger_front**
+   - Confirm: mirror — right wall narrow, left wall dominant, tube lights pull right
+4. Set direction: **away**, placement: **driver_back**
+   - Confirm: warm amber ceiling, thin left wall, outdoor glow at horizon
+5. Set placement: **passenger_back**
+   - Confirm: mirror of driver_back, right wall narrow
+6. Run full simulations for each diagonal placement:
+   - `incoming + driver_front`: Start → car approaches from diagonal → gate opens → exits
+   - `incoming + passenger_front`: same from opposite side
+   - `away + driver_back`: Start → car enters from bottom → moves to gate → exits
+   - `away + passenger_back`: same
+7. Test gate modes for each diagonal:
+   - `gate: hidden` — no gate visible, car passes freely
+   - `gate: open (initially open)` — arm already at 84°, car passes
+   - `gate: auto_open + closed` — arm lowers, car stops, arm raises, car exits
+   - `gate: wait_for_signal + closed` — car stops, press "Send Open Signal", arm raises
+8. Test plates: `ABC123` (short) and `ABCDEFGHIJ12` (12-char max)
+9. Enter **Camera Mode** for each diagonal placement — confirm clean scene, no overlays
+10. Enter **Fullscreen Scene** — simulation fills viewport correctly
+11. Toggle **Motion Path Overlay** — path visible and makes sense for lateral sweep
+12. `pnpm build` → must pass with 0 errors
+
+### Known Limitations
+
+- **Diagonal scenes do not shift the road VP**: The road polygon and vehicle depth
+  model use VP_X=400 (center). A physically correct two-point perspective road for
+  diagonal views would require a separate depth model — not implemented. The visual
+  result is a plausible diagonal garage feel but not geometrically exact.
+- **Gate post is always on roadRight**: For driver-side diagonal views, a real-world
+  camera would see the gate post on the left side. The current system always places
+  the gate on roadRight for consistency. This is acceptable for LPR camera testing
+  but not a fully accurate simulation of gate placement.
+- **Plate anchors pending calibration**: Diagonal plate anchors were set in Phase 1.2
+  and have not been re-verified against the camera-aware assets in the context of the
+  new scenes. Calibration pass still needed.
+
+### Next Steps
+
+1. **Visual verification pass**: Use the anchor overlay to verify plate position in
+   all 6 diagonal placements. Adjust `plateAnchors.ts` as needed.
+2. **Gate side selection**: Consider adding a `gateOnLeft` option in `SceneRendererProps`
+   so driver-side cameras can show the gate on the correct side.
+3. **Plate Queue**: Once visual QA is done, proceed to local plate list playback.
+
+---
+
 ## Recommended Next Prompts
 
 ### Phase 0.3 — Plate List Playback
