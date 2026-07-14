@@ -1179,3 +1179,67 @@ used for driver/passenger placements with four new diagonal-POV scenes.
 
 ### Phase 0.5 — Docker
 > "Add Dockerfile for apps/web (nginx). Add docker-compose.yml with web + api services."
+
+---
+
+## Phase 1.5 — Per-Scene Configuration Architecture
+
+**Date:** 2026-07-14
+
+### Goal
+
+Centralise all per-scene behaviour (vehicle X path, gate position, gate angles) into
+dedicated config files — one per `DetectorPlacement`. Gives `driver_front` a genuinely
+diagonal vehicle path aligned to its shifted-VP road geometry, and decouples gate
+positioning from the global depth model.
+
+### Implemented
+
+- **`scene-configs/types.ts`** — `SceneVehicleMotionConfig`, `SceneGateConfig`, `SceneRenderConfig`
+- **6 per-scene config files** — one per placement; each owns xFar/xNear, gate.t, explicitPostRightX, arm angles
+- **`scene-configs/getSceneConfig.ts`** — single resolver: `getSceneConfig(placement) → SceneRenderConfig`
+- **`viewMotionPaths.ts`** — `VIEW_MOTION_PATHS` rebuilt from scene configs; `getViewAwareX` unchanged API
+- **`SimulationScene.tsx`** — `activeGateT` now from `sceneConfig.gate.t` (removed direction check)
+- **`AssetRealisticRenderer.tsx`** — `AssetGate` receives `gateConfig: SceneGateConfig`; uses `explicitPostRightX ?? roadRight` for post position and per-config arm angles
+- **`driver_front` diagonal path** — xFar=785, xNear=382 (road center at DriverFrontScene's shifted VP); vehicle now sweeps diagonally upper-right → lower-left as it approaches
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/scene-configs/types.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scene-configs/getSceneConfig.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scene-configs/centerFront.config.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scene-configs/centerBack.config.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scene-configs/driverFront.config.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scene-configs/passengerFront.config.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scene-configs/driverBack.config.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/scene-configs/passengerBack.config.ts` — created
+- `apps/web/src/components/simulation/renderers/asset-realistic/viewMotionPaths.ts` — VIEW_MOTION_PATHS from scene configs
+- `apps/web/src/components/simulation/SimulationScene.tsx` — activeGateT from scene config
+- `apps/web/src/components/simulation/renderers/asset-realistic/AssetRealisticRenderer.tsx` — gate config threading
+- `docs/SCENE_CONFIG_ARCHITECTURE.md` — created
+
+### Decisions
+
+- `getSceneConfig()` is called at render time (not memoised) — it returns a static object reference from the map; no allocation cost.
+- `VehicleAssetLayer` unchanged — `getViewAwareX(t, placement)` API is identical; the implementation now reads from scene configs internally.
+- `rendererProps.ts` unchanged — gate config flows from `AssetRealisticRenderer` internally, not from `SimulationScene`.
+- `sceneParams.ts` lateral values retained — referenced by 5 of 6 configs; `driver_front` overrides with road-derived values.
+
+### Manual Testing
+
+1. Select `driver_front` + incoming → verify vehicle sweeps from upper-right at far to lower-left near camera.
+2. Verify gate arm aligns with stop line in `driver_front` scene (post should be ~x=659 at t=0.99).
+3. Switch to `center_front` and `center_back` → verify no regression in path or gate position.
+4. Select each of the 6 placements and confirm simulation runs without crash.
+5. Open motion path debug overlay → verify path curve matches the diagonal for `driver_front`.
+
+### Known Limitations
+
+- `getCarScale()` still uses global readingT/gateT constants. No impact since all scenes share the same values.
+- `armDirection: 'right'` typed but not implemented; all configs use `'left'`.
+
+### Next Steps
+
+- Visual QA pass for `driver_front` diagonal: verify car size at gate, plate readability, gate arm overlap.
+- Consider updating `getCarScale` to read from scene config when per-scene phase timing is needed.
+- Plate List Playback (Phase 0.3).
