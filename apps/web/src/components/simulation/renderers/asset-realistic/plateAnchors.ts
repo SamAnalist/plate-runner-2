@@ -41,12 +41,12 @@ const CENTER_FRONT: PlateAnchor = {
 // Angled view from driver's side (front-left). Camera elevated ~2–3 m, downward tilt.
 // INITIAL CALIBRATION — PENDING VISUAL VERIFICATION
 const DRIVER_FRONT: PlateAnchor = {
-  xPct:      0.160,
-  yPct:      0.625,
-  wPct:      0.130,
-  hPct:      0.085,
-  rotateDeg: 0,
-  skewXDeg:  -2,
+  xPct:      0.240,
+  yPct:      0.678,
+  wPct:      0.090,
+  hPct:      0.060,
+  rotateDeg: 8,
+  skewXDeg:  10,
   skewYDeg:  0,
   side:      'front',
 };
