@@ -3,9 +3,12 @@
  *
  * Architecture:
  *   Scene variant is selected from placement via getSceneVariant():
- *     center_front → CenterFrontScene  (parking entry)
- *     center_back  → CenterBackScene   (parking exit)
- *     driver/passenger → GenericScene  (generic interior)
+ *     center_front    → CenterFrontScene    (parking entry, centered)
+ *     center_back     → CenterBackScene     (parking exit,  centered)
+ *     driver_front    → DriverFrontScene    (parking entry, driver/left side)
+ *     passenger_front → PassengerFrontScene (parking entry, passenger/right side)
+ *     driver_back     → DriverBackScene     (parking exit,  driver/left side)
+ *     passenger_back  → PassengerBackScene  (parking exit,  passenger/right side)
  *
  *   Rendering order (back to front):
  *     1. Scene background (selected variant)
@@ -25,11 +28,14 @@
  *   reliable SVG cross-browser behaviour.
  */
 import type { SceneRendererProps } from './rendererProps';
-import { VehicleAssetLayer }       from './VehicleAssetLayer';
-import { getSceneVariant }         from './sceneVariants';
-import { CenterFrontScene }        from './scenes/CenterFrontScene';
-import { CenterBackScene }         from './scenes/CenterBackScene';
-import { GenericScene }            from './scenes/GenericScene';
+import { VehicleAssetLayer }         from './VehicleAssetLayer';
+import { getSceneVariant }           from './sceneVariants';
+import { CenterFrontScene }          from './scenes/CenterFrontScene';
+import { CenterBackScene }           from './scenes/CenterBackScene';
+import { DriverFrontScene }          from './scenes/DriverFrontScene';
+import { PassengerFrontScene }       from './scenes/PassengerFrontScene';
+import { DriverBackScene }           from './scenes/DriverBackScene';
+import { PassengerBackScene }        from './scenes/PassengerBackScene';
 import {
   SCENE_W, SCENE_H,
   getDepthValues,
@@ -277,9 +283,12 @@ export function AssetRealisticRenderer({
       </defs>
 
       {/* ── Scene background ────────────────────────────────────────────────── */}
-      {sceneVariant === 'center_front' && <CenterFrontScene />}
-      {sceneVariant === 'center_back'  && <CenterBackScene  />}
-      {sceneVariant === 'generic'      && <GenericScene     />}
+      {sceneVariant === 'center_front'    && <CenterFrontScene    />}
+      {sceneVariant === 'center_back'     && <CenterBackScene     />}
+      {sceneVariant === 'driver_front'    && <DriverFrontScene    />}
+      {sceneVariant === 'passenger_front' && <PassengerFrontScene />}
+      {sceneVariant === 'driver_back'     && <DriverBackScene     />}
+      {sceneVariant === 'passenger_back'  && <PassengerBackScene  />}
 
       {/* ── Z-ordered gate + vehicle ────────────────────────────────────────── */}
       {vehicleBehindGate
