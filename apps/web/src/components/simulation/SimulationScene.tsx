@@ -7,12 +7,11 @@ import {
   SCENE_H,
   VP_X,
   VP_Y,
-  GATE_T,
-  GATE_T_BACK,
   getDepthValues,
 } from '../../utils/depth';
 import { AssetRealisticRenderer } from './renderers/asset-realistic/AssetRealisticRenderer';
 import type { SceneRendererProps } from './renderers/asset-realistic/rendererProps';
+import { getSceneConfig }          from './renderers/asset-realistic/scene-configs/getSceneConfig';
 
 interface Props {
   config: SimulationConfig;
@@ -37,7 +36,8 @@ export function SimulationScene({
   const { state } = simulation;
   const { vehicleT, gateOpen, phase } = state;
 
-  const activeGateT  = config.direction === 'away' ? GATE_T_BACK : GATE_T;
+  const sceneConfig  = getSceneConfig(config.detectorPlacement);
+  const activeGateT  = sceneConfig.gate.t;
   const gateDepth    = useMemo(() => getDepthValues(activeGateT), [activeGateT]);
   const vehicleDepth = getDepthValues(vehicleT);
 

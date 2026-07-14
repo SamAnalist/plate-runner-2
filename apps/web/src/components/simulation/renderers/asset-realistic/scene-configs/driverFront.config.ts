@@ -24,8 +24,8 @@ import { INCOMING }               from '../../../../../config/sceneParams';
 import { VP_X, SCENE_W, lerp }    from '../../../../../utils/depth';
 
 // ── DriverFrontScene road constants (must match DriverFrontScene.tsx) ─────────
-const DF_RL_FAR  = VP_X + 380;          // 720
-const DF_RR_FAR  = VP_X + 490;          // 850
+const DF_RL_FAR  = VP_X + 320;          // 720
+const DF_RR_FAR  = VP_X + 450;          // 850
 const DF_RL_NEAR = SCENE_W * 0.125;     // 100
 const DF_RR_NEAR = SCENE_W * 0.830;     // 664
 

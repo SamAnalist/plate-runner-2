@@ -45,20 +45,29 @@ import {
   getViewAwareX,
 } from './viewMotionPaths';
 import type { DetectorPlacement } from '@plate-runner/shared';
+import { getSceneConfig }            from './scene-configs/getSceneConfig';
+import type { SceneGateConfig }      from './scene-configs/types';
 
 // ── Gate component ────────────────────────────────────────────────────────────
 function AssetGate({
   gateDepth,
   gateOpen,
   gateMode,
-}: Pick<SceneRendererProps, 'gateDepth' | 'gateOpen'> & { gateMode: string }) {
+  gateConfig,
+}: Pick<SceneRendererProps, 'gateDepth' | 'gateOpen'> & {
+  gateMode: string;
+  gateConfig: SceneGateConfig;
+}) {
   if (gateMode === 'hidden') return null;
 
   const { roadRight, roadWidth, y, scale } = gateDepth;
 
   const postW  = Math.max(7,  roadWidth * 0.042);
   const postH  = Math.max(32, 95 * scale);
-  const postX  = roadRight - postW;
+  // Per-scene gate position: use explicit X if specified (diagonal scenes),
+  // otherwise fall back to the road right edge from the global depth model.
+  const postRightX = gateConfig.explicitPostRightX ?? roadRight;
+  const postX  = postRightX - postW;
   const postY  = y - postH;
 
   const armLen   = roadWidth * 0.88;
@@ -66,8 +75,7 @@ function AssetGate({
   const pivotX   = postX + postW / 2;
   const pivotY   = postY + postH * 0.14;
 
-  // 84° = arm pointing nearly straight up (open), 0° = horizontal (closed)
-  const armAngle = gateOpen ? 84 : 0;
+  const armAngle = gateOpen ? gateConfig.openAngleDeg : gateConfig.closedAngleDeg;
 
   const lightR  = Math.max(2.8, postW * 0.40);
   const lightCX = postX + postW / 2;
@@ -246,6 +254,7 @@ export function AssetRealisticRenderer({
   showMotionPathOverlay = false,
 }: SceneRendererProps) {
   const sceneVariant = getSceneVariant(config.detectorPlacement);
+  const sceneConfig  = getSceneConfig(config.detectorPlacement);
 
   const vehicle = (
     <VehicleAssetLayer
@@ -261,6 +270,7 @@ export function AssetRealisticRenderer({
       gateDepth={gateDepth}
       gateOpen={gateOpen}
       gateMode={config.gateMode}
+      gateConfig={sceneConfig.gate}
     />
   );
 
