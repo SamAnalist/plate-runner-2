@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import type { SimulationConfig } from '@plate-runner/shared';
 import { READING_T_INCOMING, READING_T_AWAY } from '../utils/depth';
 import { getSceneConfig } from '../components/simulation/renderers/asset-realistic/scene-configs/getSceneConfig';
-import { INCOMING as IC, AWAY as AW } from '../config/sceneParams';
+import type { SceneSpeedConfig } from '../components/simulation/renderers/asset-realistic/scene-configs/types';
 
 /**
  * Simulation phase state machine:
@@ -54,18 +54,6 @@ function phaseRate(speed: number, min: number, max: number): number {
   return min + ((speed - 1) / 9) * (max - min);
 }
 
-// ── Per-phase rate ranges (sourced from sceneParams.ts) ───────────────────────
-// Incoming speed ranges
-const RI_INITIAL    = IC.speed.initial;
-const RI_STOPPING   = IC.speed.stopping;
-const RI_AFTER_STOP = IC.speed.afterStop;
-const RI_FINAL      = IC.speed.final;
-
-// Away speed ranges
-const RA_INITIAL    = AW.speed.initial;
-const RA_STOPPING   = AW.speed.stopping;
-const RA_AFTER_STOP = AW.speed.afterStop;
-const RA_FINAL      = AW.speed.final;
 
 /**
  * Returns the movement rate (t-units/second) for the current vehicle position.
@@ -92,21 +80,21 @@ function getPhaseRate(
   decelOffset: number,
   gateT: number,
   finalT: number,
-  cfg: SimulationConfig,
+  speedSlider: { initial: number; stopping: number; afterStop: number; final: number },
+  sceneSpeeds: SceneSpeedConfig,
 ): number {
-  const sp = isIncoming ? cfg.speedIncoming : cfg.speedAway;
   if (isIncoming) {
     const decelStart = stopAtT - decelOffset;
-    if (t < decelStart) return phaseRate(sp.initial,   RI_INITIAL.min,    RI_INITIAL.max);
-    if (t < stopAtT)    return phaseRate(sp.stopping,  RI_STOPPING.min,   RI_STOPPING.max);
-    if (t < gateT)      return phaseRate(sp.afterStop, RI_AFTER_STOP.min, RI_AFTER_STOP.max);
-    return phaseRate(sp.final, RI_FINAL.min, RI_FINAL.max);
+    if (t < decelStart) return phaseRate(speedSlider.initial,   sceneSpeeds.initial.min,   sceneSpeeds.initial.max);
+    if (t < stopAtT)    return phaseRate(speedSlider.stopping,  sceneSpeeds.stopping.min,  sceneSpeeds.stopping.max);
+    if (t < gateT)      return phaseRate(speedSlider.afterStop, sceneSpeeds.afterStop.min, sceneSpeeds.afterStop.max);
+    return phaseRate(speedSlider.final, sceneSpeeds.final.min, sceneSpeeds.final.max);
   } else {
     const decelStart = stopAtT + decelOffset;
-    if (t > decelStart) return phaseRate(sp.initial,   RA_INITIAL.min,    RA_INITIAL.max);
-    if (t > stopAtT)    return phaseRate(sp.stopping,  RA_STOPPING.min,   RA_STOPPING.max);
-    if (t > finalT)     return phaseRate(sp.afterStop, RA_AFTER_STOP.min, RA_AFTER_STOP.max);
-    return phaseRate(sp.final, RA_FINAL.min, RA_FINAL.max);
+    if (t > decelStart) return phaseRate(speedSlider.initial,   sceneSpeeds.initial.min,   sceneSpeeds.initial.max);
+    if (t > stopAtT)    return phaseRate(speedSlider.stopping,  sceneSpeeds.stopping.min,  sceneSpeeds.stopping.max);
+    if (t > finalT)     return phaseRate(speedSlider.afterStop, sceneSpeeds.afterStop.min, sceneSpeeds.afterStop.max);
+    return phaseRate(speedSlider.final, sceneSpeeds.final.min, sceneSpeeds.final.max);
   }
 }
 
@@ -199,11 +187,12 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     const sceneV       = sceneConfig.vehicle;
     const sceneGateT   = sceneConfig.gate.t;
     const stopAtT      = sceneV.readingT;
+    const speedSlider  = isIncoming ? cfg.speedIncoming : cfg.speedAway;
 
     setState(prev => {
       let t        = prev.vehicleT;
       let gateOpen = prev.gateOpen;
-      const rate   = getPhaseRate(t, isIncoming, stopAtT, sceneV.decelOffset, sceneGateT, sceneV.finalT, cfg);
+      const rate   = getPhaseRate(t, isIncoming, stopAtT, sceneV.decelOffset, sceneGateT, sceneV.finalT, speedSlider, sceneV.speed);
 
       if (isIncoming) {
         // Stop at gate if gate is active (visible + closed)

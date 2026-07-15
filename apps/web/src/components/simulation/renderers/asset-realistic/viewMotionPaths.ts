@@ -87,9 +87,11 @@ export function getPovYOffset(
   depthY: number,
   carH: number,
   direction: 'incoming' | 'away',
+  /** Per-scene gate t — overrides global POV_EXIT_T for incoming exit. */
+  exitGateT: number = POV_EXIT_T,
 ): number {
-  if (direction === 'incoming' && t > POV_EXIT_T) {
-    const progress = Math.min((t - POV_EXIT_T) / (1 - POV_EXIT_T), 1);
+  if (direction === 'incoming' && t > exitGateT) {
+    const progress = Math.min((t - exitGateT) / (1 - exitGateT), 1);
     return lerp(0, SCENE_H + 10 - (depthY - carH), progress);
   }
   if (direction === 'away' && t > POV_ENTRY_T_AWAY) {
@@ -153,7 +155,8 @@ export const VIEW_MOTION_PATHS: Record<DetectorPlacement, ViewMotionPath> = (() 
  */
 export function getViewAwareX(t: number, placement: DetectorPlacement): number {
   const { xFar, xNear } = VIEW_MOTION_PATHS[placement];
-  return lerp(xFar, xNear, easeOut(t));
+  const linear = getSceneConfig(placement).vehicle.linearMotion ?? false;
+  return lerp(xFar, xNear, linear ? t : easeOut(t));
 }
 
 // ─── Debug support ────────────────────────────────────────────────────────────

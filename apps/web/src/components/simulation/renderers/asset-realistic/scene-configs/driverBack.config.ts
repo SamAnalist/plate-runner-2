@@ -24,8 +24,22 @@ export const driverBackConfig: SceneRenderConfig = {
     decelOffset: AWAY.decelOffset,
     finalT:      AWAY.finalT,   // 0.30
     // Driver-side offset: camera left → car appears right of centre.
-    xFar:  VP_X + AWAY.lateral.driver.xFar,    // 408
-    xNear: VP_X + AWAY.lateral.driver.xNear,   // 475
+    xFar:        VP_X + AWAY.lateral.driver.xFar,    // 408
+    xNear:       VP_X + AWAY.lateral.driver.xNear,   // 475
+    rotationDeg: 0,
+    speed: {
+      initial:   { min: 0.01, max: 0.09 },
+      stopping:  { min: 0.01, max: 0.09 },
+      afterStop: { min: 0.12, max: 0.4  },
+      final:     { min: 0.1,  max: 0.2  },
+    },
+    carScale: {
+      initial:   1.4,
+      stopping:  1.0,
+      atGate:    1.0,
+      afterStop: 1.0,
+      final:     1.0,
+    },
   },
 
   gate: {

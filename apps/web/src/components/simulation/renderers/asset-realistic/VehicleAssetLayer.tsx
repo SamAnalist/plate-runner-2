@@ -31,6 +31,8 @@ import {
   CAR_LW,
   CAR_LH,
   CAR_ROAD_FRACTION,
+  SCENE_H,
+  VP_Y,
   lerp,
 } from '../../../../utils/depth';
 import { getViewAwareX, getPovYOffset } from './viewMotionPaths';
@@ -38,30 +40,28 @@ import { ASSET_REGISTRY } from './assetRegistry';
 import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
 import type { AssetViewKey } from './types';
-import { INCOMING, AWAY } from '../../../../config/sceneParams';
 import { getSceneConfig } from './scene-configs/getSceneConfig';
 import type { DetectorPlacement } from '@plate-runner/shared';
 
 /**
  * Returns a car size multiplier for the current depth t and placement,
  * interpolating smoothly between phase boundary scale values.
- * All timing thresholds are read from the per-scene config.
+ * All thresholds and scale values come from the per-scene config.
  */
 function getCarScale(t: number, direction: 'incoming' | 'away', placement: DetectorPlacement): number {
-  const sceneV = getSceneConfig(placement).vehicle;
+  const sceneV     = getSceneConfig(placement).vehicle;
+  const sc         = sceneV.carScale;
   if (direction === 'incoming') {
-    const sc         = INCOMING.carScale;
     const decelStart = sceneV.readingT - sceneV.decelOffset;
-    if (t <= decelStart)        return sc.initial;
-    if (t <= sceneV.readingT)   return lerp(sc.initial,   sc.stopping,  (t - decelStart)         / (sceneV.readingT - decelStart));
-    if (t <= sceneV.gateT)      return lerp(sc.stopping,  sc.afterStop, (t - sceneV.readingT)    / (sceneV.gateT - sceneV.readingT));
+    if (t <= decelStart)      return sc.initial;
+    if (t <= sceneV.readingT) return lerp(sc.initial,   sc.stopping,  (t - decelStart)      / (sceneV.readingT - decelStart));
+    if (t <= sceneV.gateT)    return lerp(sc.stopping,  sc.afterStop, (t - sceneV.readingT) / (sceneV.gateT - sceneV.readingT));
     return lerp(sc.afterStop, sc.final, Math.min((t - sceneV.gateT) / (1 - sceneV.gateT), 1));
   } else {
-    const sc         = AWAY.carScale;
     const decelStart = sceneV.readingT + sceneV.decelOffset;
-    if (t >= decelStart)        return sc.initial;
-    if (t >= sceneV.readingT)   return lerp(sc.initial,   sc.stopping,  (decelStart - t)         / (decelStart - sceneV.readingT));
-    if (t >= sceneV.gateT)      return lerp(sc.stopping,  sc.afterStop, (sceneV.readingT - t)    / (sceneV.readingT - sceneV.gateT));
+    if (t >= decelStart)      return sc.initial;
+    if (t >= sceneV.readingT) return lerp(sc.initial,   sc.stopping,  (decelStart - t)      / (decelStart - sceneV.readingT));
+    if (t >= sceneV.gateT)    return lerp(sc.stopping,  sc.afterStop, (sceneV.readingT - t) / (sceneV.readingT - sceneV.gateT));
     return lerp(sc.afterStop, sc.final, Math.min((sceneV.gateT - t) / sceneV.gateT, 1));
   }
 }
@@ -194,31 +194,54 @@ export function VehicleAssetLayer({
   // View-aware X: driver/passenger views sweep laterally as the car approaches.
   // Y and scale still come from vehicleDepth (standard depth model).
   const centerX = getViewAwareX(vehicleT, safePlacement);
+  const sceneV  = getSceneConfig(safePlacement).vehicle;
 
   // Car size = natural depth width × per-phase scale from sceneParams.
   const carScale = getCarScale(vehicleT, config.direction, safePlacement);
   const carW     = roadWidth * CAR_ROAD_FRACTION * carScale;
-  const carH  = carW * (CAR_LH / CAR_LW);
+  const carH     = carW * (CAR_LH / CAR_LW);
+
+  // ── Y override for scenes where road extends above VP_Y ─────────────────
+  // Standard: y = lerp(VP_Y, SCENE_H, t). With yFar set, the Y origin shifts
+  // so the car appears from the top of the screen instead of the horizon strip.
+  // Adjustment lerps from (yFar - VP_Y) at t=0 to 0 at t=1 — fades out smoothly
+  // so the car naturally converges to the standard position at the near end.
+  const yFarAdj   = sceneV.yFar !== undefined ? lerp(sceneV.yFar - VP_Y, 0, vehicleT) : 0;
+  const effectiveY = y + yFarAdj;
+
   const carX  = centerX - carW / 2;
-  const carY  = y - carH;
+  const carY  = effectiveY - carH;
   const scaleX = carW / CAR_LW;
   const scaleY = carH / CAR_LH;
 
-  // ── Phase 0.8: POV exit — slide off bottom (no opacity change) ──────────
-  const povYOffset = getPovYOffset(vehicleT, y, carH, config.direction);
+  // ── POV exit — slide off bottom, optionally diagonal ────────────────────
+  const povYOffset = getPovYOffset(vehicleT, effectiveY, carH, config.direction, sceneV.gateT);
+
+  // exitDiagonal: X follows road slope proportionally to the Y slide distance.
+  // Slope = (xNear - xFar) / (SCENE_H - yFar), so lateral drift matches the road angle.
+  let povXOffset = 0;
+  if ((sceneV.exitDiagonal ?? false) && povYOffset !== 0) {
+    const yRange = SCENE_H - (sceneV.yFar ?? VP_Y);
+    const scale = sceneV.exitDiagonalScale ?? 1;
+    if (yRange > 0) povXOffset = povYOffset * (sceneV.xNear - sceneV.xFar) / yRange * scale;
+  }
 
   // ── Asset & plate anchor lookup ─────────────────────────────────────────
-  const viewKey = safePlacement as AssetViewKey;
-  const asset   = ASSET_REGISTRY[viewKey];
-  const anchor  = PLATE_ANCHORS[safePlacement];
+  const viewKey    = safePlacement as AssetViewKey;
+  const asset      = ASSET_REGISTRY[viewKey];
+  const anchor     = PLATE_ANCHORS[safePlacement];
+  const rotDeg     = sceneV.rotationDeg ?? 0;
+  const rotTransform = rotDeg !== 0
+    ? ` rotate(${rotDeg}, ${CAR_LW / 2}, ${CAR_LH / 2})`
+    : '';
 
   return (
     <g>
 
       {/* Perspective transform group — depth scale only, no skewX.
-          The viewing angle is already embedded in each asset image.
+          rotTransform applies optional per-scene rotation around the car centre.
           povYOffset slides the car in/out of the scene vertically. */}
-      <g transform={`translate(${carX}, ${carY + povYOffset}) scale(${scaleX}, ${scaleY})`}>
+      <g transform={`translate(${carX + povXOffset}, ${carY + povYOffset}) scale(${scaleX}, ${scaleY})${rotTransform}`}>
 
         {/* Car body asset (raster image) */}
         {asset.type === 'raster' && (

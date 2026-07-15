@@ -75,17 +75,30 @@ function AssetGate({
   const pivotX   = postX + postW / 2;
   const pivotY   = postY + postH * 0.14;
 
-  const armAngle = gateOpen ? gateConfig.openAngleDeg : gateConfig.closedAngleDeg;
-
   const lightR  = Math.max(2.8, postW * 0.40);
   const lightCX = postX + postW / 2;
   const lightCY = postY + postH * 0.10;
   const lightCol = gateOpen ? '#4ade80' : '#f87171';
 
+  // ── Arm direction ──────────────────────────────────────────────────────────
+  // 'left'  — arm extends leftward  (pivot → -armLen). Rotates counter-clockwise
+  //           when opening (positive angle lifts the left-pointing arm upward).
+  // 'right' — arm extends rightward (pivot → +armLen). Angle is negated so the
+  //           right-pointing arm also lifts upward when opening.
+  const isRightArm  = gateConfig.armDirection === 'right';
+  const rotSign     = isRightArm ? -1 : 1;
+  const armAngle    = (gateOpen ? gateConfig.openAngleDeg : gateConfig.closedAngleDeg) * rotSign;
+  const armTipX     = isRightArm ?  armLen : -armLen;   // tip reflector X
+  const armRectX    = isRightArm ?  0      : -armLen;   // arm body rect left edge
+
   const numStripes = 5;
   const stripes = Array.from({ length: numStripes }, (_, i) => ({
-    relX: -armLen + armLen * (0.08 + i * 0.18),
-    w:    armLen * 0.058,
+    // 'left':  stripes distributed from tip toward pivot (negative x space)
+    // 'right': stripes distributed from pivot toward tip (positive x space)
+    relX: isRightArm
+      ?  armLen * (0.08 + i * 0.18)
+      : -armLen + armLen * (0.08 + i * 0.18),
+    w: armLen * 0.058,
   }));
 
   return (
@@ -126,10 +139,6 @@ function AssetGate({
       <circle cx={postX + postW * 0.5} cy={postY + postH * 0.28} r={postW * 0.14} fill="#1a1d22" />
       <circle cx={postX + postW * 0.5} cy={postY + postH * 0.72} r={postW * 0.14} fill="#1a1d22" />
 
-      {/* Status LED */}
-      <circle cx={lightCX} cy={lightCY} r={lightR * 2.0} fill={lightCol} opacity={0.08} />
-      <circle cx={lightCX} cy={lightCY} r={lightR}       fill={lightCol} opacity={0.75} />
-      <circle cx={lightCX - lightR * 0.28} cy={lightCY - lightR * 0.28} r={lightR * 0.32} fill="white" opacity={0.45} />
 
       {/* ── Gate arm — CSS transition for reliable SVG animation ─────────── */}
       <g
@@ -141,7 +150,7 @@ function AssetGate({
       >
         {/* Arm body — white parking barrier */}
         <rect
-          x={-armLen}
+          x={armRectX}
           y={-armThick / 2}
           width={armLen}
           height={armThick}
@@ -162,12 +171,16 @@ function AssetGate({
           />
         ))}
         {/* Arm tip reflector */}
-        <circle cx={-armLen} cy={0} r={armThick * 0.95} fill="white"    opacity={0.90} />
-        <circle cx={-armLen} cy={0} r={armThick * 0.45} fill={lightCol} opacity={0.65} />
+        <circle cx={armTipX} cy={0} r={armThick * 0.95} fill="white"    opacity={0.90} />
+        <circle cx={armTipX} cy={0} r={armThick * 0.45} fill={lightCol} opacity={0.65} />
       </g>
 
       {/* Pivot cap (static, on top of arm) */}
       <circle cx={pivotX} cy={pivotY} r={armThick * 1.0} fill="#4a5060" />
+      {/* Status LED */}
+      <circle cx={lightCX} cy={lightCY + 2} r={lightR * 2.0} fill={lightCol} opacity={0.08} />
+      <circle cx={lightCX} cy={lightCY + 4} r={lightR}       fill={lightCol} opacity={0.95} />
+      <circle cx={lightCX - lightR * 0.28} cy={lightCY - lightR * 0.28 + 4} r={lightR * 0.32} fill="white" opacity={0.45} />
     </g>
   );
 }

@@ -9,6 +9,32 @@
  * keep their current symmetric behaviour — all from a single lookup.
  */
 
+// ── Speed range ───────────────────────────────────────────────────────────────
+
+export interface SpeedRange {
+  /** Minimum t-units/second (speed slider = 1) */
+  min: number;
+  /** Maximum t-units/second (speed slider = 10) */
+  max: number;
+}
+
+export interface SceneSpeedConfig {
+  initial:   SpeedRange;  // far from gate, normal approach
+  stopping:  SpeedRange;  // decelerating toward readingT
+  afterStop: SpeedRange;  // resumed after gate opens
+  final:     SpeedRange;  // exit / receding to horizon
+}
+
+// ── Car scale ─────────────────────────────────────────────────────────────────
+
+export interface SceneCarScaleConfig {
+  initial:   number;  // horizon → decel zone
+  stopping:  number;  // decel zone → gate stop
+  atGate:    number;  // stopped at gate
+  afterStop: number;  // gate opens → exit/final
+  final:     number;  // exit slide-out / receding
+}
+
 // ── Vehicle motion ─────────────────────────────────────────────────────────────
 
 export interface SceneVehicleMotionConfig {
@@ -38,6 +64,44 @@ export interface SceneVehicleMotionConfig {
    * scenes it equals VP_X (400).
    */
   xNear: number;
+  /**
+   * Optional rotation applied to the vehicle image (degrees, clockwise).
+   * Applied around the car's own center. 0 = no rotation (default).
+   * Use small values (±5–15°) to tilt the car to match the road diagonal.
+   */
+  rotationDeg?: number;
+  /**
+   * When true, X interpolation uses linear easing instead of easeOut.
+   * Use for diagonal scenes where the car should keep moving laterally
+   * throughout the full path, not just at the start.
+   * Default: false (easeOut — standard behaviour for center scenes).
+   */
+  linearMotion?: boolean;
+  /**
+   * Override the Y position at t=0 (far/horizon).
+   * Default: VP_Y (145) — the global horizon line.
+   * Set to 0 for diagonal scenes whose road extends to the top of the frame,
+   * so the car appears from the very top instead of the horizon strip.
+   */
+  yFar?: number;
+  /**
+   * When true, the exit slide (after gateT) also moves X along the diagonal,
+   * following the same slope as the main xFar→xNear path.
+   * Use for diagonal scenes so the car continues moving diagonally off-screen
+   * instead of dropping straight down.
+   * Default: false.
+   */
+  exitDiagonal?: boolean;
+  /**
+   * Multiplier applied to the diagonal X offset during exit.
+   * Values > 1 push the car further in the lateral direction.
+   * Default: 1 (natural road slope).
+   */
+  exitDiagonalScale?: number;
+  /** Per-scene speed ranges for each animation phase */
+  speed: SceneSpeedConfig;
+  /** Per-scene car size multipliers for each animation phase */
+  carScale: SceneCarScaleConfig;
 }
 
 // ── Gate ──────────────────────────────────────────────────────────────────────

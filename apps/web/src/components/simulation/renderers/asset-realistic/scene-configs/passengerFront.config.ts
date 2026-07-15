@@ -26,8 +26,22 @@ export const passengerFrontConfig: SceneRenderConfig = {
     decelOffset: INCOMING.decelOffset,
     finalT:      0,   // incoming — never used
     // Passenger-side offset: camera right → car appears left of centre.
-    xFar:  VP_X + INCOMING.lateral.passenger.xFar,    // 392
-    xNear: VP_X + INCOMING.lateral.passenger.xNear,   // 325
+    xFar:        VP_X + INCOMING.lateral.passenger.xFar,    // 392
+    xNear:       VP_X + INCOMING.lateral.passenger.xNear,   // 325
+    rotationDeg: 0,
+    speed: {
+      initial:   { min: 0.033, max: 0.30  },
+      stopping:  { min: 0.028, max: 0.40  },
+      afterStop: { min: 0.023, max: 0.20  },
+      final:     { min: 0.001, max: 0.008 },
+    },
+    carScale: {
+      initial:   1.1,
+      stopping:  1.1,
+      atGate:    1.1,
+      afterStop: 1.1,
+      final:     2.7,
+    },
   },
 
   gate: {

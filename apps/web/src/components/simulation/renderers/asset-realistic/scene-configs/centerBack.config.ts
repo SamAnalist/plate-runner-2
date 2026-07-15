@@ -5,25 +5,42 @@
  * Road is symmetric; vehicle recedes toward the horizon.
  */
 import type { SceneRenderConfig } from './types';
-import { AWAY }                   from '../../../../../config/sceneParams';
 import { VP_X }                   from '../../../../../utils/depth';
 
 export const centerBackConfig: SceneRenderConfig = {
   direction: 'away',
 
+    // ── Depth / Y positions ────────────────────────────────────────────────────
+  /** Gate visual position for the away scene (higher up = smaller t value). */
+
   vehicle: {
-    spawnT:      AWAY.entryT,
-    readingT:    AWAY.readingT,
-    gateT:       AWAY.gateT,
-    decelOffset: AWAY.decelOffset,
-    finalT:      AWAY.finalT,   // 0.30 — below this t, car uses final (slow) speed
-    xFar:  VP_X + AWAY.lateral.center.xFar,   // 400
-    xNear: VP_X + AWAY.lateral.center.xNear,  // 400
+    spawnT:      0.3,
+    readingT:    0.90,
+    gateT:       0.35,
+    decelOffset: 0.05,
+    finalT:      0.30,   // 0.30 — below this t, car uses final (slow) speed
+    xFar:        VP_X + 0.0,   // 400
+    xNear:       VP_X + 0.0,  // 400
+    rotationDeg: 0,
+    speed: {
+      initial:   { min: 0.01, max: 0.09 },
+      stopping:  { min: 0.01, max: 0.09 },
+      afterStop: { min: 0.12, max: 0.4  },
+      final:     { min: 0.1,  max: 0.2  },
+    },
+    carScale: {
+      initial:   1.4,
+      stopping:  1.0,
+      atGate:    1.0,
+      afterStop: 1.0,
+      final:     1.0,
+    },
   },
 
   gate: {
-    t:             AWAY.gateT,   // 0.35
-    armDirection:  'left',
+    t:             0.35,   // 0.35
+    armDirection:  'right',
+    explicitPostRightX: 280,
     openAngleDeg:   84,
     closedAngleDeg: 0,
   },

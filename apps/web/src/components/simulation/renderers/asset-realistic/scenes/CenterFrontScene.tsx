@@ -51,14 +51,6 @@ const rShoulder = rp(RR_FAR, RR_FAR + SHOULDER_FAR, VP_Y, RR_NEAR, RR_NEAR + SHO
 
 // ─── Ceiling depth reference lines ───────────────────────────────────────────
 // Horizontal lines on ceiling at evenly-spaced depths: creates perspective grid.
-const CEIL_LINES = [0.25, 0.50, 0.75].map(t => ({
-  y:  Math.round(lerp(VP_Y, 0, t)),
-  lx: Math.round(lerp(RL_FAR, CL_NEAR_X, t)),   // right edge of left wall panel
-  rx: Math.round(lerp(RR_FAR, CR_NEAR_X, t)),   // left edge of right wall panel
-}));
-// [0.25] → y=109, lx=328, rx=472
-// [0.50] → y=73,  lx=265, rx=535
-// [0.75] → y=36,  lx=203, rx=598
 
 // ─── Fluorescent tube lines ───────────────────────────────────────────────────
 // Two tubes at ±22% of ceiling lane width from center, converging to VP.
@@ -156,28 +148,7 @@ export function CenterFrontScene() {
         fill="url(#cfCeil)"
       />
 
-      {/* ── Ceiling-to-wall edge lines ──────────────────────────────────────── */}
-      {/* The junction between overhead ceiling and side walls */}
-      <line x1={RL_FAR} y1={VP_Y} x2={CL_NEAR_X} y2={0}
-            stroke="rgba(255,255,255,0.14)" strokeWidth={0.9} />
-      <line x1={RR_FAR} y1={VP_Y} x2={CR_NEAR_X} y2={0}
-            stroke="rgba(255,255,255,0.14)" strokeWidth={0.9} />
 
-      {/* ── Perspective depth grid on ceiling ──────────────────────────────── */}
-      {/* Horizontal structural lines at 3 depth levels — creates tunnel effect */}
-      {CEIL_LINES.map(({ y, lx, rx }, i) => (
-        <g key={i}>
-          {/* Left wall band */}
-          <line x1={0}  y1={y} x2={lx}       y2={y}
-                stroke="rgba(255,255,255,0.055)" strokeWidth={0.8} />
-          {/* Ceiling overhead band */}
-          <line x1={lx} y1={y} x2={rx}       y2={y}
-                stroke="rgba(255,255,255,0.045)" strokeWidth={0.7} />
-          {/* Right wall band */}
-          <line x1={rx} y1={y} x2={SCENE_W}  y2={y}
-                stroke="rgba(255,255,255,0.055)" strokeWidth={0.8} />
-        </g>
-      ))}
 
       {/* ── Wall panel joints (vertical structural lines, perspective-correct) ─ */}
       {/* Left wall — two panel joints at 1/3 and 2/3 of wall face width */}

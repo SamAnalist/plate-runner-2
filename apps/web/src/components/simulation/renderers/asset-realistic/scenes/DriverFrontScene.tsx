@@ -37,30 +37,48 @@ import {
 } from '../../../../../utils/depth';
 
 // ─── Road geometry constants ──────────────────────────────────────────────────
-const RL_FAR  = VP_X + 320;         // 720 — road left edge at horizon (upper right)
-const RR_FAR  = VP_X + 450;         // 850 — road right edge at horizon (exits right)
-const RL_NEAR = SCENE_W * 0.125;    // 100 — road left edge at bottom
-const RR_NEAR = SCENE_W * 0.830;    // 628 — road right edge at bottom
+const RL_FAR  = VP_X + 300;         // road left edge at horizon
+const RR_FAR  = VP_X + 580;         // road right edge at horizon (exits right)
+const RL_NEAR = SCENE_W * 0.125;    // road left edge at bottom
+const RR_NEAR = SCENE_W * 0.830;    // road right edge at bottom
 const SHOULDER_NEAR = 45;
 const SHOULDER_FAR  = 4;
 
+// Project road edges beyond the horizon up to y=0 (top of scene).
+// Each road edge is a straight line; we continue it from VP_Y upward to y=0.
+// At VP_Y the edge is at RL_FAR/RR_FAR; at SCENE_H it is at RL_NEAR/RR_NEAR.
+// t_top = VP_Y / (SCENE_H - VP_Y) is how far above the horizon y=0 sits,
+// in units of the (horizon→bottom) segment length.
+const T_TOP    = VP_Y / (SCENE_H - VP_Y);
+const RL_TOP   = Math.round(RL_FAR  + (RL_FAR  - RL_NEAR)  * T_TOP);
+const RR_TOP   = Math.round(RR_FAR  + (RR_FAR  - RR_NEAR)  * T_TOP);
+
 // ─── Ceiling geometry — asymmetric (camera on LEFT/driver side) ──────────────
 // Near left pulled inward (x=90): camera flush with left wall.
-// Near right = road right near (628). Both far edges follow road at horizon.
-const CL_NEAR_X = 90;               // ceiling near left edge  (camera side)
-const CR_NEAR_X = 800;          // ceiling near right edge (628)
+const CL_NEAR_X = 90;
+const CR_NEAR_X = 800;
 
 // Road center at far (horizon) and near (bottom) — used by arrow
-const CX_FAR  = (RL_FAR + RR_FAR) / 2;   // 785
-const CX_NEAR = (RL_NEAR + RR_NEAR) / 2; // 364
+const CX_FAR  = (RL_FAR + RR_FAR) / 2;
+const CX_NEAR = (RL_NEAR + RR_NEAR) / 2;
 
 // ─── Road polygon strings ────────────────────────────────────────────────────
-function rp(lf: number, rf: number, yf: number, ln: number, rn: number, yn: number) {
-  return `${lf},${yf} ${rf},${yf} ${rn},${yn} ${ln},${yn}`;
-}
-const road      = rp(RL_FAR, RR_FAR, VP_Y, RL_NEAR, RR_NEAR, SCENE_H);
-const lShoulder = rp(RL_FAR - SHOULDER_FAR, RL_FAR, VP_Y, RL_NEAR - SHOULDER_NEAR, RL_NEAR, SCENE_H);
-const rShoulder = rp(RR_FAR, RR_FAR + SHOULDER_FAR, VP_Y, RR_NEAR, RR_NEAR + SHOULDER_NEAR, SCENE_H);
+// Road polygon now extends from y=0 (top) through horizon to bottom.
+// SVG clips anything outside the viewBox automatically.
+const road = [
+  `${RL_TOP},0`,  `${RR_TOP},0`,
+  `${RR_NEAR},${SCENE_H}`, `${RL_NEAR},${SCENE_H}`,
+].join(' ');
+
+const lShoulder = [
+  `${RL_TOP - SHOULDER_FAR},0`, `${RL_TOP},0`,
+  `${RL_NEAR},${SCENE_H}`, `${RL_NEAR - SHOULDER_NEAR},${SCENE_H}`,
+].join(' ');
+
+const rShoulder = [
+  `${RR_TOP},0`, `${RR_TOP + SHOULDER_FAR},0`,
+  `${RR_NEAR + SHOULDER_NEAR},${SCENE_H}`, `${RR_NEAR},${SCENE_H}`,
+].join(' ');
 
 // ─── Ceiling depth grid lines ─────────────────────────────────────────────────
 // Interpolates ceiling edges between far (road horizon) and near values.
@@ -75,12 +93,6 @@ const CEIL_LINES = [0.25, 0.50, 0.75].map(t => ({
 // t=0.50 → y=73,  lx=400, rx=739
 // t=0.75 → y=36,  lx=240, rx=684
 
-// ─── Fluorescent tube lights ──────────────────────────────────────────────────
-// Far ends sweep toward upper-right (road VP area). Near ends shift left toward camera.
-const TUBE_L_X1 = 820;   const TUBE_L_Y1 = VP_Y;   // far end — near road left at horizon
-const TUBE_L_X2 = 320;   const TUBE_L_Y2 = -20;      // near end — shifted hard LEFT
-const TUBE_R_X1 = 860;   const TUBE_R_Y1 = VP_Y;   // far end — at scene right edge
-const TUBE_R_X2 = 430;   const TUBE_R_Y2 = -20;      // near end — slightly left of center
 
 // ─── Gate / stop-line geometry ────────────────────────────────────────────────
 const GATE_Y  = Math.round(lerp(VP_Y, SCENE_H, GATE_T));
@@ -88,7 +100,7 @@ const GATE_RL = Math.round(lerp(RL_FAR, RL_NEAR, GATE_T));
 const GATE_RR = Math.round(lerp(RR_FAR, RR_NEAR, GATE_T));
 
 // ─── Entry direction arrow ────────────────────────────────────────────────────
-const ARR_T    = 0.35;
+const ARR_T    = 0.45;
 const ARR_Y    = lerp(VP_Y, SCENE_H, ARR_T);
 const ARR_RW   = lerp(RR_FAR - RL_FAR, RR_NEAR - RL_NEAR, ARR_T);
 const ARR_H    = ARR_RW * 0.32;
@@ -99,30 +111,33 @@ const ARR_TIP_Y  = ARR_Y + ARR_H / 2;
 const ARR_BASE_Y = ARR_Y - ARR_H / 2;
 const ARR_HBAS_Y = ARR_TIP_Y - ARR_HH;
 // Arrow center X follows road center at ARR_T depth (not hardcoded 400)
-const ARR_CX = Math.round(lerp(CX_FAR, CX_NEAR, ARR_T)) - 50; // ≈ 650
+const ARR_CX = Math.round(lerp(CX_FAR, CX_NEAR, ARR_T)) - 72; // ≈ 650
 // Lean: total horizontal shift at the TOP of the arrow (base). Adjust to taste.
-const ARR_LEAN_X    = 100;
+const ARR_LEAN_X    = 160;
 // Proportional lean at each Y level so the whole arrow tilts uniformly:
 //   tip (bottom) = 0 lean, head junction = partial lean, base (top) = full lean
 const ARR_LEAN_HEAD = Math.round(ARR_LEAN_X * (ARR_HH / ARR_H)); // lean at head/body junction
 const ARR_LEAN_BASE = ARR_LEAN_X;                                  // lean at base (top)
 
 // ─── Centre-line dashes ───────────────────────────────────────────────────────
-const CENTER_DASHES = Array.from({ length: 9 }, (_, i) => {
-  const t0 = (i + 0.08) / 9;
-  const t1 = (i + 0.45) / 9;
+// Extended full height: from y=0 (top) to y=SCENE_H (bottom).
+// t=0 → y=0 (top), t=1 → y=SCENE_H (bottom).
+const CX_TOP = (RL_TOP + RR_TOP) / 2;
+const CENTER_DASHES = Array.from({ length: 14 }, (_, i) => {
+  const t0 = (i + 0.08) / 14;
+  const t1 = (i + 0.55) / 14;
   return {
-    x0: lerp(CX_FAR, CX_NEAR, t0), y0: lerp(VP_Y, SCENE_H, t0),
-    x1: lerp(CX_FAR, CX_NEAR, t1), y1: lerp(VP_Y, SCENE_H, t1),
-    w:  lerp(0.6, 4.5, (t0 + t1) / 2),
+    x0: lerp(CX_TOP, CX_NEAR, t0), y0: lerp(0, SCENE_H, t0),
+    x1: lerp(CX_TOP, CX_NEAR, t1), y1: lerp(0, SCENE_H, t1),
+    w:  lerp(0.4, 4.5, (t0 + t1) / 2),
   };
 });
 
 // ─── Floor light pools ────────────────────────────────────────────────────────
 // Positioned below ceiling tubes — slightly left of road center (camera-left bias).
 const FLOOR_POOLS = [
-  { t: 0.14, cx: 727, frac: 0.21 },
-  { t: 0.70, cx: 500, frac: 0.21 },
+  { t: 0.14, cx: 787, frac: 0.21 },
+  { t: 0.80, cx: 480, frac: 0.21 },
 ].map(p => {
   const rw = lerp(RR_FAR - RL_FAR, RR_NEAR - RL_NEAR, p.t);
   return {
@@ -161,32 +176,9 @@ export function DriverFrontScene() {
 
       {/* ── Left wall panel ─────────────────────────────────────────────────── */}
       {/* At top (y=0): 0→80px. At horizon: 0→720px. Diagonal road receding right. */}
-      <polygon
-        points={`0,0 ${CL_NEAR_X},0 ${RL_FAR},${VP_Y} 0,${VP_Y}`}
-        fill="#1c2028"
-      />
-
-      {/* ── Right wall panel — thin right strip ─────────────────────────────── */}
-      {/* RR_FAR=850 exits scene right — SVG clips at x=800. */}
-      <polygon
-        points={`${CR_NEAR_X},0 ${SCENE_W},0 ${SCENE_W},${VP_Y} ${RR_FAR},${VP_Y}`}
-        fill="#1d2128"
-      />
-
-      {/* ── Overhead ceiling panel ──────────────────────────────────────────── */}
-      {/* Diagonal strip: spans 80→628 at top, 720→850(clipped) at horizon. */}
-      <polygon
-        points={`${CL_NEAR_X},0 ${CR_NEAR_X},0 ${RR_FAR},${VP_Y} ${RL_FAR},${VP_Y}`}
-        fill="url(#dfCeil)"
-      />
-
       {/* ── Ceiling-to-wall edge lines ──────────────────────────────────────── */}
       {/* Left edge: (720,145)→(80,0) — strong diagonal sweep */}
-      <line x1={RL_FAR} y1={VP_Y} x2={CL_NEAR_X} y2={0}
-            stroke="rgba(255,255,255,0.14)" strokeWidth={1.0} />
-      {/* Right edge: (850,145)→(628,0) — exits scene, SVG clips */}
-      <line x1={RR_FAR} y1={VP_Y} x2={CR_NEAR_X} y2={0}
-            stroke="rgba(255,255,255,0.12)" strokeWidth={0.9} />
+
 
       {/* ── Asymmetric ceiling depth grid ──────────────────────────────────── */}
       {/* Horizontal depth lines trace the diagonal perspective of the ceiling. */}
@@ -206,35 +198,14 @@ export function DriverFrontScene() {
 
       {/* ── Left wall joints ────────────────────────────────────────────────── */}
       {/* Lines converge from far (RL_FAR-fraction, 145) to near (CL_NEAR-fraction, 0). */}
-      <line x1={Math.round(RL_FAR  * 0.36)} y1={VP_Y}
-            x2={Math.round(CL_NEAR_X * 0.36)} y2={0}
-            stroke="rgba(255,255,255,0.042)" strokeWidth={0.7} />
-      <line x1={Math.round(RL_FAR  * 0.68)} y1={VP_Y}
-            x2={Math.round(CL_NEAR_X * 0.68)} y2={0}
-            stroke="rgba(255,255,255,0.035)" strokeWidth={0.6} />
+
 
       {/* ── Right wall joints ────────────────────────────────────────────────── */}
-      <line x1={Math.round(lerp(SCENE_W, RR_FAR, 0.36))} y1={VP_Y}
-            x2={Math.round(lerp(SCENE_W, CR_NEAR_X, 0.36))} y2={0}
-            stroke="rgba(255,255,255,0.038)" strokeWidth={0.7} />
-      <line x1={Math.round(lerp(SCENE_W, RR_FAR, 0.68))} y1={VP_Y}
-            x2={Math.round(lerp(SCENE_W, CR_NEAR_X, 0.68))} y2={0}
-            stroke="rgba(255,255,255,0.032)" strokeWidth={0.6} />
+
 
       {/* ── Fluorescent tubes — diagonal sweep toward upper-right VP ─────────── */}
       {/* Far ends at upper-right (road VP area), near ends biased LEFT toward camera. */}
-      <line x1={TUBE_L_X1} y1={TUBE_L_Y1} x2={TUBE_L_X2} y2={TUBE_L_Y2}
-            stroke="#ece8cc" strokeWidth={18} opacity={0.06} />
-      <line x1={TUBE_R_X1} y1={TUBE_R_Y1} x2={TUBE_R_X2} y2={TUBE_R_Y2}
-            stroke="#ece8cc" strokeWidth={18} opacity={0.06} />
-      <line x1={TUBE_L_X1} y1={TUBE_L_Y1} x2={TUBE_L_X2} y2={TUBE_L_Y2}
-            stroke="#f0ecda" strokeWidth={1.4} opacity={0.52} />
-      <line x1={TUBE_R_X1} y1={TUBE_R_Y1} x2={TUBE_R_X2} y2={TUBE_R_Y2}
-            stroke="#f0ecda" strokeWidth={1.4} opacity={0.52} />
-      <ellipse cx={TUBE_L_X2} cy={TUBE_L_Y2 + 4} rx={14} ry={5}
-               fill="#f0ecda" opacity={0.10} />
-      <ellipse cx={TUBE_R_X2} cy={TUBE_R_Y2 + 4} rx={14} ry={5}
-               fill="#f0ecda" opacity={0.10} />
+
 
       {/* ── Near-camera structural column (left edge) ────────────────────────── */}
       <rect x={0} y={0} width={16} height={SCENE_H} fill="url(#dfPillar)" opacity={0.70} />
@@ -242,31 +213,24 @@ export function DriverFrontScene() {
             stroke="rgba(255,255,255,0.09)" strokeWidth={0.8} />
 
       {/* ── Entry glow at horizon — lane exits scene to the right ─────────────── */}
-      {/* Soft glow where the diagonal lane converges off-screen upper-right. */}
-      <ellipse cx={760} cy={VP_Y} rx={55} ry={14}
-               fill="rgba(180,200,160,0.06)" />
 
       {/* ── Ceiling ambient wash ─────────────────────────────────────────────── */}
       {/* Centered over visible ceiling area (CL_NEAR_X=80 to CR_NEAR_X=628 at top). */}
       <ellipse cx={350} cy={12} rx={200} ry={50} fill="#d0ccac" opacity={0.020} />
 
-      {/* ── Horizon line ─────────────────────────────────────────────────────── */}
-      <line x1={0} y1={VP_Y} x2={SCENE_W} y2={VP_Y}
-            stroke="#34383e" strokeWidth={1.5} opacity={0.70} />
+      {/* ── Dark asphalt base — full scene height ─────────────────────────────── */}
+      <rect x={0} y={0} width={SCENE_W} height={SCENE_H} fill="#171a1e" />
 
-      {/* ── Dark asphalt base ─────────────────────────────────────────────────── */}
-      <rect x={0} y={VP_Y} width={SCENE_W} height={SCENE_H - VP_Y} fill="#171a1e" />
-
-      {/* ── Road polygon ──────────────────────────────────────────────────────── */}
+      {/* ── Road polygon — extends full height to y=0 ─────────────────────────── */}
       <polygon points={lShoulder} fill="#141618" />
       <polygon points={rShoulder} fill="#141618" />
       <polygon points={road}      fill="#1e2226" />
       <polygon points={road}      fill="url(#arAsphalt)" opacity={0.6} />
 
-      {/* Road edge lines — diagonal, converge upper-right */}
-      <line x1={RL_FAR} y1={VP_Y} x2={RL_NEAR} y2={SCENE_H}
+      {/* Road edge lines — extend full height to y=0 */}
+      <line x1={RL_TOP} y1={0} x2={RL_NEAR} y2={SCENE_H}
             stroke="#d0c890" strokeWidth={1.8} opacity={0.55} />
-      <line x1={RR_FAR} y1={VP_Y} x2={RR_NEAR} y2={SCENE_H}
+      <line x1={RR_TOP} y1={0} x2={RR_NEAR} y2={SCENE_H}
             stroke="#d0c890" strokeWidth={1.8} opacity={0.55} />
 
       {/* Centre-line dashes — follow diagonal road center */}
@@ -296,9 +260,9 @@ export function DriverFrontScene() {
           `${ARR_CX - ARR_BW + ARR_LEAN_HEAD},${ARR_HBAS_Y}`,
           `${ARR_CX - ARR_HW + ARR_LEAN_HEAD},${ARR_HBAS_Y}`,
         ].join(' ')}
-        fill="rgba(180,195,80,0.17)"
-        stroke="rgba(180,195,80,0.35)"
-        strokeWidth={0.9}
+        fill="rgba(180,170,90,0.87)"
+        stroke="rgba(180,195,80,0.55)"
+        strokeWidth={1.9}
         strokeLinejoin="round"
       />
     </>
