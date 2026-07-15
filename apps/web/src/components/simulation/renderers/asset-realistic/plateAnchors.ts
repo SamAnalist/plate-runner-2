@@ -97,12 +97,12 @@ const DRIVER_BACK: PlateAnchor = {
 // Angled view from passenger's side of rear face. Camera elevated ~2–3 m, downward tilt.
 // INITIAL CALIBRATION — PENDING VISUAL VERIFICATION
 const PASSENGER_BACK: PlateAnchor = {
-  xPct:      0.165,
-  yPct:      0.610,
-  wPct:      0.140,
-  hPct:      0.080,
-  rotateDeg: 0,
-  skewXDeg:  3,
+  xPct:      0.275,
+  yPct:      0.540,
+  wPct:      0.110,
+  hPct:      0.070,
+  rotateDeg: 4,
+  skewXDeg:  2,
   skewYDeg:  0,
   side:      'rear',
 };

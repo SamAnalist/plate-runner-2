@@ -217,13 +217,20 @@ export function VehicleAssetLayer({
   // ── POV exit — slide off bottom, optionally diagonal ────────────────────
   const povYOffset = getPovYOffset(vehicleT, effectiveY, carH, config.direction, sceneV.gateT);
 
-  // exitDiagonal: X follows road slope proportionally to the Y slide distance.
-  // Slope = (xNear - xFar) / (SCENE_H - yFar), so lateral drift matches the road angle.
+  // Diagonal slide offsets — X follows road slope proportional to the Y slide distance.
+  // exitDiagonal: for incoming exit (car slides off bottom after gate).
+  // entryDiagonal: for away entry (car slides in from bottom-side before POV_ENTRY_T_AWAY).
+  // Both use slope = (xNear - xFar) / (SCENE_H - yFar) to match the road angle.
   let povXOffset = 0;
-  if ((sceneV.exitDiagonal ?? false) && povYOffset !== 0) {
-    const yRange = SCENE_H - (sceneV.yFar ?? VP_Y);
-    const scale = sceneV.exitDiagonalScale ?? 1;
-    if (yRange > 0) povXOffset = povYOffset * (sceneV.xNear - sceneV.xFar) / yRange * scale;
+  const yRange = SCENE_H - (sceneV.yFar ?? VP_Y);
+  if (yRange > 0 && povYOffset !== 0) {
+    if ((sceneV.exitDiagonal ?? false) && config.direction === 'incoming') {
+      const scale = sceneV.exitDiagonalScale ?? 1;
+      povXOffset = povYOffset * (sceneV.xNear - sceneV.xFar) / yRange * scale;
+    } else if ((sceneV.entryDiagonal ?? false) && config.direction === 'away') {
+      const scale = sceneV.entryDiagonalScale ?? 1;
+      povXOffset = povYOffset * (sceneV.xNear - sceneV.xFar) / yRange * scale;
+    }
   }
 
   // ── Asset & plate anchor lookup ─────────────────────────────────────────

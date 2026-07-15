@@ -62,15 +62,16 @@ function AssetGate({
 
   const { roadRight, roadWidth, y, scale } = gateDepth;
 
-  const postW  = Math.max(7,  roadWidth * 0.042);
-  const postH  = Math.max(32, 95 * scale);
+  const gateArmScale = gateConfig.armScale ?? 1;
+  const postW  = Math.max(7,  roadWidth * 0.042 * gateArmScale);
+  const postH  = Math.max(32, 95 * scale * gateArmScale);
   // Per-scene gate position: use explicit X if specified (diagonal scenes),
   // otherwise fall back to the road right edge from the global depth model.
   const postRightX = gateConfig.explicitPostRightX ?? roadRight;
   const postX  = postRightX - postW;
   const postY  = y - postH;
 
-  const armLen   = roadWidth * 0.88;
+  const armLen   = roadWidth * 0.88 * gateArmScale;
   const armThick = Math.max(3.5, roadWidth * 0.022);
   const pivotX   = postX + postW / 2;
   const pivotY   = postY + postH * 0.14;

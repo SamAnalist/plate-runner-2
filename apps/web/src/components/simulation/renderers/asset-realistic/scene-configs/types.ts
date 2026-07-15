@@ -98,6 +98,18 @@ export interface SceneVehicleMotionConfig {
    * Default: 1 (natural road slope).
    */
   exitDiagonalScale?: number;
+  /**
+   * When true, the entry slide (away direction, t descending through POV_ENTRY_T_AWAY)
+   * also moves X along the diagonal so the car enters from the expected lateral side
+   * rather than purely vertically.
+   * Default: false.
+   */
+  entryDiagonal?: boolean;
+  /**
+   * Multiplier applied to the diagonal X offset during entry (away direction).
+   * Default: 1 (natural road slope).
+   */
+  entryDiagonalScale?: number;
   /** Per-scene speed ranges for each animation phase */
   speed: SceneSpeedConfig;
   /** Per-scene car size multipliers for each animation phase */
@@ -127,6 +139,13 @@ export interface SceneGateConfig {
   openAngleDeg: number;
   /** Arm rotation in degrees when gate is fully closed (0 = horizontal) */
   closedAngleDeg: number;
+  /**
+   * Multiplier applied to arm length and post height.
+   * Use when the gate depth (t) produces a roadWidth that is too small for
+   * the scene's perspective (e.g. diagonal scenes where the gate sits far
+   * from the camera). Default: 1 (natural road-width sizing).
+   */
+  armScale?: number;
 }
 
 // ── Scene render config ────────────────────────────────────────────────────────
