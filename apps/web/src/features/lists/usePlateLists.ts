@@ -14,6 +14,9 @@ import {
   duplicatePlateList,
   resetPlateListStorage,
   generateListId,
+  exportPlateList,
+  exportAllPlateLists,
+  importPlateLists,
 } from './plateListStorage';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 
@@ -35,9 +38,15 @@ export interface MutationResult {
   error?: string;
 }
 
+export interface ImportSummary {
+  importedCount: number;
+  errors: string[];
+}
+
 export interface PlateListsControls {
   lists: PlateList[];
   storageError: string | null;
+  lastImportResult: ImportSummary | null;
 
   createList: (draft: PlateListDraft) => MutationResult;
   updateList: (id: string, draft: PlateListDraft) => MutationResult;
@@ -49,6 +58,11 @@ export interface PlateListsControls {
   runList: (id: string) => void;
   /** Applies the list's simulationDefaults and loads its plates into the queue, without starting playback. */
   loadListIntoQueue: (id: string) => void;
+
+  exportListToJSON: (id: string) => string | null;
+  exportAllToJSON: () => string;
+  /** Parses and imports a JSON payload (single-list or collection envelope). Result is also stored in lastImportResult. */
+  importFromJSON: (raw: string) => ImportSummary;
 }
 
 function validateDraft(draft: PlateListDraft): string | null {
@@ -66,6 +80,7 @@ function validateDraft(draft: PlateListDraft): string | null {
 
 export function usePlateLists({ config, onConfigChange, plateQueue }: UsePlateListsArgs): PlateListsControls {
   const [{ lists, error: storageError }, setStore] = useState(() => getPlateLists());
+  const [lastImportResult, setLastImportResult] = useState<ImportSummary | null>(null);
 
   const refresh = useCallback(() => {
     setStore(getPlateLists());
@@ -180,9 +195,27 @@ export function usePlateLists({ config, onConfigChange, plateQueue }: UsePlateLi
     refresh();
   }, [refresh]);
 
+  const exportListToJSON = useCallback((id: string): string | null => {
+    const envelope = exportPlateList(id);
+    return envelope ? JSON.stringify(envelope, null, 2) : null;
+  }, []);
+
+  const exportAllToJSON = useCallback((): string => {
+    return JSON.stringify(exportAllPlateLists(), null, 2);
+  }, []);
+
+  const importFromJSON = useCallback((raw: string): ImportSummary => {
+    const { imported, errors } = importPlateLists(raw);
+    const summary: ImportSummary = { importedCount: imported.length, errors };
+    setLastImportResult(summary);
+    if (imported.length > 0) refresh();
+    return summary;
+  }, [refresh]);
+
   return {
     lists,
     storageError,
+    lastImportResult,
     createList,
     updateList,
     deleteList,
@@ -190,5 +223,8 @@ export function usePlateLists({ config, onConfigChange, plateQueue }: UsePlateLi
     resetStorage,
     runList,
     loadListIntoQueue,
+    exportListToJSON,
+    exportAllToJSON,
+    importFromJSON,
   };
 }

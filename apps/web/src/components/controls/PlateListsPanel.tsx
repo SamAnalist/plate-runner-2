@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_QUEUE_CONFIG,
   getPlacementsForDirection,
@@ -77,6 +77,22 @@ function MiniToggle<T extends string>({
       ))}
     </div>
   );
+}
+
+function downloadJSON(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function slugify(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'plate-list';
 }
 
 const VEHICLE_COLOR_HEX: Record<VehicleColor, string> = {
@@ -364,6 +380,7 @@ function ListCard({
   onEdit,
   onDuplicate,
   onDelete,
+  onExport,
 }: {
   list: PlateList;
   onRun: () => void;
@@ -371,6 +388,7 @@ function ListCard({
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onExport: () => void;
 }) {
   const d = list.simulationDefaults;
   return (
@@ -399,6 +417,7 @@ function ListCard({
         <SmallButton onClick={onLoad}>Load Into Queue</SmallButton>
         <SmallButton onClick={onEdit}>Edit</SmallButton>
         <SmallButton onClick={onDuplicate}>Duplicate</SmallButton>
+        <SmallButton onClick={onExport}>Export</SmallButton>
         <SmallButton tone="danger" onClick={onDelete}>Delete</SmallButton>
       </div>
     </div>
@@ -408,8 +427,14 @@ function ListCard({
 // ─── Panel ───────────────────────────────────────────────────────────────
 
 export function PlateListsPanel(props: PlateListsControls) {
-  const { lists, storageError, createList, updateList, deleteList, duplicateList, resetStorage, runList, loadListIntoQueue } = props;
+  const {
+    lists, storageError, lastImportResult,
+    createList, updateList, deleteList, duplicateList, resetStorage,
+    runList, loadListIntoQueue,
+    exportListToJSON, exportAllToJSON, importFromJSON,
+  } = props;
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editingList = editingId && editingId !== 'new' ? lists.find(l => l.id === editingId) ?? null : null;
 
@@ -423,6 +448,26 @@ export function PlateListsPanel(props: PlateListsControls) {
     if (window.confirm('Reset plate list storage? All saved lists will be permanently deleted.')) {
       resetStorage();
     }
+  }
+
+  function handleExportList(list: PlateList) {
+    const json = exportListToJSON(list.id);
+    if (json) downloadJSON(`${slugify(list.name)}.json`, json);
+  }
+
+  function handleExportAll() {
+    downloadJSON('plate-runner-lists.json', exportAllToJSON());
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') importFromJSON(reader.result);
+    };
+    reader.readAsText(file);
   }
 
   return (
@@ -480,8 +525,38 @@ export function PlateListsPanel(props: PlateListsControls) {
                   onEdit={() => setEditingId(list.id)}
                   onDuplicate={() => duplicateList(list.id)}
                   onDelete={() => handleDelete(list.id, list.name)}
+                  onExport={() => handleExportList(list)}
                 />
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {editingId === null && (
+        <div>
+          <Label>Import / Export</Label>
+          <div className="flex flex-wrap gap-1.5">
+            <SmallButton onClick={handleExportAll} disabled={lists.length === 0}>Export All</SmallButton>
+            <SmallButton onClick={() => fileInputRef.current?.click()}>Import JSON</SmallButton>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+          </div>
+          {lastImportResult && (
+            <div className="mt-1.5 text-[10px] font-mono">
+              <p className="text-emerald-400">Imported {lastImportResult.importedCount} list(s).</p>
+              {lastImportResult.errors.length > 0 && (
+                <div className="mt-1 max-h-20 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 px-2 py-1">
+                  {lastImportResult.errors.map((err, i) => (
+                    <p key={i} className="text-red-400/80 leading-snug truncate">{err}</p>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
