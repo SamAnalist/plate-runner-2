@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   MAX_PLATE_LIST_NAME_LENGTH,
   MAX_PLATE_LIST_DESCRIPTION_LENGTH,
   MAX_PLATE_LIST_PLATES,
   type PlateList,
   type PlateListSimulationDefaults,
+  type SimulationConfig,
 } from '@plate-runner/shared';
 import {
   getPlateLists,
@@ -14,6 +15,13 @@ import {
   resetPlateListStorage,
   generateListId,
 } from './plateListStorage';
+import type { PlateQueueControls } from '../queue/usePlateQueue';
+
+interface UsePlateListsArgs {
+  config: SimulationConfig;
+  onConfigChange: (c: SimulationConfig) => void;
+  plateQueue: PlateQueueControls;
+}
 
 export interface PlateListDraft {
   name: string;
@@ -36,6 +44,11 @@ export interface PlateListsControls {
   deleteList: (id: string) => void;
   duplicateList: (id: string) => void;
   resetStorage: () => void;
+
+  /** Applies the list's simulationDefaults and immediately runs its plates through the queue. */
+  runList: (id: string) => void;
+  /** Applies the list's simulationDefaults and loads its plates into the queue, without starting playback. */
+  loadListIntoQueue: (id: string) => void;
 }
 
 function validateDraft(draft: PlateListDraft): string | null {
@@ -51,12 +64,66 @@ function validateDraft(draft: PlateListDraft): string | null {
   return null;
 }
 
-export function usePlateLists(): PlateListsControls {
+export function usePlateLists({ config, onConfigChange, plateQueue }: UsePlateListsArgs): PlateListsControls {
   const [{ lists, error: storageError }, setStore] = useState(() => getPlateLists());
 
   const refresh = useCallback(() => {
     setStore(getPlateLists());
   }, []);
+
+  const listsRef = useRef(lists);
+  listsRef.current = lists;
+  const configRef = useRef(config);
+  configRef.current = config;
+  const plateQueueRef = useRef(plateQueue);
+  plateQueueRef.current = plateQueue;
+
+  /**
+   * Applying a list's defaults changes direction/placement/gate/color — fields
+   * useSimulation reads via its own configRef, which only updates on next
+   * render. So we can't call onConfigChange() and start the queue in the same
+   * tick (unlike the plate-only case usePlateQueue handles internally). This
+   * effect waits for the real re-render (config actually changing) before
+   * touching the queue — mirrors useSimulation's own "wait for next render"
+   * discipline (e.g. its direction-change effect).
+   */
+  const pendingActionRef = useRef<{ plates: string[]; autoRun: boolean } | null>(null);
+  useEffect(() => {
+    if (!pendingActionRef.current) return;
+    const { plates, autoRun } = pendingActionRef.current;
+    pendingActionRef.current = null;
+    const rawInput = plates.join('\n');
+    if (autoRun) plateQueueRef.current.loadAndRunQueue(rawInput);
+    else plateQueueRef.current.loadQueue(rawInput);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config]);
+
+  const applyListDefaults = useCallback((list: PlateList): SimulationConfig => {
+    const d = list.simulationDefaults;
+    return {
+      ...configRef.current,
+      direction: d.direction,
+      detectorPlacement: d.detectorPlacement,
+      vehicleColor: d.vehicleColor,
+      ...d.gateConfig,
+    };
+  }, []);
+
+  const runList = useCallback((id: string) => {
+    const list = listsRef.current.find(l => l.id === id);
+    if (!list) return;
+    onConfigChange(applyListDefaults(list));
+    plateQueueRef.current.setQueueConfig(list.simulationDefaults.queueConfig);
+    pendingActionRef.current = { plates: list.plates, autoRun: true };
+  }, [onConfigChange, applyListDefaults]);
+
+  const loadListIntoQueue = useCallback((id: string) => {
+    const list = listsRef.current.find(l => l.id === id);
+    if (!list) return;
+    onConfigChange(applyListDefaults(list));
+    plateQueueRef.current.setQueueConfig(list.simulationDefaults.queueConfig);
+    pendingActionRef.current = { plates: list.plates, autoRun: false };
+  }, [onConfigChange, applyListDefaults]);
 
   const createList = useCallback((draft: PlateListDraft): MutationResult => {
     const validationError = validateDraft(draft);
@@ -121,5 +188,7 @@ export function usePlateLists(): PlateListsControls {
     deleteList,
     duplicateList,
     resetStorage,
+    runList,
+    loadListIntoQueue,
   };
 }

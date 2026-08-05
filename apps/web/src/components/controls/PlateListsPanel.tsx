@@ -359,11 +359,15 @@ function ListForm({
 
 function ListCard({
   list,
+  onRun,
+  onLoad,
   onEdit,
   onDuplicate,
   onDelete,
 }: {
   list: PlateList;
+  onRun: () => void;
+  onLoad: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -391,6 +395,8 @@ function ListCard({
         updated {new Date(list.updatedAt).toLocaleString()}
       </p>
       <div className="flex flex-wrap gap-1.5 mt-1">
+        <SmallButton tone="primary" onClick={onRun}>▶ Run List</SmallButton>
+        <SmallButton onClick={onLoad}>Load Into Queue</SmallButton>
         <SmallButton onClick={onEdit}>Edit</SmallButton>
         <SmallButton onClick={onDuplicate}>Duplicate</SmallButton>
         <SmallButton tone="danger" onClick={onDelete}>Delete</SmallButton>
@@ -402,7 +408,7 @@ function ListCard({
 // ─── Panel ───────────────────────────────────────────────────────────────
 
 export function PlateListsPanel(props: PlateListsControls) {
-  const { lists, storageError, createList, updateList, deleteList, duplicateList, resetStorage } = props;
+  const { lists, storageError, createList, updateList, deleteList, duplicateList, resetStorage, runList, loadListIntoQueue } = props;
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
 
   const editingList = editingId && editingId !== 'new' ? lists.find(l => l.id === editingId) ?? null : null;
@@ -469,6 +475,8 @@ export function PlateListsPanel(props: PlateListsControls) {
                 <ListCard
                   key={list.id}
                   list={list}
+                  onRun={() => runList(list.id)}
+                  onLoad={() => loadListIntoQueue(list.id)}
                   onEdit={() => setEditingId(list.id)}
                   onDuplicate={() => duplicateList(list.id)}
                   onDelete={() => handleDelete(list.id, list.name)}

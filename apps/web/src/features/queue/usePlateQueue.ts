@@ -35,6 +35,8 @@ export interface PlateQueueControls {
   loadError: string | null;
 
   loadQueue: (rawInput: string) => void;
+  /** Parses input and immediately starts the first item — safe to call in the same tick as a config change (see usePlateLists). */
+  loadAndRunQueue: (rawInput: string) => void;
   setQueueConfig: (c: PlateQueueConfig) => void;
 
   runQueue: () => void;
@@ -110,8 +112,8 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
     simulation.reset();
   }, [simulation]);
 
-  const startItemAt = useCallback((index: number) => {
-    const item = itemsRef.current[index];
+  const startItemAt = useCallback((index: number, itemsOverride?: PlateQueueItem[]) => {
+    const item = (itemsOverride ?? itemsRef.current)[index];
     if (!item) return;
     setCurrentIndex(index);
     applyItemStatus(item.id, 'running');
@@ -203,6 +205,33 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
     clearGapTimer();
   }, [clearGapTimer]);
 
+  /**
+   * Parses input and starts the first item immediately, using the freshly
+   * computed items array rather than itemsRef.current (which only updates on
+   * next render). This makes it safe to call right after changing config
+   * (direction/placement/gate/etc.) in the same tick — see usePlateLists's
+   * runList(), which relies on this to apply a saved list's defaults and
+   * start playback without racing React's render cycle.
+   */
+  const loadAndRunQueue = useCallback((rawInput: string) => {
+    const parsed = parsePlateQueueInput(rawInput);
+    if (parsed.total > MAX_QUEUE_SIZE) {
+      setLoadError(`Too many plates: ${parsed.total} detected, max is ${MAX_QUEUE_SIZE}.`);
+      return;
+    }
+    setLoadError(null);
+    const newItems = parsed.valid.map(plate => ({ id: nextId(), plate, status: 'pending' as const }));
+    setItems(newItems);
+    setCurrentIndex(0);
+    clearGapTimer();
+    if (newItems.length === 0) {
+      setQueueStatus('idle');
+      return;
+    }
+    setQueueStatus('running');
+    startItemAt(0, newItems);
+  }, [clearGapTimer, startItemAt]);
+
   const runQueue = useCallback(() => {
     if (itemsRef.current.length === 0) return;
     if (!['idle', 'stopped', 'completed'].includes(queueStatusRef.current)) return;
@@ -291,6 +320,7 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
     loadError,
 
     loadQueue,
+    loadAndRunQueue,
     setQueueConfig,
 
     runQueue,

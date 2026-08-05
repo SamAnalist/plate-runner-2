@@ -45,7 +45,7 @@ export default function App() {
   }
 
   const plateQueue = usePlateQueue({ config, onConfigChange: handleConfigChange, simulation });
-  const plateLists = usePlateLists();
+  const plateLists = usePlateLists({ config, onConfigChange: handleConfigChange, plateQueue });
 
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
