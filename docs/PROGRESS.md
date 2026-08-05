@@ -1243,3 +1243,90 @@ positioning from the global depth model.
 - Visual QA pass for `driver_front` diagonal: verify car size at gate, plate readability, gate arm overlap.
 - Consider updating `getCarScale` to read from scene config when per-scene phase timing is needed.
 - Plate List Playback (Phase 0.3).
+
+---
+
+## Phase 0.4 — Local Plate Queue
+
+**Date:** 2026-08-05
+
+### Goal
+
+Add a local Plate Queue: paste many plates, validate them, and play them back
+sequentially through the existing single-vehicle simulator — no backend, no
+remote mode, no scheduler, no persistence beyond the current page session.
+
+### Implemented
+
+- `parsePlateQueueInput` — splits pasted text on comma/space/tab/newline,
+  reuses `validatePlate`, reports valid/invalid/total counts.
+- `usePlateQueue` — orchestration hook that drives the existing
+  `useSimulation` instance externally (sets `config.plate`, calls
+  `start()`/`reset()`, watches `state.phase`). No changes were needed inside
+  `useSimulation` itself.
+- `PlateQueuePanel` — collapsible "Plate Queue" section in `ControlPanel`:
+  paste input with live valid/invalid counts, queue settings
+  (gap/mode/loop), playback controls, and a scrollable status-badged item
+  list.
+- `run_all` and `manual_next` playback modes, `loop`, pause/resume (queue-level),
+  skip current, stop, clear, reset status.
+- Manual single-plate controls (Plate field, Start/Stop/Reset) are disabled
+  and labeled "Controlled by Plate Queue" while the queue is actively driving
+  playback, to avoid desyncing queue state from the simulator.
+
+### Files Changed
+
+- `packages/shared/src/types/queue.ts` — created: queue/item status and config types
+- `packages/shared/src/index.ts` — export the new queue types
+- `apps/web/src/features/queue/plateQueueParser.ts` — created
+- `apps/web/src/features/queue/usePlateQueue.ts` — created
+- `apps/web/src/components/controls/PlateQueuePanel.tsx` — created
+- `apps/web/src/components/controls/ControlPanel.tsx` — new Plate Queue section, manual playback guarded while queue is active
+- `apps/web/src/components/controls/PlateInput.tsx` — added `disabled` prop, mirrors externally-driven value
+- `apps/web/src/App.tsx` — instantiate `usePlateQueue`, pass down to `ControlPanel`
+- `docs/QUEUE_SPEC.md` — created
+- `docs/SIMULATION_SPEC.md` — note on queue orchestration
+- `docs/GATE_BEHAVIOR.md` — queue/gate interaction matrix
+
+### Decisions
+
+- No changes to `useSimulation`: it never reads `config.plate`, so the queue
+  can swap the plate and call `start()`/`reset()` safely — this kept the
+  well-tested state machine untouched.
+- Space is treated as a token separator (per spec), so `"ABC 123"` typed on
+  one line parses as two valid plates, not one invalid one — documented in
+  `QUEUE_SPEC.md`.
+- Pause is queue-level only (blocks advancing to the next vehicle); it does
+  not pause a vehicle mid-animation, since the simulator has no pause
+  primitive. Documented as a known limitation rather than modifying the rAF
+  loop in this phase.
+- Duplicates are allowed in a queue by design.
+
+### Manual Testing
+
+- Paste `ABC123`, `XYZ999`, `TEST01` (newline-separated) → Apply Queue → Run Queue → all three play in sequence.
+- Paste 12-char plates `ABCDEFGHIJ12` and `123456789012` → both validate and run.
+- Paste `ABC-123`, `ABCDEFGHIJKLM`, `<script>` → all reported invalid with reasons, not added to the queue.
+- Gate `hidden` → vehicles pass straight through, queue auto-advances.
+- Gate visible + initially open → same, no stop.
+- Gate closed + `auto_open` → vehicle stops, arm opens automatically, queue advances.
+- Gate closed + `wait_for_signal` → vehicle stops, queue shows `waiting_for_signal`, Send Open Signal resumes it, queue advances.
+- Pause mid-queue → next vehicle does not start; Resume continues.
+- Skip Current → current item marked skipped, next item starts.
+- Stop Queue → current vehicle cancelled, queue status `stopped`, item statuses preserved.
+- `manual_next` mode → Next Vehicle required between runs.
+- `loop` on → queue restarts from item 1 after the last item completes.
+- Confirmed unaffected: single-plate manual run, all 6 placements, incoming/away, Camera Mode, Fullscreen Scene.
+
+### Known Limitations
+
+- Pause cannot interrupt a vehicle already mid-animation (queue-level pause only).
+- `failed` item status has no automatic trigger yet (no failure path exists locally).
+- Queue is in-memory only — no persistence across page reloads.
+- Max 500 plates per queue.
+
+### Next Steps
+
+- Visual QA pass for `driver_front` diagonal (carried over from Phase 1.5).
+- Consider a lightweight pause primitive in `useSimulation` if mid-run pausing becomes a real requirement.
+- Backend-backed plate lists / remote queue control (future phase, not yet in scope).

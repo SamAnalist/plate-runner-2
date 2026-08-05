@@ -226,3 +226,17 @@ simulation.openGate();
 ```
 
 The simulation engine is fully decoupled from the signal source. Any future backend, WebSocket, or remote trigger only needs to call `openGate()`.
+
+---
+
+## 9. Plate Queue Interaction (Phase 0.4)
+
+The local Plate Queue (`docs/QUEUE_SPEC.md`) plays multiple plates through
+this same gate logic sequentially, without changing any of the above:
+
+| Gate config | Queue behavior |
+|---|---|
+| `hidden` | Vehicle passes straight through; queue advances after the gap. |
+| Visible, initially open | Same — never stops. |
+| Visible, closed, `auto_open` | Vehicle stops/opens/resumes exactly as in §1–4 above; queue just waits for `phase === 'done'` and advances. |
+| Visible, closed, `wait_for_signal` | Vehicle stops at `waiting_for_signal`; the queue mirrors this in its own status and waits for the same **Send Open Signal** button described in §6. Nothing about the signal flow changes — the queue only observes `simulation.state.phase`. |

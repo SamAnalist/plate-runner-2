@@ -366,3 +366,14 @@ Implemented in `packages/shared/src/validators/plate.ts`:
 2. **No `dangerouslySetInnerHTML`** anywhere in simulation components.
 3. **Plate text is plain data**, not code or markup.
 4. `textLength` + `lengthAdjust="spacingAndGlyphs"` prevent overflow.
+
+---
+
+## 15. Plate Queue Orchestration (Phase 0.4)
+
+`usePlateQueue` (`apps/web/src/features/queue/usePlateQueue.ts`) drives this
+same `useSimulation` state machine externally — it does not add new phases
+or alter the transitions above. It works because `useSimulation` never reads
+`config.plate`, only direction/placement/gate/speed fields, so the queue can
+swap `config.plate` and call `start()` between runs with no race against the
+simulator's internal state. See `docs/QUEUE_SPEC.md` for the full spec.
