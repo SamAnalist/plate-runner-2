@@ -10,14 +10,17 @@ import type {
 } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../../features/queue/usePlateQueue';
+import type { PlateListsControls } from '../../features/lists/usePlateLists';
 import { getPlacementsForDirection } from '@plate-runner/shared';
 import { PlateInput } from './PlateInput';
 import { PlateQueuePanel } from './PlateQueuePanel';
+import { PlateListsPanel } from './PlateListsPanel';
 
 interface ControlPanelProps {
   config: SimulationConfig;
   simulation: SimulationControls;
   plateQueue: PlateQueueControls;
+  plateLists: PlateListsControls;
   onConfigChange: (c: SimulationConfig) => void;
   showDebug: boolean;
   onShowDebugChange: (v: boolean) => void;
@@ -372,6 +375,7 @@ export function ControlPanel({
   config,
   simulation,
   plateQueue,
+  plateLists,
   onConfigChange,
   showDebug,
   onShowDebugChange,
@@ -569,6 +573,17 @@ export function ControlPanel({
           defaultOpen={false}
         >
           <PlateQueuePanel {...plateQueue} />
+        </CollapsibleSection>
+
+        <Divider />
+
+        {/* ── Plate Lists ───────────────────────────────────────────────── */}
+        <CollapsibleSection
+          title="Plate Lists"
+          badge={plateLists.lists.length > 0 ? String(plateLists.lists.length) : undefined}
+          defaultOpen={false}
+        >
+          <PlateListsPanel {...plateLists} />
         </CollapsibleSection>
 
         <Divider />

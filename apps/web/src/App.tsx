@@ -9,6 +9,7 @@ import { SimulationScene } from './components/simulation/SimulationScene';
 import { ControlPanel } from './components/controls/ControlPanel';
 import { useSimulation } from './hooks/useSimulation';
 import { usePlateQueue } from './features/queue/usePlateQueue';
+import { usePlateLists } from './features/lists/usePlateLists';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
@@ -44,6 +45,7 @@ export default function App() {
   }
 
   const plateQueue = usePlateQueue({ config, onConfigChange: handleConfigChange, simulation });
+  const plateLists = usePlateLists();
 
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
@@ -106,6 +108,7 @@ export default function App() {
             config={config}
             simulation={simulation}
             plateQueue={plateQueue}
+            plateLists={plateLists}
             onConfigChange={handleConfigChange}
             showDebug={showDebug}
             onShowDebugChange={setShowDebug}
