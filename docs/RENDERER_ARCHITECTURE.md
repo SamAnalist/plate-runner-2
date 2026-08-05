@@ -201,9 +201,33 @@ passenger_front/back: skewXDeg = +7   (right edge recedes — passenger-side cam
 
 Values calibrated against real 1536×1024 PNG assets in Phase 0.5 via pixel-level plate blank detection. Updated to ±9° (was ±7° against placeholder geometry). Re-calibrate if a new render with a different camera angle is produced.
 
+## 9b. Color-Keyed Asset Registry (Phase 0.6)
+
+`assetRegistry.tsx` is now keyed by **both** `VehicleColor` and `AssetViewKey`:
+
+```ts
+const VEHICLE_ASSET_REGISTRY: Record<VehicleColor, Partial<Record<AssetViewKey, AssetEntry>>> = {
+  blue: { center_front: {...}, driver_front: {...}, ... },  // fully populated
+  red:  {},                                                  // no assets yet
+  gray: {},                                                  // no assets yet
+};
+```
+
+Files live at `public/assets/vehicles/main-car/<color>/<view>.png` (moved from the old flat `main-car/<view>.png` layout — only `blue/` exists today).
+
+`VehicleAssetLayer` no longer indexes the registry directly — it calls the resolver:
+
+```ts
+const asset = getVehicleAsset({ color: config.vehicleColor, placement: viewKey });
+// asset: { src, width, height, fallbackUsed }
+```
+
+`getVehicleAsset` falls back to the `blue` entry for the same placement when the requested color has no asset, setting `fallbackUsed: true`. This is how `red`/`gray` render correctly today (as blue) without any placeholder/fake image files. See `docs/VEHICLE_COLOR_VARIANTS.md` for the product-level policy and how to add a new color's real assets later (populate that color's object in `VEHICLE_ASSET_REGISTRY` — no other code changes needed).
+
+The legacy `CarPalette`/`CAR_PALETTES` SVG-tinting fallback and the `svg-prototype` `AssetEntry` variant were removed in this phase — they were dead code for the raster pipeline (confirmed unused anywhere else) and would have required pruning to typecheck against the narrowed `VehicleColor` anyway.
+
 ## 10. Extension Points
 
 - **New visual style**: add to `VisualStyle` union, add label to `VISUAL_STYLE_LABELS`, add entry to `RENDERERS` record, create `MyRenderer.tsx` implementing `SceneRendererProps`.
-- **Install real car asset**: update `ASSET_REGISTRY[viewKey].src` to the real PNG path, delete `isPlaceholder`, re-calibrate `PLATE_ANCHORS[placement].skewXDeg`.
-- **New vehicle color**: implement hue-rotate filter in `VehicleAssetLayer` OR commission per-colour asset variants and expand `ASSET_REGISTRY` key scheme.
+- **Install a new color's real assets**: add PNG files under `public/assets/vehicles/main-car/<color>/`, populate that color's object in `VEHICLE_ASSET_REGISTRY` (`assetRegistry.tsx`) with the six placement entries. `VehicleAssetLayer` and `getVehicleAsset` need no changes. Anchors are shared across colors (see `docs/VEHICLE_COLOR_VARIANTS.md`) as long as the new image has the same geometry/crop as the blue reference.
 - **New camera angle (e.g. overhead front)**: extend `AssetViewKey`, add matching `DetectorPlacement`, add file + anchor entries.

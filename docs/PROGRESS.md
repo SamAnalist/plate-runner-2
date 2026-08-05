@@ -1451,3 +1451,133 @@ assertions, not just visual inspection:
 - Consider whether the gate-arm CSS transition should become frame-driven
   if pixel-perfect pause fidelity during `gate_opening` ever becomes a
   hard requirement (currently out of scope).
+
+---
+
+## Phase 0.6 — Persistent Plate Lists and Vehicle Color Variants
+
+**Date:** 2026-08-05
+
+### Goal
+
+Add two local/browser-only capabilities: persistent, named plate lists
+(create/edit/duplicate/delete/run/import/export) and vehicle color variants
+(blue/red/gray, asset-backed with a documented fallback). No backend,
+remote mode, scheduler, or new render scenes.
+
+### Implemented
+
+- **Vehicle color variants**: `VehicleColor` narrowed to `'blue' | 'red' | 'gray'`.
+  Asset registry restructured to `Record<VehicleColor, Partial<Record<AssetViewKey, AssetEntry>>>`
+  with a `getVehicleAsset({color, placement})` resolver that falls back to
+  the blue asset when a color has no asset yet (`red`/`gray` today) —
+  verified visually in QA (both render the identical blue PNG `href`).
+  Existing PNGs moved to `main-car/blue/`. Dead `CarPalette`/`CAR_PALETTES`
+  SVG-tint code removed (unused, would've needed pruning anyway).
+- **Persistent plate lists**: `PlateList` type (name, description, plates,
+  `simulationDefaults` — direction/placement/vehicleColor/gateConfig/queueConfig
+  — timestamps, version) stored in `localStorage` via a plain-function
+  storage service, with a `usePlateLists` hook (mirrors `usePlateQueue`'s own
+  dependency-injection pattern) providing CRUD + playback + import/export.
+- **Plate list playback**: "Run List" applies a list's defaults and starts
+  the queue; "Load Into Queue" applies defaults without starting. Required a
+  genuine correctness fix (not just a convenience method) — see Decisions.
+- **Import/export**: versioned JSON envelopes (`schemaVersion: 1`), single
+  or collection, downloaded via `Blob`+`<a download>` and imported via
+  `FileReader`. Per-list validation against shared enum arrays; imports
+  always get a fresh local id/timestamps (name preserved) to avoid ever
+  colliding with a local list.
+- **UI reorg**: "Gate" and "Vehicle Color + Speed" wrapped in
+  `CollapsibleSection`s (`defaultOpen`, so first-load appearance is
+  unchanged) to keep the now-larger panel scannable; new "Plate Lists"
+  collapsible section added after "Plate Queue".
+
+### Files Changed
+
+- `packages/shared/src/types/simulation.ts` — narrowed `VehicleColor`, added `GateConfig`, `VEHICLE_COLORS`/`GATE_MODES`/`GATE_INITIAL_STATES`/`DIRECTIONS`
+- `packages/shared/src/types/plateList.ts` — created
+- `packages/shared/src/types/queue.ts` — added `PLATE_QUEUE_MODES`
+- `packages/shared/src/directionPlacement.ts` — added `DETECTOR_PLACEMENTS`
+- `packages/shared/src/index.ts` — new exports
+- `apps/web/src/components/simulation/renderers/asset-realistic/assetRegistry.tsx` — color-keyed registry + `getVehicleAsset`
+- `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` — uses resolver
+- `apps/web/src/components/simulation/renderers/asset-realistic/types.ts` — removed dead `CarPalette`/svg-prototype code
+- `apps/web/public/assets/vehicles/main-car/blue/*.png` — moved (git mv) from the old flat layout
+- `apps/web/src/features/lists/plateListStorage.ts` — created
+- `apps/web/src/features/lists/usePlateLists.ts` — created
+- `apps/web/src/components/controls/PlateListsPanel.tsx` — created
+- `apps/web/src/features/queue/usePlateQueue.ts` — added `loadAndRunQueue`, `startItemAt` override param
+- `apps/web/src/components/controls/ControlPanel.tsx` — narrowed `COLOR_MAP`, `Plate Lists` section, Gate/Visual Settings collapsibles
+- `apps/web/src/App.tsx` — instantiate `usePlateLists`
+
+### Decisions
+
+- **The sequencing fix was the crux of this phase.** Applying a saved list
+  changes `direction`/`detectorPlacement`/`gateMode`/`vehicleColor` — fields
+  `useSimulation` reads via its own `configRef`, current only as of the
+  *next* render. `onConfigChange()` + start-the-queue in the same tick would
+  start against stale settings. Fixed with two pieces: `loadAndRunQueue` in
+  `usePlateQueue` (starts using a freshly-computed items array, not the
+  stale `itemsRef`) and a `useEffect` keyed on `config` in `usePlateLists`
+  that defers the actual queue call until the real re-render happens. Both
+  pieces were designed during planning, before writing code — this avoided
+  a silent "Run List does nothing" bug entirely rather than debugging it
+  after the fact.
+- Fallback to blue (not "reject unselectable colors") for missing
+  red/gray assets — documented in `docs/VEHICLE_COLOR_VARIANTS.md`,
+  never breaks the app, an explicit note appears in the UI.
+- Dead `CarPalette`/`svg-prototype` code deleted rather than pruned to fit
+  the narrowed `VehicleColor` — confirmed zero other references first.
+- Import always mints a new local id (keeps `name`) rather than trusting a
+  foreign `id` — avoids ever silently overwriting an unrelated local list.
+- `Reset Status`/manual controls behavior around plate lists mirrors the
+  Plate Queue's own existing pause/skip/stop semantics exactly — a
+  list-driven run is indistinguishable from a manually-loaded queue once
+  it's running.
+
+### Manual Testing (18/18 scenarios, via headless-Chromium Playwright driver with DOM/attribute assertions)
+
+1. Create list with 3 valid plates — ✅ saved and listed.
+2. Create list with invalid plates — ✅ live preview showed `total 4 · valid 1 · invalid 3`; only the valid plate was kept.
+3. Edit list — ✅ name change persisted.
+4. Duplicate list — ✅ `Copy of ...` created.
+5. Delete list — ✅ confirmed via `window.confirm`, removed.
+6. Export one list — ✅ correct `plate_runner_plate_list` envelope, `schemaVersion: 1`.
+7. Export all lists — ✅ correct `plate_runner_plate_list_collection` envelope with all lists.
+8. Import one list — ✅ appeared under its (possibly renamed) name.
+9. Import a collection — ✅ `Imported 1 list(s).` summary shown, list added.
+10. Import invalid JSON — ✅ `Imported 0 list(s).` + inline "Invalid JSON" error, app didn't crash.
+11. Run list with blue — ✅ vehicle `<image href>` = `/assets/vehicles/main-car/blue/center_front.png`.
+12. Run list with red — ✅ same href (fallback confirmed).
+13. Run list with gray — ✅ same href (fallback confirmed); reached `waiting_for_signal` correctly for a `wait_for_signal` list.
+14. Fallback verified — ✅ (folded into 12/13 — identical asset path for red/gray vs blue).
+15. Queue pause/resume from a list — ✅ `t` frozen exactly, Send Open Signal correctly disabled while paused, resumed cleanly.
+16. `wait_for_signal` from a list — ✅ signal sent, queue advanced to the second item, which reached `waiting_for_signal` again on its own.
+17. Persistence across reload — ✅ list still present after a hard page reload.
+18. Camera Mode shows no UI — ✅ neither "Simulation Controls" nor "Plate Lists" render in Camera Mode.
+
+Regression spot-check (existing features): single-plate manual run, manual
+pause/resume (`t` frozen exactly across an 800ms hold), and gate `hidden`
+mode (no arm rendered) all still work. Zero console errors across every QA
+script run this phase.
+
+### Known Limitations
+
+- `red`/`gray` render identically to `blue` until real assets are added
+  (by design this phase — see `docs/VEHICLE_COLOR_VARIANTS.md`).
+- Plate anchors are shared across colors; a future color with different
+  image geometry will need color-aware anchors (documented, not implemented).
+- No cross-device sync — plate lists are per-browser `localStorage` only;
+  portability is only via manual JSON export/import.
+- `schemaVersion` has no real migration path yet — any version other than 1
+  is rejected outright.
+- List `version` field is currently unused beyond being present (starts at
+  1) — reserved for a future list-shape migration, separate from the JSON
+  envelope's `schemaVersion`.
+
+### Next Steps
+
+- Consider adding real red/gray vehicle asset renders when available (pure
+  asset-drop, per the documented extension path — no code changes needed
+  beyond populating the registry).
+- Backend/remote/API phases remain explicitly out of scope until requested.

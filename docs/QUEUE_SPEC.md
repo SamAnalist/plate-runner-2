@@ -162,3 +162,22 @@ currently in motion, via `simulation.pause()` — see
   (e.g. the gate arm's CSS rise animation is not frame-driven, so it isn't
   guaranteed to freeze pixel-for-pixel mid-transition, only the logical
   timer that gates the vehicle's resume).
+
+## `loadAndRunQueue` and Plate List integration (Phase 0.6)
+
+`loadAndRunQueue(rawInput)` was added alongside `loadQueue` — it parses the
+input and starts the first item **immediately, using the freshly computed
+items array** rather than the `itemsRef` mirror (which only updates on the
+next render). This matters because `docs/PLATE_LISTS_SPEC.md`'s "Run List"
+action changes `direction`/`detectorPlacement`/`gateMode`/`vehicleColor` in
+the same user action that starts the queue — fields `useSimulation` reads via
+its own `configRef` (also only current as of the next render). `usePlateLists`
+handles that half of the timing problem by waiting for the actual config
+re-render (see its own doc); `loadAndRunQueue` handles the queue's half by
+never depending on `itemsRef` for the very first item. `loadQueue` itself is
+unchanged and still used by "Load Into Queue" and manual queue loading.
+
+A run started from a Plate List behaves exactly like a manually-loaded
+queue in every other respect (pause/resume, skip, stop, gate interaction,
+`manual_next`, loop) — the queue has no awareness that its plates/settings
+came from a saved list rather than the textarea.

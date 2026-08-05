@@ -390,3 +390,20 @@ gained `pause()`/`resume()`, both idempotent no-ops outside their valid
 states. Full mechanics, the timer-pause utility, and the gate/queue
 interaction are documented in `docs/SIMULATION_STATE_MACHINE.md` — read that
 doc alongside this one for anything pause-related.
+
+---
+
+## 17. Vehicle Color and Gate Config Types (Phase 0.6)
+
+`VehicleColor` narrowed from 6 values to `'blue' | 'red' | 'gray'` — see
+`docs/VEHICLE_COLOR_VARIANTS.md` for the asset/fallback strategy. This is a
+breaking rename at the type level; `SimulationConfig.vehicleColor` itself is
+unchanged (still defaults to `'blue'`).
+
+A new `GateConfig` interface bundles the 4 existing gate fields
+(`gateMode`, `gateInitialState`, `stopBeforeOpenMs`, `delayAfterOpenMs`) into
+a reusable shape — used by `PlateList.simulationDefaults.gateConfig` (see
+`docs/PLATE_LISTS_SPEC.md`) so a saved list can carry its own gate
+configuration independent of the rest of `SimulationConfig`. `SimulationConfig`
+itself stays flat (unchanged) — `GateConfig` is purely an extraction/reuse
+shape, not a structural change to the simulator.
