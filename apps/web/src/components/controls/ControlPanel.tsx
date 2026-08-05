@@ -473,40 +473,43 @@ export function ControlPanel({
 
         <Divider />
 
-        {/* ── Gate ───────────────────────────────────────────────────────── */}
-        <GateSection
-          config={config}
-          onConfigChange={onConfigChange}
-          simulation={simulation}
-        />
+        {/* ── Gate Settings ─────────────────────────────────────────────── */}
+        <CollapsibleSection title="Gate Settings" defaultOpen>
+          <GateSection
+            config={config}
+            onConfigChange={onConfigChange}
+            simulation={simulation}
+          />
+        </CollapsibleSection>
 
         <Divider />
 
-        {/* ── Vehicle Color ──────────────────────────────────────────────── */}
-        <div>
-          <SectionLabel>Vehicle Color</SectionLabel>
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(COLOR_MAP) as VehicleColor[]).map(color => (
-              <button key={color} title={color} onClick={() => set('vehicleColor', color)}
-                className={`w-7 h-7 rounded-full border-2 transition-all ${
-                  config.vehicleColor === color
-                    ? 'border-white/80 scale-110'
-                    : 'border-white/20 hover:border-white/50'}`}
-                style={{ backgroundColor: COLOR_MAP[color] }}
-              />
-            ))}
+        {/* ── Visual Settings (vehicle color + speed) ─────────────────────── */}
+        <CollapsibleSection title="Visual Settings" defaultOpen>
+          <div className="flex flex-col gap-4">
+            <div>
+              <SectionLabel>Vehicle Color</SectionLabel>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(COLOR_MAP) as VehicleColor[]).map(color => (
+                  <button key={color} title={color} onClick={() => set('vehicleColor', color)}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${
+                      config.vehicleColor === color
+                        ? 'border-white/80 scale-110'
+                        : 'border-white/20 hover:border-white/50'}`}
+                    style={{ backgroundColor: COLOR_MAP[color] }}
+                  />
+                ))}
+              </div>
+              {config.vehicleColor !== 'blue' && (
+                <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
+                  No dedicated asset yet — rendering as blue until one is added.
+                </p>
+              )}
+            </div>
+
+            <SpeedPhasesSection config={config} set={set} />
           </div>
-          {config.vehicleColor !== 'blue' && (
-            <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
-              No dedicated asset yet — rendering as blue until one is added.
-            </p>
-          )}
-        </div>
-
-        <Divider />
-
-        {/* ── Speed ──────────────────────────────────────────────────────── */}
-        <SpeedPhasesSection config={config} set={set} />
+        </CollapsibleSection>
 
         <Divider />
 
