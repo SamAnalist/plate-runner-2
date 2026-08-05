@@ -9,12 +9,15 @@ import type {
   VehicleColor,
 } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
+import type { PlateQueueControls } from '../../features/queue/usePlateQueue';
 import { getPlacementsForDirection } from '@plate-runner/shared';
 import { PlateInput } from './PlateInput';
+import { PlateQueuePanel } from './PlateQueuePanel';
 
 interface ControlPanelProps {
   config: SimulationConfig;
   simulation: SimulationControls;
+  plateQueue: PlateQueueControls;
   onConfigChange: (c: SimulationConfig) => void;
   showDebug: boolean;
   onShowDebugChange: (v: boolean) => void;
@@ -357,9 +360,12 @@ function GateSection({
 
 // ─── Main panel ────────────────────────────────────────────────────────────
 
+const QUEUE_ACTIVE_STATUSES = ['running', 'paused', 'waiting_for_signal', 'waiting_for_next'];
+
 export function ControlPanel({
   config,
   simulation,
+  plateQueue,
   onConfigChange,
   showDebug,
   onShowDebugChange,
@@ -371,6 +377,7 @@ export function ControlPanel({
   onShowMotionPathOverlayChange,
 }: ControlPanelProps) {
   const { state, start, stop, reset } = simulation;
+  const queueActive = QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
 
   function set<K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) {
     onConfigChange({ ...config, [key]: value });
@@ -400,7 +407,7 @@ export function ControlPanel({
       <div className="flex-1 overflow-y-auto px-4 py-4">
 
         {/* ── Plate ──────────────────────────────────────────────────────── */}
-        <PlateInput value={config.plate} onChange={p => set('plate', p)} />
+        <PlateInput value={config.plate} onChange={p => set('plate', p)} disabled={queueActive} />
 
         <Divider />
 
@@ -504,28 +511,45 @@ export function ControlPanel({
               t={state.vehicleT.toFixed(3)}
             </span>
           </div>
-          <div className="flex gap-2">
-            {!isRunning && !isGateOpening ? (
-              <button onClick={start}
-                className="flex-1 py-2 rounded-md text-sm font-mono font-bold
-                  bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/60 transition-colors">
-                {state.phase === 'done' || isAtGate ? 'Restart' : 'Start'}
+          {queueActive ? (
+            <p className="py-2 text-center text-[10px] font-mono text-cyan-400/70 border border-cyan-500/20 rounded-md bg-cyan-500/5">
+              Controlled by Plate Queue
+            </p>
+          ) : (
+            <div className="flex gap-2">
+              {!isRunning && !isGateOpening ? (
+                <button onClick={start}
+                  className="flex-1 py-2 rounded-md text-sm font-mono font-bold
+                    bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/60 transition-colors">
+                  {state.phase === 'done' || isAtGate ? 'Restart' : 'Start'}
+                </button>
+              ) : (
+                <button onClick={stop}
+                  className="flex-1 py-2 rounded-md text-sm font-mono font-bold
+                    bg-red-600/80 hover:bg-red-600 text-white border border-red-500/60 transition-colors">
+                  Stop
+                </button>
+              )}
+              <button onClick={reset}
+                className="px-3 py-2 rounded-md text-sm font-mono
+                  bg-white/5 hover:bg-white/10 text-white/60 hover:text-white
+                  border border-white/12 transition-colors">
+                Reset
               </button>
-            ) : (
-              <button onClick={stop}
-                className="flex-1 py-2 rounded-md text-sm font-mono font-bold
-                  bg-red-600/80 hover:bg-red-600 text-white border border-red-500/60 transition-colors">
-                Stop
-              </button>
-            )}
-            <button onClick={reset}
-              className="px-3 py-2 rounded-md text-sm font-mono
-                bg-white/5 hover:bg-white/10 text-white/60 hover:text-white
-                border border-white/12 transition-colors">
-              Reset
-            </button>
-          </div>
+            </div>
+          )}
         </div>
+
+        <Divider />
+
+        {/* ── Plate Queue ───────────────────────────────────────────────── */}
+        <CollapsibleSection
+          title="Plate Queue"
+          badge={queueActive ? plateQueue.queueStatus.toUpperCase() : undefined}
+          defaultOpen={false}
+        >
+          <PlateQueuePanel {...plateQueue} />
+        </CollapsibleSection>
 
         <Divider />
 

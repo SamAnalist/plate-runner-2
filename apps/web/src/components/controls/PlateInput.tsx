@@ -1,14 +1,21 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { validatePlate } from '@plate-runner/shared';
 
 interface PlateInputProps {
   value: string;
   onChange: (normalized: string) => void;
+  disabled?: boolean;
 }
 
-export function PlateInput({ value, onChange }: PlateInputProps) {
+export function PlateInput({ value, onChange, disabled }: PlateInputProps) {
   const [raw, setRaw]   = useState(value);
   const [error, setError] = useState<string | null>(null);
+
+  // When externally driven (e.g. by the Plate Queue), mirror the incoming value.
+  // Free typing is untouched — the field only self-normalizes on blur, as before.
+  useEffect(() => {
+    if (disabled) setRaw(value);
+  }, [value, disabled]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,6 +57,7 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
           value={raw}
           onChange={handleChange}
           onBlur={handleBlur}
+          disabled={disabled}
           maxLength={12}
           placeholder="ABC123"
           spellCheck={false}
@@ -60,6 +68,7 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
             font-mono font-bold text-base tracking-[0.15em] text-white text-center
             outline-none transition-colors
             placeholder:text-white/20
+            disabled:opacity-40 disabled:cursor-not-allowed
             ${isValid
               ? 'border-white/20 focus:border-blue-500/60'
               : error
@@ -75,16 +84,24 @@ export function PlateInput({ value, onChange }: PlateInputProps) {
         </span>
       </div>
 
-      {/* Validation error */}
-      {error && (
-        <p className="text-[11px] text-red-400 font-mono leading-tight">{error}</p>
-      )}
-
-      {/* Valid indicator */}
-      {isValid && (
-        <p className="text-[11px] text-emerald-400/70 font-mono leading-tight">
-          Plate accepted
+      {disabled ? (
+        <p className="text-[11px] text-cyan-400/70 font-mono leading-tight">
+          Controlled by Plate Queue
         </p>
+      ) : (
+        <>
+          {/* Validation error */}
+          {error && (
+            <p className="text-[11px] text-red-400 font-mono leading-tight">{error}</p>
+          )}
+
+          {/* Valid indicator */}
+          {isValid && (
+            <p className="text-[11px] text-emerald-400/70 font-mono leading-tight">
+              Plate accepted
+            </p>
+          )}
+        </>
       )}
     </div>
   );
