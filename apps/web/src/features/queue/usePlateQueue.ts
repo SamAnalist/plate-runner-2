@@ -10,6 +10,7 @@ import {
 } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
 import { parsePlateQueueInput } from './plateQueueParser';
+import { createPausableTimers } from '../../utils/pausableTimers';
 
 interface UsePlateQueueArgs {
   config: SimulationConfig;
@@ -57,7 +58,7 @@ function nextId(): string {
 }
 
 const ACTIVE_STATUSES: PlateQueueStatus[] = ['running', 'waiting_for_signal'];
-const SKIPPABLE_STATUSES: PlateQueueStatus[] = ['running', 'waiting_for_signal', 'waiting_for_next'];
+const SKIPPABLE_STATUSES: PlateQueueStatus[] = ['running', 'waiting_for_signal', 'waiting_for_next', 'paused'];
 
 export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQueueArgs): PlateQueueControls {
   const [items, setItems] = useState<PlateQueueItem[]>([]);
@@ -79,15 +80,11 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
   configRef.current = config;
   const prevPhaseRef = useRef(simulation.state.phase);
 
-  const gapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** True while the queue would like to advance but is paused; consumed on resume. */
-  const pendingAdvanceRef = useRef(false);
+  /** Manages the single 'gap' timer (inter-vehicle wait in run_all mode) so pause() can freeze it with remaining time preserved. */
+  const queueTimers = useRef(createPausableTimers());
 
   const clearGapTimer = useCallback(() => {
-    if (gapTimerRef.current !== null) {
-      clearTimeout(gapTimerRef.current);
-      gapTimerRef.current = null;
-    }
+    queueTimers.current.clear('gap');
   }, []);
 
   const applyItemStatus = useCallback((id: string, status: PlateQueueItemStatus, error?: string) => {
@@ -124,12 +121,6 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
 
   /** Decides what happens after the current item finishes (completed/skipped). */
   const advance = useCallback(() => {
-    if (queueStatusRef.current === 'paused') {
-      pendingAdvanceRef.current = true;
-      return;
-    }
-    pendingAdvanceRef.current = false;
-
     const list = itemsRef.current;
     const next = currentIndexRef.current + 1;
 
@@ -184,8 +175,7 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
     if (phase === 'done' && prevPhase !== 'done' && status === 'running') {
       markCurrentCompleted();
       if (queueConfigRef.current.mode === 'run_all') {
-        clearGapTimer();
-        gapTimerRef.current = setTimeout(advance, queueConfigRef.current.gapBetweenVehiclesMs);
+        queueTimers.current.schedule('gap', queueConfigRef.current.gapBetweenVehiclesMs, advance);
       } else {
         setQueueStatus('waiting_for_next');
       }
@@ -193,7 +183,10 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simulation.state.phase]);
 
-  useEffect(() => () => clearGapTimer(), [clearGapTimer]);
+  useEffect(() => {
+    const timerManager = queueTimers.current;
+    return () => timerManager.clearAll();
+  }, []);
 
   // ── Public controls ────────────────────────────────────────────────────────
 
@@ -217,37 +210,44 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
     startItemAt(0);
   }, [startItemAt]);
 
+  /**
+   * Pauses the queue AND the current vehicle: freezes the gap timer (if waiting
+   * between vehicles) with its remaining time preserved, and calls simulation.pause()
+   * to freeze motion / gate timers in place.
+   */
   const pauseQueue = useCallback(() => {
     if (!ACTIVE_STATUSES.includes(queueStatusRef.current)) return;
-    clearGapTimer();
+    queueTimers.current.pauseAll();
+    simulation.pause();
     setQueueStatus('paused');
-  }, [clearGapTimer]);
+  }, [simulation]);
 
+  /**
+   * Resumes the gap timer (continuing from its remaining time) and the simulation.
+   * If the gap timer was active, it fires `advance()` itself once its remaining
+   * time elapses — no separate "replay the advance" step needed.
+   */
   const resumeQueue = useCallback(() => {
     if (queueStatusRef.current !== 'paused') return;
-    if (pendingAdvanceRef.current) {
-      setQueueStatus('running');
-      advance();
-      return;
-    }
-    // A vehicle is still mid-run (or waiting for the gate signal) — resume observing it.
+    queueTimers.current.resumeAll();
+    simulation.resume();
     setQueueStatus(simulation.state.phase === 'waiting_for_signal' ? 'waiting_for_signal' : 'running');
-  }, [advance, simulation.state.phase]);
+  }, [simulation]);
 
   const stopQueue = useCallback(() => {
     clearGapTimer();
-    pendingAdvanceRef.current = false;
     cancelCurrentVehicle();
     setQueueStatus('stopped');
   }, [clearGapTimer, cancelCurrentVehicle]);
 
+  /** Skip is an explicit override of pause — it always resumes+advances, even if the queue was paused. */
   const skipCurrent = useCallback(() => {
     if (!SKIPPABLE_STATUSES.includes(queueStatusRef.current)) return;
     const item = itemsRef.current[currentIndexRef.current];
     if (!item) return;
     clearGapTimer();
     applyItemStatus(item.id, 'skipped');
-    cancelCurrentVehicle();
+    cancelCurrentVehicle(); // simulation.reset() also clears isPaused
     setQueueStatus('running');
     advance();
   }, [applyItemStatus, cancelCurrentVehicle, clearGapTimer, advance]);
@@ -260,7 +260,6 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
 
   const clearQueue = useCallback(() => {
     clearGapTimer();
-    pendingAdvanceRef.current = false;
     cancelCurrentVehicle();
     setItems([]);
     setCurrentIndex(0);
@@ -270,7 +269,6 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
 
   const resetQueue = useCallback(() => {
     clearGapTimer();
-    pendingAdvanceRef.current = false;
     setItems(prev => prev.map(it => ({ ...it, status: 'pending', error: undefined })));
     setCurrentIndex(0);
     setQueueStatus('idle');

@@ -82,7 +82,7 @@ export function PlateQueuePanel(props: PlateQueueControls) {
   const canPause   = isRunning || isWaitingSignal;
   const canResume  = isPaused;
   const canStop    = isRunning || isWaitingSignal || isWaitingNext || isPaused;
-  const canSkip    = isRunning || isWaitingSignal || isWaitingNext;
+  const canSkip    = isRunning || isWaitingSignal || isWaitingNext || isPaused;
   const canNext    = isWaitingNext;
   const canClear   = hasQueue && !isRunning && !isWaitingSignal;
   const canReset   = hasQueue && !isRunning && !isWaitingSignal;
@@ -208,9 +208,9 @@ export function PlateQueuePanel(props: PlateQueueControls) {
         <div className="grid grid-cols-2 gap-1.5">
           <SmallButton tone="primary" onClick={runQueue} disabled={!canRun}>▶ Run Queue</SmallButton>
           {canPause ? (
-            <SmallButton tone="warn" onClick={pauseQueue} disabled={!canPause}>⏸ Pause</SmallButton>
+            <SmallButton tone="warn" onClick={pauseQueue} disabled={!canPause}>⏸ Pause Vehicle</SmallButton>
           ) : (
-            <SmallButton tone="warn" onClick={resumeQueue} disabled={!canResume}>⏵ Resume</SmallButton>
+            <SmallButton tone="warn" onClick={resumeQueue} disabled={!canResume}>⏵ Resume Vehicle</SmallButton>
           )}
           <SmallButton tone="danger" onClick={stopQueue} disabled={!canStop}>■ Stop Queue</SmallButton>
           <SmallButton onClick={skipCurrent} disabled={!canSkip}>⏭ Skip Current</SmallButton>
@@ -218,6 +218,9 @@ export function PlateQueuePanel(props: PlateQueueControls) {
           <SmallButton onClick={resetQueue} disabled={!canReset}>↺ Reset Status</SmallButton>
           <SmallButton tone="danger" onClick={clearQueue} disabled={!canClear}>✕ Clear Queue</SmallButton>
         </div>
+        <p className="mt-1.5 text-[9px] text-white/25 font-mono leading-snug">
+          Pause freezes the current vehicle in place — motion, gate arm, and timers all stop until Resume.
+        </p>
       </div>
 
       {/* ── Queue Items ───────────────────────────────────────────────── */}

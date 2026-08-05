@@ -319,15 +319,24 @@ function GateSection({
 
       {/* ── Send Open Signal — prominent, only when waiting_for_signal ── */}
       {isWaiting && (
-        <button
-          onClick={openGate}
-          className="w-full py-2.5 rounded text-sm font-mono font-bold
-            bg-yellow-500/20 border-2 border-yellow-400/70 text-yellow-300
-            hover:bg-yellow-500/35 hover:border-yellow-300 transition-all
-            animate-pulse"
-        >
-          ⬆ Send Open Signal
-        </button>
+        <>
+          <button
+            onClick={openGate}
+            disabled={state.isPaused}
+            className="w-full py-2.5 rounded text-sm font-mono font-bold
+              bg-yellow-500/20 border-2 border-yellow-400/70 text-yellow-300
+              hover:bg-yellow-500/35 hover:border-yellow-300 transition-all
+              disabled:opacity-30 disabled:cursor-not-allowed disabled:animate-none
+              animate-pulse"
+          >
+            ⬆ Send Open Signal
+          </button>
+          {state.isPaused && (
+            <p className="text-[10px] text-cyan-400/70 font-mono text-center -mt-1.5">
+              Paused — resume to send signal
+            </p>
+          )}
+        </>
       )}
 
       {/* ── Manual gate override ──────────────────────────────────────── */}
@@ -376,7 +385,7 @@ export function ControlPanel({
   showMotionPathOverlay,
   onShowMotionPathOverlayChange,
 }: ControlPanelProps) {
-  const { state, start, stop, reset } = simulation;
+  const { state, start, stop, reset, pause, resume } = simulation;
   const queueActive = QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
 
   function set<K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) {
@@ -530,6 +539,15 @@ export function ControlPanel({
                   Stop
                 </button>
               )}
+              <button
+                onClick={state.isPaused ? resume : pause}
+                disabled={!state.isPaused && (state.phase === 'idle' || state.phase === 'done')}
+                className="px-3 py-2 rounded-md text-sm font-mono font-semibold
+                  bg-white/5 hover:bg-white/10 text-white/60 hover:text-white
+                  border border-white/12 transition-colors
+                  disabled:opacity-30 disabled:cursor-not-allowed">
+                {state.isPaused ? '⏵ Resume' : '⏸ Pause'}
+              </button>
               <button onClick={reset}
                 className="px-3 py-2 rounded-md text-sm font-mono
                   bg-white/5 hover:bg-white/10 text-white/60 hover:text-white
