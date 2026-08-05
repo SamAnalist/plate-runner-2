@@ -1330,3 +1330,124 @@ remote mode, no scheduler, no persistence beyond the current page session.
 - Visual QA pass for `driver_front` diagonal (carried over from Phase 1.5).
 - Consider a lightweight pause primitive in `useSimulation` if mid-run pausing becomes a real requirement.
 - Backend-backed plate lists / remote queue control (future phase, not yet in scope).
+
+---
+
+## Phase 0.5 — Simulation Pause Primitive
+
+**Date:** 2026-08-05
+
+### Goal
+
+Close the known limitation from Phase 0.4: `Pause Queue` only blocked the
+queue from advancing to the next vehicle, but a vehicle already mid-animation,
+mid-gate-timer, or mid-gap-wait kept going. This phase adds a real
+`pause()`/`resume()` primitive to `useSimulation` that freezes motion, gate
+timers, and visual state exactly where they were, and wires the Plate Queue
+to use it.
+
+### Implemented
+
+- `SimulationState.isPaused: boolean` — orthogonal to `phase` (Option B from
+  the spec); no new phase, no existing phase-based conditional needed
+  changes.
+- `simulation.pause()` / `simulation.resume()` — idempotent; freeze/resume
+  the rAF loop (during `running`) or the active gate timer (during
+  `stopped_at_gate` / `gate_opening`) with exact remaining time preserved.
+- New shared utility `createPausableTimers()` (`apps/web/src/utils/pausableTimers.ts`)
+  — an id-keyed timer manager with `pauseAll()`/`resumeAll()` that records
+  and restores exact remaining time. Used by both `useSimulation` (gate
+  timers) and `usePlateQueue` (inter-vehicle gap timer) — no duplicated
+  pause-with-remaining-time logic.
+- `usePlateQueue`'s `pauseQueue()`/`resumeQueue()` rewritten to call
+  `simulation.pause()`/`resume()` in addition to freezing/resuming the gap
+  timer. This let us delete the old `pendingAdvanceRef` hack entirely — the
+  gap timer resuming itself fires `advance()` when its remaining time
+  elapses, so there's no separate "replay the advance" bookkeeping.
+- `skipCurrent()` now works from `paused` too (explicit override — always
+  resumes+advances afterward).
+- `openGate()` no-ops while paused (defense in depth); "Send Open Signal" is
+  `disabled` in the UI while paused, with a short explanatory note.
+- Manual single-plate controls gained an optional Pause/Resume button
+  (only shown when the queue isn't controlling playback).
+- `PlateQueuePanel` copy updated ("Pause Vehicle"/"Resume Vehicle" + a
+  caption) to make clear pause now freezes the current vehicle, not just
+  queue advancement.
+
+### Files Changed
+
+- `apps/web/src/utils/pausableTimers.ts` — created
+- `apps/web/src/hooks/useSimulation.ts` — `isPaused`, `pause()`, `resume()`, migrated gate timers to the new utility, `openGate()` guard
+- `apps/web/src/features/queue/usePlateQueue.ts` — migrated gap timer to the new utility, rewired `pauseQueue`/`resumeQueue`, removed `pendingAdvanceRef`, `skipCurrent` allows `paused`
+- `apps/web/src/components/controls/ControlPanel.tsx` — disable Send Open Signal while paused, manual Pause/Resume button, `canSkip` fix (see below)
+- `apps/web/src/components/controls/PlateQueuePanel.tsx` — copy tweak, `canSkip` now includes `paused`
+- `docs/SIMULATION_STATE_MACHINE.md` — created
+- `docs/QUEUE_SPEC.md`, `docs/SIMULATION_SPEC.md`, `docs/GATE_BEHAVIOR.md` — updated
+
+### Decisions
+
+- `isPaused` overlay (not a new `phase`) — avoids touching every existing
+  phase-based conditional across `useSimulation`, `ControlPanel`, and
+  `usePlateQueue`.
+- Shared `pausableTimers` utility instead of duplicating remaining-time
+  bookkeeping in both hooks.
+- Skip Current is an explicit override of pause — it always leaves the
+  queue `running` afterward, even if it was paused. Simplest, least
+  surprising behavior; documented in `QUEUE_SPEC.md`.
+- Send Open Signal is disabled (not queued) while paused — avoids a signal
+  firing unexpectedly the instant the user resumes.
+- `resetQueue()` intentionally does not touch a live paused vehicle — Reset
+  Status is scoped to item statuses only, matching Phase 0.4's behavior.
+
+### Manual Testing
+
+Verified via a headless-Chromium Playwright driver (no project run-skill
+exists yet) against the dev server, with pixel/position and DOM-state
+assertions, not just visual inspection:
+
+- Isolated manual pause: `t` was byte-identical before pause and 1500ms
+  into the pause, then advanced correctly after resume — confirms exact
+  freeze with no drift and no jump on resume.
+- Gate dwell (`stopped_at_gate`, `auto_open`): paused 600ms into the 2000ms
+  dwell, held 2500ms (past the original full window) — arm stayed `CLOSED`
+  the entire time; resumed and the arm opened using only the ~1.4s that
+  remained, not a fresh 2000ms.
+- Queue-driven pause of a vehicle near completion (t=0.966) — held through
+  where it would have finished, resumed, vehicle completed normally, queue
+  correctly transitioned into the gap-wait with the next item still
+  `pending`.
+- `wait_for_signal` + pause: Send Open Signal correctly became disabled;
+  resuming re-enabled it.
+- Skip Current while paused: correctly skips the current item and leaves
+  the queue running on the next one (found and fixed a bug here — see
+  below).
+- Stop Queue while paused, then Reset Status: simulation returns to `idle`,
+  manual controls re-enable, all item statuses reset to `pending`, no
+  orphaned/stuck state.
+- Zero console errors across every run.
+
+### Bugs Found and Fixed During QA
+
+- `PlateQueuePanel`'s `canSkip` was not updated when `paused` was added to
+  the hook's `SKIPPABLE_STATUSES` — the "Skip Current" button stayed
+  disabled while paused even though the hook itself supported it. Fixed by
+  adding `isPaused` to `canSkip`.
+
+### Known Limitations
+
+- The gate arm's visual rise is a fixed-duration CSS transition (0.85s),
+  not frame-driven — pausing freezes the *logical* timer that gates when
+  the vehicle resumes, but doesn't guarantee the CSS transition itself
+  freezes mid-frame. Not observed to cause a visible issue in QA (the
+  window is short), but noted as a simplification in
+  `docs/SIMULATION_STATE_MACHINE.md`.
+- `resetQueue()` does not cancel a paused vehicle by design (see Decisions).
+- `failed` queue-item status still has no automatic trigger (carried over
+  from Phase 0.4 — no failure path exists locally).
+
+### Next Steps
+
+- Plate Lists persistence (explicitly deferred — not started this phase).
+- Consider whether the gate-arm CSS transition should become frame-driven
+  if pixel-perfect pause fidelity during `gate_opening` ever becomes a
+  hard requirement (currently out of scope).

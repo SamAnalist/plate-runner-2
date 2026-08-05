@@ -377,3 +377,16 @@ or alter the transitions above. It works because `useSimulation` never reads
 `config.plate`, only direction/placement/gate/speed fields, so the queue can
 swap `config.plate` and call `start()` between runs with no race against the
 simulator's internal state. See `docs/QUEUE_SPEC.md` for the full spec.
+
+---
+
+## 16. Pause / Resume Primitive (Phase 0.5)
+
+`SimulationState` gained `isPaused: boolean`, orthogonal to `phase` — pausing
+never changes which phase the machine is in, it only freezes whatever is
+producing motion for that phase (the rAF loop during `running`, or the
+active gate timer during `stopped_at_gate`/`gate_opening`). `SimulationControls`
+gained `pause()`/`resume()`, both idempotent no-ops outside their valid
+states. Full mechanics, the timer-pause utility, and the gate/queue
+interaction are documented in `docs/SIMULATION_STATE_MACHINE.md` — read that
+doc alongside this one for anything pause-related.

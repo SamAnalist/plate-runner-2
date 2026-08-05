@@ -240,3 +240,27 @@ this same gate logic sequentially, without changing any of the above:
 | Visible, initially open | Same — never stops. |
 | Visible, closed, `auto_open` | Vehicle stops/opens/resumes exactly as in §1–4 above; queue just waits for `phase === 'done'` and advances. |
 | Visible, closed, `wait_for_signal` | Vehicle stops at `waiting_for_signal`; the queue mirrors this in its own status and waits for the same **Send Open Signal** button described in §6. Nothing about the signal flow changes — the queue only observes `simulation.state.phase`. |
+
+---
+
+## 10. Pause / Resume and the Gate (Phase 0.5)
+
+`simulation.pause()`/`resume()` (see `docs/SIMULATION_STATE_MACHINE.md`)
+freeze whichever gate timer is currently active, with its exact remaining
+time preserved:
+
+- Paused while approaching the gate (before it stops) → the rAF loop is
+  frozen; the vehicle visually stops mid-road.
+- Paused at `stopped_at_gate` (`auto_open` dwell) → the `stopBeforeOpenMs`
+  countdown freezes; resuming continues the countdown from where it left
+  off, not from the start.
+- Paused at `gate_opening` (arm rising) → the resume-after-open timer
+  freezes the same way. Note: the arm's *visual* rise is a fixed-duration
+  CSS transition (0.85s), not frame-driven — pausing freezes the *logical*
+  timer that gates when the vehicle resumes moving, but does not
+  necessarily freeze the CSS transition mid-frame. See the state-machine
+  doc's known limitations.
+- Paused at `waiting_for_signal` → nothing to freeze motion-wise, but
+  **Send Open Signal becomes disabled** until Resume is pressed — the
+  signal is not queued while paused, avoiding an unexpected gate-open the
+  instant the user resumes.

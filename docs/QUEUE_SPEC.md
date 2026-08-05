@@ -124,13 +124,33 @@ statuses as-is; it does not clear the queue. `Clear Queue` empties the
 queue entirely. `Reset Status` puts every item back to `pending` without
 touching the loaded plates.
 
+## Pause / Resume (Phase 0.5 — real pause)
+
+`Pause Queue` now pauses **both** the queue's advancement and the vehicle
+currently in motion, via `simulation.pause()` — see
+`docs/SIMULATION_STATE_MACHINE.md` for the full mechanics. In short:
+
+- Motion (rAF loop), gate timers (`stopBeforeOpen` auto-open dwell,
+  `resumeAfterGate` arm-rise delay), and the queue's own inter-vehicle
+  `gapBetweenVehiclesMs` timer are all frozen with their exact remaining
+  time preserved.
+- `Resume Queue` continues everything from precisely where it froze — no
+  restarted timers, no visual jump.
+- While paused during `waiting_for_signal`, **Send Open Signal is disabled**
+  (both in the UI and defensively inside `openGate()` itself) — the signal
+  is not queued, the user must resume first.
+- **Skip Current works even while paused** and is treated as an explicit
+  override: it cancels the current vehicle, marks it `skipped`, and always
+  leaves the queue `running` afterward (pausing does not persist across a
+  skip).
+- `Stop Queue` and `Clear Queue` cancel the current vehicle via
+  `simulation.reset()`, which also clears the pause flag — no special
+  handling needed.
+- `Reset Status` only resets item statuses; it does not touch a live paused
+  vehicle (by design — see state-machine doc's known limitations).
+
 ## Known limitations
 
-- **Pause is queue-level only.** `Pause Queue` prevents the queue from
-  *advancing* to the next vehicle (the inter-vehicle gap timer is cancelled),
-  but it cannot pause a vehicle already mid-animation — `useSimulation`'s
-  animation loop has no pause primitive today. This is a deliberate scope
-  decision to avoid changing the simulation state machine in this phase.
 - **`failed` status has no automatic trigger yet.** The local simulator has
   no failure path (no network calls, no external signal that can error), so
   `markCurrentFailed` exists on the hook for API completeness / future use
@@ -138,3 +158,7 @@ touching the loaded plates.
 - Duplicate plates in a queue are allowed and run independently, by design.
 - The queue is in-memory only; refreshing the page clears it (no persistence
   in this phase, per scope).
+- See `docs/SIMULATION_STATE_MACHINE.md` for pause-specific limitations
+  (e.g. the gate arm's CSS rise animation is not frame-driven, so it isn't
+  guaranteed to freeze pixel-for-pixel mid-transition, only the logical
+  timer that gates the vehicle's resume).
