@@ -99,9 +99,6 @@ function getPhaseRate(
 }
 
 function startT(direction: SimulationConfig['direction']): number {
-  // Phase 0.8: start outside the visible frame so the vehicle enters naturally.
-  // The POV opacity / Y-offset functions in viewMotionPaths.ts handle the
-  // visual entry (fade-in from above the horizon) and exit (slide off bottom).
   return direction === 'incoming' ? 0.0 : 1.0;
 }
 
@@ -120,24 +117,32 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
   });
 
   const rafRef         = useRef<number | null>(null);
-  // Two separate timer refs to prevent the useEffect cleanup from cancelling
-  // the resume timer when the phase transitions from stopped_at_gate → gate_opening.
   /** Timer for the pre-open pause (stopBeforeOpenMs, set by useEffect) */
   const stopTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Timer for the post-open resume (850ms arm + delayAfterOpenMs, set by triggerGateOpen) */
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTimeRef    = useRef<number | null>(null);
-  const stateRef       = useRef(state);
-  const configRef      = useRef(config);
-  stateRef.current     = state;
-  configRef.current    = config;
+  /**
+   * Smoothed velocity (t-units/sec). Each frame it approaches the target rate
+   * via exponential decay: currentRate += (target - current) * (1 - e^(-dt/TAU)).
+   * Reset to 0 when the car stops so post-gate resume always starts from rest.
+   */
+  const currentRateRef = useRef(0);
+  /** Smoothing time constant in seconds. Lower = snappier. Higher = more inertia. */
+  const RATE_TAU = 0.0001;
+
+  const stateRef   = useRef(state);
+  const configRef  = useRef(config);
+  stateRef.current  = state;
+  configRef.current = config;
 
   const cancelLoop = useCallback(() => {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
-    lastTimeRef.current = null;
+    lastTimeRef.current    = null;
+    currentRateRef.current = 0;
   }, []);
 
   const clearTimer = useCallback(() => {
@@ -182,7 +187,6 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     const isIncoming = cfg.direction === 'incoming';
     const shouldStop = gateActive(cfg);
 
-    // Per-scene timing — each placement has its own readingT, gateT, decelOffset, finalT
     const sceneConfig  = getSceneConfig(cfg.detectorPlacement);
     const sceneV       = sceneConfig.vehicle;
     const sceneGateT   = sceneConfig.gate.t;
@@ -192,10 +196,16 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     setState(prev => {
       let t        = prev.vehicleT;
       let gateOpen = prev.gateOpen;
-      const rate   = getPhaseRate(t, isIncoming, stopAtT, sceneV.decelOffset, sceneGateT, sceneV.finalT, speedSlider, sceneV.speed);
+
+      // Target rate from phase logic.
+      // For 'away': hold afterStop speed for FINAL_PHASE_DELAY_MS after crossing finalT
+      // before switching to final speed — prevents a hard jump at the phase boundary.
+      const targetRate = getPhaseRate(t, isIncoming, stopAtT, sceneV.decelOffset, sceneGateT, sceneV.finalT, speedSlider, sceneV.speed);
+      const alpha = 1 - Math.exp(-dt / RATE_TAU);
+      currentRateRef.current += (targetRate - currentRateRef.current) * alpha;
+      const rate = currentRateRef.current;
 
       if (isIncoming) {
-        // Stop at gate if gate is active (visible + closed)
         if (shouldStop && !gateOpen && t >= stopAtT && t < sceneGateT + 0.01) {
           cancelLoop();
           const newPhase: SimulationPhase =
@@ -210,7 +220,6 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
           return { ...prev, vehicleT: t, gateOpen, phase: 'done', isRunning: false };
         }
       } else {
-        // Away direction: vehicle moves from near → far
         if (shouldStop && !gateOpen && t <= stopAtT) {
           cancelLoop();
           const newPhase: SimulationPhase =
@@ -230,22 +239,19 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     });
 
     rafRef.current = requestAnimationFrame(animate);
-  }, [cancelLoop]);
+  }, [cancelLoop, RATE_TAU]);
 
   // ── Gate opening sequence ──────────────────────────────────────────────────
 
   /** Called when the gate arm finishes rising + delayAfterOpenMs has elapsed.
-   *  Resumes the rAF movement loop. */
+   *  currentRateRef is already 0 from cancelLoop — the exponential smoothing
+   *  will ramp velocity up from rest naturally on resume. */
   const resumeAfterGate = useCallback(() => {
     setState(prev => ({ ...prev, phase: 'running', isRunning: true }));
     rafRef.current = requestAnimationFrame(animate);
   }, [animate]);
 
-  /** Opens the gate visually and schedules vehicle resume.
-   *  gateOpenDurationMs is fixed at 850ms (Framer Motion arm animation).
-   *  Vehicle resumes after arm finishes + delayAfterOpenMs.
-   *  Uses resumeTimerRef (NOT stopTimerRef) so the useEffect cleanup for the
-   *  stopped_at_gate phase does not accidentally cancel the resume timer. */
+  /** Opens the gate visually and schedules vehicle resume. */
   const triggerGateOpen = useCallback(() => {
     const cfg = configRef.current;
     const ARM_ANIMATION_MS = 850;
@@ -255,11 +261,6 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     resumeTimerRef.current = setTimeout(resumeAfterGate, resumeDelay);
   }, [resumeAfterGate]);
 
-  /**
-   * openGate — dual purpose:
-   *   1. While waiting_for_signal → triggers the full gate-open → resume sequence
-   *   2. Any other time → just opens the arm visually (manual override)
-   */
   const openGate = useCallback(() => {
     const phase = stateRef.current.phase;
     if (phase === 'waiting_for_signal') {
@@ -298,16 +299,11 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
 
   useEffect(() => {
     if (state.phase !== 'stopped_at_gate') return;
-    // Only auto_open mode uses this timer (wait_for_signal uses button)
     if (configRef.current.gateMode !== 'auto_open') return;
 
     const ms = configRef.current.stopBeforeOpenMs;
     stopTimerRef.current = setTimeout(triggerGateOpen, ms);
 
-    // Cleanup only cancels the stop timer — NOT the resume timer.
-    // If we cancelled resumeTimerRef here, the vehicle would never resume
-    // because this cleanup fires when phase changes to gate_opening (right
-    // after triggerGateOpen sets the resume timer).
     return () => {
       if (stopTimerRef.current !== null) {
         clearTimeout(stopTimerRef.current);
