@@ -3,6 +3,7 @@ import type { SimulationConfig } from '@plate-runner/shared';
 import { READING_T_INCOMING, READING_T_AWAY } from '../utils/depth';
 import { getSceneConfig } from '../components/simulation/renderers/asset-realistic/scene-configs/getSceneConfig';
 import type { SceneSpeedConfig } from '../components/simulation/renderers/asset-realistic/scene-configs/types';
+import { createPausableTimers } from '../utils/pausableTimers';
 
 /**
  * Simulation phase state machine:
@@ -34,6 +35,8 @@ export interface SimulationState {
   vehicleT: number;
   gateOpen: boolean;
   isRunning: boolean;
+  /** True while pause() has frozen motion/timers without changing phase. */
+  isPaused: boolean;
 }
 
 export interface SimulationControls {
@@ -43,6 +46,10 @@ export interface SimulationControls {
   reset: () => void;
   openGate: () => void;
   closeGate: () => void;
+  /** Freezes vehicle motion and any active gate timer in place. No-op if idle/done/already paused. */
+  pause: () => void;
+  /** Continues from exactly where pause() froze things. No-op if not paused or idle/done. */
+  resume: () => void;
 }
 
 /**
@@ -114,14 +121,13 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     vehicleT: startT(config.direction),
     gateOpen: config.gateInitialState === 'open',
     isRunning: false,
+    isPaused: false,
   });
 
-  const rafRef         = useRef<number | null>(null);
-  /** Timer for the pre-open pause (stopBeforeOpenMs, set by useEffect) */
-  const stopTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Timer for the post-open resume (850ms arm + delayAfterOpenMs, set by triggerGateOpen) */
-  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTimeRef    = useRef<number | null>(null);
+  const rafRef      = useRef<number | null>(null);
+  /** Manages the two gate-related timers ('stopBeforeOpen', 'resumeAfterGate') so pause() can freeze them with remaining time preserved. */
+  const timers       = useRef(createPausableTimers());
+  const lastTimeRef = useRef<number | null>(null);
   /**
    * Smoothed velocity (t-units/sec). Each frame it approaches the target rate
    * via exponential decay: currentRate += (target - current) * (1 - e^(-dt/TAU)).
@@ -145,33 +151,23 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     currentRateRef.current = 0;
   }, []);
 
-  const clearTimer = useCallback(() => {
-    if (stopTimerRef.current !== null) {
-      clearTimeout(stopTimerRef.current);
-      stopTimerRef.current = null;
-    }
-    if (resumeTimerRef.current !== null) {
-      clearTimeout(resumeTimerRef.current);
-      resumeTimerRef.current = null;
-    }
-  }, []);
-
   const stop = useCallback(() => {
     cancelLoop();
-    clearTimer();
-    setState(s => ({ ...s, phase: 'idle', isRunning: false }));
-  }, [cancelLoop, clearTimer]);
+    timers.current.clearAll();
+    setState(s => ({ ...s, phase: 'idle', isRunning: false, isPaused: false }));
+  }, [cancelLoop]);
 
   const reset = useCallback(() => {
     cancelLoop();
-    clearTimer();
+    timers.current.clearAll();
     setState({
       phase: 'idle',
       vehicleT: startT(configRef.current.direction),
       gateOpen: configRef.current.gateInitialState === 'open',
       isRunning: false,
+      isPaused: false,
     });
-  }, [cancelLoop, clearTimer]);
+  }, [cancelLoop]);
 
   const closeGate = useCallback(() => setState(s => ({ ...s, gateOpen: false })), []);
 
@@ -258,10 +254,12 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     const resumeDelay = ARM_ANIMATION_MS + cfg.delayAfterOpenMs;
 
     setState(prev => ({ ...prev, gateOpen: true, phase: 'gate_opening' }));
-    resumeTimerRef.current = setTimeout(resumeAfterGate, resumeDelay);
+    timers.current.schedule('resumeAfterGate', resumeDelay, resumeAfterGate);
   }, [resumeAfterGate]);
 
   const openGate = useCallback(() => {
+    // While paused, the signal is neither applied nor queued — the user must resume first.
+    if (stateRef.current.isPaused) return;
     const phase = stateRef.current.phase;
     if (phase === 'waiting_for_signal') {
       triggerGateOpen();
@@ -274,7 +272,7 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
 
   const start = useCallback(() => {
     cancelLoop();
-    clearTimer();
+    timers.current.clearAll();
     const cfg = configRef.current;
     const cur = stateRef.current;
 
@@ -290,10 +288,42 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
       vehicleT: initialT,
       gateOpen: initialGateOpen,
       isRunning: true,
+      isPaused: false,
     });
 
     rafRef.current = requestAnimationFrame(animate);
-  }, [cancelLoop, clearTimer, animate]);
+  }, [cancelLoop, animate]);
+
+  // ── Pause / Resume ─────────────────────────────────────────────────────────
+
+  /** Freezes vehicle motion and any active gate timer in place. No-op if idle/done/already paused. */
+  const pause = useCallback(() => {
+    const cur = stateRef.current;
+    if (cur.phase === 'idle' || cur.phase === 'done' || cur.isPaused) return;
+
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    // Discard the elapsed-time anchor so resume's first frame computes dt=0 (no jump).
+    lastTimeRef.current = null;
+    timers.current.pauseAll();
+    setState(s => ({ ...s, isPaused: true }));
+  }, []);
+
+  /** Continues from exactly where pause() froze things. No-op if not paused or idle/done. */
+  const resume = useCallback(() => {
+    const cur = stateRef.current;
+    if (!cur.isPaused || cur.phase === 'idle' || cur.phase === 'done') return;
+
+    timers.current.resumeAll();
+    // rAF only ever runs during 'running' — stopped_at_gate/gate_opening/waiting_for_signal
+    // are driven purely by timers, already resumed above.
+    if (cur.phase === 'running') {
+      rafRef.current = requestAnimationFrame(animate);
+    }
+    setState(s => ({ ...s, isPaused: false }));
+  }, [animate]);
 
   // ── Auto-open timer: fires when phase becomes stopped_at_gate ─────────────
 
@@ -302,14 +332,9 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     if (configRef.current.gateMode !== 'auto_open') return;
 
     const ms = configRef.current.stopBeforeOpenMs;
-    stopTimerRef.current = setTimeout(triggerGateOpen, ms);
+    timers.current.schedule('stopBeforeOpen', ms, triggerGateOpen);
 
-    return () => {
-      if (stopTimerRef.current !== null) {
-        clearTimeout(stopTimerRef.current);
-        stopTimerRef.current = null;
-      }
-    };
+    return () => timers.current.clear('stopBeforeOpen');
   }, [state.phase, triggerGateOpen]);
 
   // ── Reset when direction changes ───────────────────────────────────────────
@@ -319,9 +344,12 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
   }, [config.direction]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
-  useEffect(() => () => { cancelLoop(); clearTimer(); }, [cancelLoop, clearTimer]);
+  useEffect(() => {
+    const timerManager = timers.current;
+    return () => { cancelLoop(); timerManager.clearAll(); };
+  }, [cancelLoop]);
 
-  return { state, start, stop, reset, openGate, closeGate };
+  return { state, start, stop, reset, openGate, closeGate, pause, resume };
 }
 
 // Re-export for convenience in components
