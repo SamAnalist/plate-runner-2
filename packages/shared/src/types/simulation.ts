@@ -1,4 +1,5 @@
 export type Direction = 'incoming' | 'away';
+export const DIRECTIONS: Direction[] = ['incoming', 'away'];
 
 export type DetectorSide = 'driver' | 'center' | 'passenger';
 export type DetectorFace = 'front' | 'back';
@@ -17,6 +18,7 @@ export type DetectorPlacement =
  * hidden          — Gate is not rendered in the scene.
  */
 export type GateMode = 'auto_open' | 'wait_for_signal' | 'hidden';
+export const GATE_MODES: GateMode[] = ['auto_open', 'wait_for_signal', 'hidden'];
 
 /**
  * Initial visual state of the gate arm at the start of a simulation run.
@@ -24,8 +26,27 @@ export type GateMode = 'auto_open' | 'wait_for_signal' | 'hidden';
  *   closed — Arm starts horizontal; gate behavior (auto_open / wait_for_signal) applies.
  */
 export type GateInitialState = 'open' | 'closed';
+export const GATE_INITIAL_STATES: GateInitialState[] = ['open', 'closed'];
 
-export type VehicleColor = 'blue' | 'white' | 'black' | 'silver' | 'red' | 'green';
+/**
+ * Bundles the gate-related fields of SimulationConfig into a reusable shape —
+ * used by PlateList.simulationDefaults to save/apply a gate configuration
+ * independent of the rest of SimulationConfig.
+ */
+export interface GateConfig {
+  gateMode: GateMode;
+  gateInitialState: GateInitialState;
+  stopBeforeOpenMs: number;
+  delayAfterOpenMs: number;
+}
+
+/**
+ * Supported vehicle colors. Only 'blue' has real asset variants today —
+ * 'red' and 'gray' fall back to the blue asset until their PNGs are added.
+ * See docs/VEHICLE_COLOR_VARIANTS.md.
+ */
+export type VehicleColor = 'blue' | 'red' | 'gray';
+export const VEHICLE_COLORS: VehicleColor[] = ['blue', 'red', 'gray'];
 
 /**
  * Four phase-specific speed values (1–10) for a single direction.

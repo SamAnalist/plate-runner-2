@@ -17,9 +17,9 @@
  *   are genuinely distinct visual angles, not the same image with a skew.
  *
  * Vehicle colour:
- *   PNG assets are single-colour renders — vehicleColor config is acknowledged
- *   but not applied. Colour tinting (hue-rotate filter or per-colour asset
- *   variants) is a future phase task.
+ *   Resolved via getVehicleAsset({ color: config.vehicleColor, placement }).
+ *   Only 'blue' has real asset files today — 'red'/'gray' fall back to the
+ *   blue asset until their PNGs are added (see docs/VEHICLE_COLOR_VARIANTS.md).
  */
 import type { SimulationConfig } from '@plate-runner/shared';
 import {
@@ -36,7 +36,7 @@ import {
   lerp,
 } from '../../../../utils/depth';
 import { getViewAwareX, getPovYOffset } from './viewMotionPaths';
-import { ASSET_REGISTRY } from './assetRegistry';
+import { getVehicleAsset } from './assetRegistry';
 import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
 import type { AssetViewKey } from './types';
@@ -235,7 +235,7 @@ export function VehicleAssetLayer({
 
   // ── Asset & plate anchor lookup ─────────────────────────────────────────
   const viewKey    = safePlacement as AssetViewKey;
-  const asset      = ASSET_REGISTRY[viewKey];
+  const asset      = getVehicleAsset({ color: config.vehicleColor, placement: viewKey });
   const anchor     = PLATE_ANCHORS[safePlacement];
   const rotDeg     = sceneV.rotationDeg ?? 0;
   const rotTransform = rotDeg !== 0
@@ -250,20 +250,15 @@ export function VehicleAssetLayer({
           povYOffset slides the car in/out of the scene vertically. */}
       <g transform={`translate(${carX + povXOffset}, ${carY + povYOffset}) scale(${scaleX}, ${scaleY})${rotTransform}`}>
 
-        {/* Car body asset (raster image) */}
-        {asset.type === 'raster' && (
-          <image
-            href={asset.src}
-            x={0}
-            y={0}
-            width={CAR_LW}
-            height={CAR_LH}
-            preserveAspectRatio="none"
-          />
-        )}
-
-        {/* SVG prototype fallback — only used if registry entry is svg-prototype */}
-        {asset.type === 'svg-prototype' && asset.render({ body: '#4a5060', hood: '#3a4050', dark: '#1a2030', glass: '#0a1020', trim: '#2a3040' })}
+        {/* Car body asset (raster image), resolved for the current vehicle color */}
+        <image
+          href={asset.src}
+          x={0}
+          y={0}
+          width={CAR_LW}
+          height={CAR_LH}
+          preserveAspectRatio="none"
+        />
 
         {/* License plate overlay — always a separate layer, never baked into asset */}
         <DynamicPlateOverlay

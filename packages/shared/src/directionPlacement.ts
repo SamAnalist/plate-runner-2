@@ -14,6 +14,12 @@ export const PLACEMENTS_BY_DIRECTION: Record<Direction, DetectorPlacement[]> = {
   away:     ['driver_back',  'center_back',  'passenger_back'],
 };
 
+/** All valid detector placements, across both directions. */
+export const DETECTOR_PLACEMENTS: DetectorPlacement[] = [
+  ...PLACEMENTS_BY_DIRECTION.incoming,
+  ...PLACEMENTS_BY_DIRECTION.away,
+];
+
 /** Returns the allowed placements for a given direction. */
 export function getPlacementsForDirection(direction: Direction): DetectorPlacement[] {
   return PLACEMENTS_BY_DIRECTION[direction];

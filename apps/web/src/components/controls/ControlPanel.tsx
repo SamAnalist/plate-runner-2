@@ -109,12 +109,9 @@ function CollapsibleSection({
 // ─── Color swatch ─────────────────────────────────────────────────────────
 
 const COLOR_MAP: Record<VehicleColor, string> = {
-  blue:   '#2563eb',
-  white:  '#e8e8e8',
-  black:  '#1c1c2e',
-  silver: '#8d96a3',
-  red:    '#dc2626',
-  green:  '#16a34a',
+  blue: '#2563eb',
+  red:  '#dc2626',
+  gray: '#6b7280',
 };
 
 // ─── Phase speed controls ─────────────────────────────────────────────────
@@ -495,6 +492,11 @@ export function ControlPanel({
               />
             ))}
           </div>
+          {config.vehicleColor !== 'blue' && (
+            <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
+              No dedicated asset yet — rendering as blue until one is added.
+            </p>
+          )}
         </div>
 
         <Divider />

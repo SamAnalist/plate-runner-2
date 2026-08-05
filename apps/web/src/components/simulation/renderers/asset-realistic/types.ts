@@ -12,9 +12,6 @@
  * AssetViewKey mirrors DetectorPlacement exactly (6 distinct views).
  * Each view has its own asset file and its own PlateAnchor.
  */
-import type React from 'react';
-import type { VehicleColor } from '@plate-runner/shared';
-
 // ─── Asset view key ───────────────────────────────────────────────────────────
 
 /**
@@ -76,54 +73,17 @@ export interface PlateAnchor {
   side: 'front' | 'rear';
 }
 
-// ─── Car palette ──────────────────────────────────────────────────────────────
-// Retained for SVG fallback / legacy svg-prototype tinting.
-// Raster asset renderers do NOT use the palette — colour is baked into the image.
-
-export interface CarPalette {
-  body:  string;
-  hood:  string;
-  dark:  string;
-  glass: string;
-  trim:  string;
-}
-
-export const CAR_PALETTES: Record<VehicleColor, CarPalette> = {
-  blue:   { body: '#1e4fcf', hood: '#1a44bb', dark: '#102d80', glass: '#090f1e', trim: '#163898' },
-  white:  { body: '#d5d5d5', hood: '#c2c2c2', dark: '#a0a0a0', glass: '#1a2230', trim: '#b0b0b0' },
-  black:  { body: '#181820', hood: '#111118', dark: '#080810', glass: '#030308', trim: '#222230' },
-  silver: { body: '#7e8794', hood: '#606870', dark: '#424a52', glass: '#141b27', trim: '#505860' },
-  red:    { body: '#c82020', hood: '#a81818', dark: '#881414', glass: '#150606', trim: '#900e0e' },
-  green:  { body: '#138c3e', hood: '#116e30', dark: '#0e4820', glass: '#04120a', trim: '#0c5e28' },
-};
-
 // ─── Asset entry ──────────────────────────────────────────────────────────────
 
 /**
- * Raster asset entry — the current production target.
+ * Raster asset entry — the current (and only) production target.
  *
- * src        — path served from /public (e.g. /assets/vehicles/main-car/center_front.png)
+ * src        — path served from /public (e.g. /assets/vehicles/main-car/blue/center_front.png)
  * naturalW/H — original image pixel dimensions; used for aspect-ratio verification.
- *
- * svg-prototype — LEGACY fallback used during Phase 0.4 development only.
- *                 The ASSET_REGISTRY no longer uses svg-prototype entries.
- *                 Kept in the union so existing code that references it compiles.
  */
-export type AssetEntry =
-  | {
-      type: 'raster';
-      src: string;
-      naturalW: number;
-      naturalH: number;
-      /**
-       * @deprecated Unused. Camera-aware LPR/ANPR assets are installed and real.
-       * This field is retained only for backwards compatibility and will be removed
-       * in a future cleanup pass.
-       */
-      isPlaceholder?: true;
-    }
-  | {
-      /** @deprecated Phase 0.4 SVG prototype — not used in ASSET_REGISTRY. */
-      type: 'svg-prototype';
-      render: (palette: CarPalette) => React.ReactElement;
-    };
+export interface AssetEntry {
+  type: 'raster';
+  src: string;
+  naturalW: number;
+  naturalH: number;
+}

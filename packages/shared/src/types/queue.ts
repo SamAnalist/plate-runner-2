@@ -23,6 +23,7 @@ export type PlateQueueStatus =
   | 'stopped';
 
 export type PlateQueueMode = 'run_all' | 'manual_next';
+export const PLATE_QUEUE_MODES: PlateQueueMode[] = ['run_all', 'manual_next'];
 
 export interface PlateQueueConfig {
   /** Delay (ms) between one vehicle completing and the next starting. Only used in run_all mode. */
