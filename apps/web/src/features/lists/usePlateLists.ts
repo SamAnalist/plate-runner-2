@@ -19,11 +19,19 @@ import {
   importPlateLists,
 } from './plateListStorage';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
+import type { ExecutionHistoryControls } from '../history/useExecutionHistory';
+import { summarizeGateConfig } from '../scheduler/schedulerLogic';
 
 interface UsePlateListsArgs {
   config: SimulationConfig;
   onConfigChange: (c: SimulationConfig) => void;
   plateQueue: PlateQueueControls;
+  executionHistory: ExecutionHistoryControls;
+}
+
+export interface RunResult {
+  ok: boolean;
+  reason?: 'missing_list';
 }
 
 export interface PlateListDraft {
@@ -54,10 +62,12 @@ export interface PlateListsControls {
   duplicateList: (id: string) => void;
   resetStorage: () => void;
 
-  /** Applies the list's simulationDefaults and immediately runs its plates through the queue. */
-  runList: (id: string) => void;
+  /** Applies the list's simulationDefaults, immediately runs its plates through the queue, and creates an execution history record (triggeredBy: 'manual_list_run'). */
+  runList: (id: string) => RunResult;
   /** Applies the list's simulationDefaults and loads its plates into the queue, without starting playback. */
   loadListIntoQueue: (id: string) => void;
+  /** Used by useLocalScheduler: same as runList, but with a pre-ordered plate array (e.g. shuffled) and triggeredBy: 'schedule'. */
+  runListForSchedule: (id: string, opts: { plates: string[]; scheduleId: string }) => RunResult;
 
   exportListToJSON: (id: string) => string | null;
   exportAllToJSON: () => string;
@@ -78,7 +88,7 @@ function validateDraft(draft: PlateListDraft): string | null {
   return null;
 }
 
-export function usePlateLists({ config, onConfigChange, plateQueue }: UsePlateListsArgs): PlateListsControls {
+export function usePlateLists({ config, onConfigChange, plateQueue, executionHistory }: UsePlateListsArgs): PlateListsControls {
   const [{ lists, error: storageError }, setStore] = useState(() => getPlateLists());
   const [lastImportResult, setLastImportResult] = useState<ImportSummary | null>(null);
 
@@ -124,13 +134,43 @@ export function usePlateLists({ config, onConfigChange, plateQueue }: UsePlateLi
     };
   }, []);
 
-  const runList = useCallback((id: string) => {
-    const list = listsRef.current.find(l => l.id === id);
-    if (!list) return;
+  /** Shared by runList/runListForSchedule: applies defaults, starts an execution record, queues the deferred queue-start. */
+  const executeList = useCallback((
+    list: PlateList,
+    plates: string[],
+    triggeredBy: 'manual_list_run' | 'schedule',
+    scheduleId?: string,
+  ) => {
     onConfigChange(applyListDefaults(list));
     plateQueueRef.current.setQueueConfig(list.simulationDefaults.queueConfig);
-    pendingActionRef.current = { plates: list.plates, autoRun: true };
-  }, [onConfigChange, applyListDefaults]);
+    executionHistory.startExecution({
+      plateListId: list.id,
+      plateListName: list.name,
+      totalPlates: plates.length,
+      vehicleColor: list.simulationDefaults.vehicleColor,
+      direction: list.simulationDefaults.direction,
+      detectorPlacement: list.simulationDefaults.detectorPlacement,
+      gateModeSummary: summarizeGateConfig(list.simulationDefaults.gateConfig),
+      queueMode: list.simulationDefaults.queueConfig.mode,
+      triggeredBy,
+      scheduleId,
+    });
+    pendingActionRef.current = { plates, autoRun: true };
+  }, [onConfigChange, applyListDefaults, executionHistory]);
+
+  const runList = useCallback((id: string): RunResult => {
+    const list = listsRef.current.find(l => l.id === id);
+    if (!list) return { ok: false, reason: 'missing_list' };
+    executeList(list, list.plates, 'manual_list_run');
+    return { ok: true };
+  }, [executeList]);
+
+  const runListForSchedule = useCallback((id: string, opts: { plates: string[]; scheduleId: string }): RunResult => {
+    const list = listsRef.current.find(l => l.id === id);
+    if (!list) return { ok: false, reason: 'missing_list' };
+    executeList(list, opts.plates, 'schedule', opts.scheduleId);
+    return { ok: true };
+  }, [executeList]);
 
   const loadListIntoQueue = useCallback((id: string) => {
     const list = listsRef.current.find(l => l.id === id);
@@ -223,6 +263,7 @@ export function usePlateLists({ config, onConfigChange, plateQueue }: UsePlateLi
     resetStorage,
     runList,
     loadListIntoQueue,
+    runListForSchedule,
     exportListToJSON,
     exportAllToJSON,
     importFromJSON,

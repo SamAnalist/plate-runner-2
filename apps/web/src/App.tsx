@@ -10,6 +10,7 @@ import { ControlPanel } from './components/controls/ControlPanel';
 import { useSimulation } from './hooks/useSimulation';
 import { usePlateQueue } from './features/queue/usePlateQueue';
 import { usePlateLists } from './features/lists/usePlateLists';
+import { useExecutionHistory } from './features/history/useExecutionHistory';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
@@ -45,7 +46,8 @@ export default function App() {
   }
 
   const plateQueue = usePlateQueue({ config, onConfigChange: handleConfigChange, simulation });
-  const plateLists = usePlateLists({ config, onConfigChange: handleConfigChange, plateQueue });
+  const executionHistory = useExecutionHistory({ plateQueue });
+  const plateLists = usePlateLists({ config, onConfigChange: handleConfigChange, plateQueue, executionHistory });
 
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
