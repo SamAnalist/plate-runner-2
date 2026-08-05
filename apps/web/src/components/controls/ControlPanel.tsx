@@ -12,11 +12,13 @@ import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../../features/queue/usePlateQueue';
 import type { PlateListsControls } from '../../features/lists/usePlateLists';
 import type { LocalSchedulerControls } from '../../features/scheduler/useLocalScheduler';
+import type { ExecutionHistoryControls } from '../../features/history/useExecutionHistory';
 import { getPlacementsForDirection } from '@plate-runner/shared';
 import { PlateInput } from './PlateInput';
 import { PlateQueuePanel } from './PlateQueuePanel';
 import { PlateListsPanel } from './PlateListsPanel';
 import { SchedulerPanel } from './SchedulerPanel';
+import { ExecutionHistoryPanel } from './ExecutionHistoryPanel';
 
 interface ControlPanelProps {
   config: SimulationConfig;
@@ -24,6 +26,7 @@ interface ControlPanelProps {
   plateQueue: PlateQueueControls;
   plateLists: PlateListsControls;
   scheduler: LocalSchedulerControls;
+  executionHistory: ExecutionHistoryControls;
   onConfigChange: (c: SimulationConfig) => void;
   showDebug: boolean;
   onShowDebugChange: (v: boolean) => void;
@@ -380,6 +383,7 @@ export function ControlPanel({
   plateQueue,
   plateLists,
   scheduler,
+  executionHistory,
   onConfigChange,
   showDebug,
   onShowDebugChange,
@@ -604,6 +608,17 @@ export function ControlPanel({
           defaultOpen={false}
         >
           <SchedulerPanel scheduler={scheduler} lists={plateLists.lists} queueActive={queueActive} />
+        </CollapsibleSection>
+
+        <Divider />
+
+        {/* ── Execution History ────────────────────────────────────────── */}
+        <CollapsibleSection
+          title="Execution History"
+          badge={executionHistory.records.length > 0 ? String(executionHistory.records.length) : undefined}
+          defaultOpen={false}
+        >
+          <ExecutionHistoryPanel history={executionHistory} />
         </CollapsibleSection>
 
         <Divider />

@@ -114,6 +114,7 @@ export default function App() {
             plateQueue={plateQueue}
             plateLists={plateLists}
             scheduler={scheduler}
+            executionHistory={executionHistory}
             onConfigChange={handleConfigChange}
             showDebug={showDebug}
             onShowDebugChange={setShowDebug}
