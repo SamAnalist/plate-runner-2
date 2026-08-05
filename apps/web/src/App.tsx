@@ -11,6 +11,7 @@ import { useSimulation } from './hooks/useSimulation';
 import { usePlateQueue } from './features/queue/usePlateQueue';
 import { usePlateLists } from './features/lists/usePlateLists';
 import { useExecutionHistory } from './features/history/useExecutionHistory';
+import { useLocalScheduler } from './features/scheduler/useLocalScheduler';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
@@ -48,6 +49,7 @@ export default function App() {
   const plateQueue = usePlateQueue({ config, onConfigChange: handleConfigChange, simulation });
   const executionHistory = useExecutionHistory({ plateQueue });
   const plateLists = usePlateLists({ config, onConfigChange: handleConfigChange, plateQueue, executionHistory });
+  const scheduler = useLocalScheduler({ plateLists, plateQueue, executionHistory });
 
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
@@ -111,6 +113,7 @@ export default function App() {
             simulation={simulation}
             plateQueue={plateQueue}
             plateLists={plateLists}
+            scheduler={scheduler}
             onConfigChange={handleConfigChange}
             showDebug={showDebug}
             onShowDebugChange={setShowDebug}

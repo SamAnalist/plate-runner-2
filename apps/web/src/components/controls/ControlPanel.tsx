@@ -11,16 +11,19 @@ import type {
 import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../../features/queue/usePlateQueue';
 import type { PlateListsControls } from '../../features/lists/usePlateLists';
+import type { LocalSchedulerControls } from '../../features/scheduler/useLocalScheduler';
 import { getPlacementsForDirection } from '@plate-runner/shared';
 import { PlateInput } from './PlateInput';
 import { PlateQueuePanel } from './PlateQueuePanel';
 import { PlateListsPanel } from './PlateListsPanel';
+import { SchedulerPanel } from './SchedulerPanel';
 
 interface ControlPanelProps {
   config: SimulationConfig;
   simulation: SimulationControls;
   plateQueue: PlateQueueControls;
   plateLists: PlateListsControls;
+  scheduler: LocalSchedulerControls;
   onConfigChange: (c: SimulationConfig) => void;
   showDebug: boolean;
   onShowDebugChange: (v: boolean) => void;
@@ -376,6 +379,7 @@ export function ControlPanel({
   simulation,
   plateQueue,
   plateLists,
+  scheduler,
   onConfigChange,
   showDebug,
   onShowDebugChange,
@@ -587,6 +591,19 @@ export function ControlPanel({
           defaultOpen={false}
         >
           <PlateListsPanel {...plateLists} />
+        </CollapsibleSection>
+
+        <Divider />
+
+        {/* ── Scheduler ─────────────────────────────────────────────────── */}
+        <CollapsibleSection
+          title="Scheduler"
+          badge={scheduler.schedules.filter(s => s.status === 'enabled').length > 0
+            ? `${scheduler.schedules.filter(s => s.status === 'enabled').length} active`
+            : undefined}
+          defaultOpen={false}
+        >
+          <SchedulerPanel scheduler={scheduler} lists={plateLists.lists} queueActive={queueActive} />
         </CollapsibleSection>
 
         <Divider />
