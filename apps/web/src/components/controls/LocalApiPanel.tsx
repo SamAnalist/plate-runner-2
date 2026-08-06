@@ -11,8 +11,11 @@ const CONNECTION_TONE: Record<ApiConnectionStatus, BadgeTone> = {
   error: 'danger',
 };
 
+const URL_SCHEME_PATTERN = /^https?:\/\//i;
+
 export function LocalApiPanel({ listener }: { listener: ApiCommandListenerControls }) {
   const { enabled, setEnabled, apiBaseUrl, setApiBaseUrl, apiKey, setApiKey, connectionStatus, pendingCount, lastError, testConnection } = listener;
+  const urlLooksValid = !apiBaseUrl || URL_SCHEME_PATTERN.test(apiBaseUrl);
 
   return (
     <div className="flex flex-col gap-3">
@@ -26,18 +29,36 @@ export function LocalApiPanel({ listener }: { listener: ApiCommandListenerContro
               value={apiBaseUrl}
               onChange={e => setApiBaseUrl(e.target.value)}
               placeholder="http://localhost:8787"
-              className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
+              className={`w-full px-2 py-1.5 rounded bg-white/5 border text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50 ${
+                urlLooksValid ? 'border-white/15' : 'border-red-500/50'}`}
             />
+            {!urlLooksValid && (
+              <p className="mt-1 text-[9px] font-mono text-red-400/80">Should start with http:// or https://</p>
+            )}
           </div>
           <div>
-            <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1">API Key</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] text-white/35 uppercase tracking-[0.16em]">API Key</p>
+              <button
+                onClick={() => setApiKey('')}
+                className="text-[9px] font-mono text-white/25 hover:text-white/60 transition-colors"
+              >
+                Clear API Key
+              </button>
+            </div>
             <input
-              type="text"
+              type="password"
+              autoComplete="off"
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
               placeholder="dev-local-key"
               className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
             />
+            <p className="mt-1 text-[9px] font-mono text-white/25 leading-snug">
+              Only used in this browser session — not saved to local storage. Controller/Display
+              credentials are stored locally; clear them from Settings → Local Storage → Remote
+              Pairing Credentials.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button tone="primary" onClick={testConnection}>Test Connection</Button>

@@ -20,13 +20,31 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 
-function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+function TextInput({
+  value, onChange, placeholder, type = 'text', maxLength, invalid,
+}: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
+  type?: 'text' | 'password'; maxLength?: number; invalid?: boolean;
+}) {
   return (
     <input
-      type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
+      type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      maxLength={maxLength} autoComplete={type === 'password' ? 'off' : undefined}
+      className={`w-full px-2 py-1.5 rounded bg-white/5 border text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50 ${
+        invalid ? 'border-red-500/50' : 'border-white/15'}`}
     />
   );
+}
+
+const URL_SCHEME_PATTERN = /^https?:\/\//i;
+
+const REMOTE_ERROR_MESSAGES: Record<string, string> = {
+  token_expired: 'Pairing expired — re-pair with this display.',
+  unauthorized: 'Not authorized — this pairing may have been revoked. Re-pair if needed.',
+};
+
+function friendlyRemoteError(error: string): string {
+  return REMOTE_ERROR_MESSAGES[error] ?? error;
 }
 
 function Select<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: readonly T[] }) {
@@ -44,7 +62,7 @@ function ActionResultBadge({ result }: { result: RemoteActionResult | null }) {
   if (!result) return null;
   return result.ok
     ? <Badge tone="success">Sent — {result.commandId.slice(0, 8)}</Badge>
-    : <Badge tone="danger">{result.error}</Badge>;
+    : <Badge tone="danger">{friendlyRemoteError(result.error)}</Badge>;
 }
 
 export function ControllerModePanel({ controller, localLists }: { controller: RemoteControllerControls; localLists: PlateList[] }) {
@@ -97,8 +115,11 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
       <div>
         <Label>Connection</Label>
         <div className="flex flex-col gap-2">
-          <TextInput value={apiBaseUrl} onChange={setApiBaseUrl} placeholder="http://localhost:8787" />
-          <TextInput value={apiKey} onChange={setApiKey} placeholder="dev-local-key" />
+          <TextInput
+            value={apiBaseUrl} onChange={setApiBaseUrl} placeholder="http://localhost:8787"
+            invalid={!!apiBaseUrl && !URL_SCHEME_PATTERN.test(apiBaseUrl)}
+          />
+          <TextInput value={apiKey} onChange={setApiKey} placeholder="dev-local-key" type="password" />
         </div>
       </div>
 
@@ -106,8 +127,8 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
         <Label>Pair Display</Label>
         {!pairingRequest ? (
           <div className="flex flex-col gap-2">
-            <TextInput value={controllerName} onChange={setControllerName} placeholder="Controller name (e.g. Laptop Samuel)" />
-            <TextInput value={pairCode} onChange={setPairCode} placeholder="6-digit code" />
+            <TextInput value={controllerName} onChange={setControllerName} placeholder="Controller name (e.g. Laptop Samuel)" maxLength={80} />
+            <TextInput value={pairCode} onChange={setPairCode} placeholder="6-digit code" maxLength={6} />
             <Button
               tone="primary"
               disabled={!controllerName.trim() || !/^\d{6}$/.test(pairCode.trim())}

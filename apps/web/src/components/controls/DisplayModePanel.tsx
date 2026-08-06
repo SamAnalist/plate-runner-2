@@ -14,6 +14,8 @@ const CONNECTION_TONE: Record<DisplayConnectionStatus, BadgeTone> = {
   error: 'danger',
 };
 
+const URL_SCHEME_PATTERN = /^https?:\/\//i;
+
 function useCountdown(expiresAt: string | undefined) {
   const [remainingMs, setRemainingMs] = useState(() => (expiresAt ? new Date(expiresAt).getTime() - Date.now() : 0));
   useEffect(() => {
@@ -86,13 +88,14 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
           <input
             type="text" value={apiBaseUrl} onChange={e => setApiBaseUrl(e.target.value)}
             placeholder="http://localhost:8787"
-            className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
+            className={`w-full px-2 py-1.5 rounded bg-white/5 border text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50 ${
+              !apiBaseUrl || URL_SCHEME_PATTERN.test(apiBaseUrl) ? 'border-white/15' : 'border-red-500/50'}`}
           />
         </div>
         <div>
           <Label>API Key</Label>
           <input
-            type="text" value={apiKey} onChange={e => setApiKey(e.target.value)}
+            type="password" autoComplete="off" value={apiKey} onChange={e => setApiKey(e.target.value)}
             placeholder="dev-local-key"
             className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
           />
@@ -101,7 +104,7 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
           <Label>Register This Display</Label>
           <input
             type="text" value={nameInput} onChange={e => setNameInput(e.target.value)}
-            placeholder="Entrance Display 1"
+            placeholder="Entrance Display 1" maxLength={80}
             className="w-full mb-2 px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
           />
           <Button tone="primary" onClick={() => nameInput.trim() && registerDisplay(nameInput.trim())} disabled={!nameInput.trim()}>

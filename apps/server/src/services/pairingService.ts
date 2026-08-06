@@ -5,6 +5,7 @@ import { generatePairingCode, generateSecureToken, hashToken } from '../security
 import { validateName } from './validation';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
+const MAX_PENDING_REQUESTS_PER_DISPLAY = 5;
 
 interface ServiceLogger {
   info: (obj: Record<string, unknown>, msg?: string) => void;
@@ -16,7 +17,7 @@ export type RequestCodeResult =
 
 export type CreateRequestResult =
   | { ok: true; pairingRequestId: string; displayId: string; displayName: string; expiresAt: string }
-  | { ok: false; status: 400 | 404 | 410; error: string };
+  | { ok: false; status: 400 | 404 | 409 | 410; error: string };
 
 export type RequestStatusResult =
   | { ok: true; status: PairingSession['status']; displayId: string; displayName: string }
@@ -33,7 +34,7 @@ export type FinalizeResult =
 const CODE_PATTERN = /^\d{6}$/;
 const RESOLVABLE_STATUSES: PairingSession['status'][] = ['pending', 'approval_pending', 'approved'];
 
-export function createPairingService(repo: RemoteRepo, logger: ServiceLogger) {
+export function createPairingService(repo: RemoteRepo, logger: ServiceLogger, pairingTokenTtlDays: number | null = null) {
   /** Lazily expires a session past its expiresAt if it's still in a non-terminal state. Same TTL covers the code AND any approval_pending/approved request built on top of it. */
   function resolveSession(session: PairingSession, now: Date): PairingSession {
     if (RESOLVABLE_STATUSES.includes(session.status) && new Date(session.expiresAt).getTime() <= now.getTime()) {
@@ -82,6 +83,10 @@ export function createPairingService(repo: RemoteRepo, logger: ServiceLogger) {
 
     const display = repo.getDisplayById(session.displayId);
     if (!display) return { ok: false, status: 404, error: 'display no longer exists' };
+
+    if (listPendingRequestsForDisplay(session.displayId).length >= MAX_PENDING_REQUESTS_PER_DISPLAY) {
+      return { ok: false, status: 409, error: 'too_many_pending_requests' };
+    }
 
     const updated: PairingSession = { ...session, status: 'approval_pending', controllerName: nameResult.name };
     repo.updateSession(updated);
@@ -150,6 +155,9 @@ export function createPairingService(repo: RemoteRepo, logger: ServiceLogger) {
 
     const controllerToken = generateSecureToken();
     const pairingId = randomUUID();
+    const expiresAt = pairingTokenTtlDays != null
+      ? new Date(Date.now() + pairingTokenTtlDays * 24 * 60 * 60 * 1000).toISOString()
+      : undefined;
     repo.insertDevicePairing({
       id: pairingId,
       displayId: session.displayId,
@@ -157,6 +165,7 @@ export function createPairingService(repo: RemoteRepo, logger: ServiceLogger) {
       tokenHash: hashToken(controllerToken),
       name: session.controllerName,
       createdAt: nowIso,
+      expiresAt,
     });
 
     repo.updateSession({ ...session, status: 'used', usedAt: nowIso });

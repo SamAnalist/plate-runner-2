@@ -32,6 +32,7 @@ interface DevicePairingRow {
   createdAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
+  expiresAt: string | null;
   controllerName?: string | null;
 }
 
@@ -50,6 +51,8 @@ export interface DevicePairingRecord {
   createdAt: string;
   lastUsedAt?: string;
   revokedAt?: string;
+  /** Optional TTL from PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS at finalize time — undefined means never expires. */
+  expiresAt?: string;
 }
 
 function rowToDisplay(row: DisplayRow): DisplayDeviceRecord {
@@ -88,6 +91,7 @@ function rowToPairing(row: DevicePairingRow): DevicePairingRecord {
     createdAt: row.createdAt,
     lastUsedAt: row.lastUsedAt ?? undefined,
     revokedAt: row.revokedAt ?? undefined,
+    expiresAt: row.expiresAt ?? undefined,
   };
 }
 
@@ -149,8 +153,8 @@ export function createRemoteRepo({ db }: StorageHandle) {
 
   // ── Device pairings ───────────────────────────────────────────────────
   const insertPairingStmt = db.prepare(`
-    INSERT INTO device_pairings (id, displayId, controllerId, tokenHash, name, createdAt, lastUsedAt, revokedAt)
-    VALUES (@id, @displayId, @controllerId, @tokenHash, @name, @createdAt, @lastUsedAt, @revokedAt)
+    INSERT INTO device_pairings (id, displayId, controllerId, tokenHash, name, createdAt, lastUsedAt, revokedAt, expiresAt)
+    VALUES (@id, @displayId, @controllerId, @tokenHash, @name, @createdAt, @lastUsedAt, @revokedAt, @expiresAt)
   `);
   const getPairingByTokenHashStmt = db.prepare(`SELECT * FROM device_pairings WHERE tokenHash = ?`);
   const getPairingByIdStmt = db.prepare(`SELECT * FROM device_pairings WHERE id = ?`);
@@ -228,6 +232,7 @@ export function createRemoteRepo({ db }: StorageHandle) {
         name: pairing.name ?? null,
         lastUsedAt: pairing.lastUsedAt ?? null,
         revokedAt: pairing.revokedAt ?? null,
+        expiresAt: pairing.expiresAt ?? null,
       });
     },
     getPairingByTokenHash(tokenHash: string): DevicePairingRecord | null {

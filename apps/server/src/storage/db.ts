@@ -72,7 +72,8 @@ const SCHEMA = `
     name        TEXT,
     createdAt   TEXT NOT NULL,
     lastUsedAt  TEXT,
-    revokedAt   TEXT
+    revokedAt   TEXT,
+    expiresAt   TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_device_pairings_display ON device_pairings(displayId);
   CREATE INDEX IF NOT EXISTS idx_device_pairings_tokenHash ON device_pairings(tokenHash);
@@ -99,6 +100,9 @@ function applyMigrations(db: Database.Database): void {
   // Macro Phase 5.1 — manual pairing approval: set when a controller claims a code
   // (status -> approval_pending), read back when finalize() creates the controller device.
   ensureColumn(db, 'pairing_sessions', 'controllerName', 'controllerName TEXT');
+  // Security hardening — optional controller-token TTL (PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS).
+  // Null means "never expires", matching the original no-TTL behavior.
+  ensureColumn(db, 'device_pairings', 'expiresAt', 'expiresAt TEXT');
 }
 
 /**

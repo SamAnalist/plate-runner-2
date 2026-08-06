@@ -8,6 +8,8 @@ import { Label } from '../ui/Label';
 import { Button } from '../ui/Button';
 import { FieldError } from '../ui/FieldError';
 
+const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024; // 5MB — a real backup is a few KB; this just rejects obviously-wrong files before reading them.
+
 interface BackupPanelProps {
   plateLists: PlateList[];
   schedules: ScheduledPlateListRun[];
@@ -30,6 +32,10 @@ export function BackupPanel({ plateLists, schedules, executionHistory, lastScree
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      setImportError(`File is too large (${Math.round(file.size / 1024)}KB, max ${MAX_IMPORT_FILE_BYTES / 1024 / 1024}MB).`);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== 'string') return;
