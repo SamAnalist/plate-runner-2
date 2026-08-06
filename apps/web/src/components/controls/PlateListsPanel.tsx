@@ -13,44 +13,10 @@ import {
 } from '@plate-runner/shared';
 import type { PlateListsControls, PlateListDraft } from '../../features/lists/usePlateLists';
 import { parsePlateQueueInput } from '../../features/queue/plateQueueParser';
-
-// ─── Local primitives (mirrors PlateQueuePanel's pattern) ──────────────────
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1.5">{children}</p>;
-}
-
-function SmallButton({
-  onClick,
-  disabled,
-  children,
-  tone = 'neutral',
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-  tone?: 'neutral' | 'primary' | 'danger' | 'warn';
-}) {
-  const toneClasses: Record<string, string> = {
-    neutral: 'border-white/12 text-white/55 hover:text-white/85 hover:border-white/25 bg-white/5',
-    primary: 'border-blue-500/60 text-blue-300 hover:bg-blue-600/20 bg-blue-600/10',
-    danger:  'border-red-500/40 text-red-400 hover:bg-red-500/15 bg-white/5',
-    warn:    'border-yellow-400/50 text-yellow-300 hover:bg-yellow-500/15 bg-white/5',
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`
-        px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold
-        border transition-all disabled:opacity-25 disabled:cursor-not-allowed
-        ${toneClasses[tone]}
-      `}
-    >
-      {children}
-    </button>
-  );
-}
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
+import { EmptyState } from '../ui/EmptyState';
+import { FieldError } from '../ui/FieldError';
 
 function MiniToggle<T extends string>({
   options,
@@ -67,7 +33,7 @@ function MiniToggle<T extends string>({
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`px-2 py-1 rounded text-[10px] font-mono font-semibold border transition-all ${
+          className={`px-2.5 py-1.5 rounded text-xs font-mono font-semibold border transition-all ${
             value === opt.value
               ? 'bg-blue-600/80 border-blue-500/70 text-white'
               : 'bg-white/5 border-white/12 text-white/50 hover:text-white/80'}`}
@@ -351,21 +317,22 @@ function ListForm({
               onChange={e => set('gapBetweenVehiclesMs', Number(e.target.value))}
               className="w-full accent-blue-500 h-1 rounded cursor-pointer" />
           </div>
-          <button
+          <Button
+            variant="ghost"
+            tone={form.loop ? 'primary' : 'neutral'}
+            className="w-full"
             onClick={() => set('loop', !form.loop)}
-            className={`w-full py-1.5 rounded text-xs font-mono font-semibold border transition-all ${
-              form.loop ? 'bg-cyan-600/25 border-cyan-500/45 text-cyan-300' : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}`}
           >
             {form.loop ? '↻ Loop: ON' : '↻ Loop: OFF'}
-          </button>
+          </Button>
         </div>
       </div>
 
-      {error && <p className="text-[10px] text-red-400 font-mono">{error}</p>}
+      {error && <FieldError>{error}</FieldError>}
 
       <div className="flex gap-2">
-        <SmallButton tone="primary" onClick={handleSave}>Save List</SmallButton>
-        <SmallButton onClick={onCancel}>Cancel</SmallButton>
+        <Button tone="primary" onClick={handleSave}>Save List</Button>
+        <Button onClick={onCancel}>Cancel</Button>
       </div>
     </div>
   );
@@ -413,12 +380,12 @@ function ListCard({
         updated {new Date(list.updatedAt).toLocaleString()}
       </p>
       <div className="flex flex-wrap gap-1.5 mt-1">
-        <SmallButton tone="primary" onClick={onRun}>▶ Run List</SmallButton>
-        <SmallButton onClick={onLoad}>Load Into Queue</SmallButton>
-        <SmallButton onClick={onEdit}>Edit</SmallButton>
-        <SmallButton onClick={onDuplicate}>Duplicate</SmallButton>
-        <SmallButton onClick={onExport}>Export</SmallButton>
-        <SmallButton tone="danger" onClick={onDelete}>Delete</SmallButton>
+        <Button tone="primary" onClick={onRun}>▶ Run List</Button>
+        <Button onClick={onLoad}>Load Into Queue</Button>
+        <Button onClick={onEdit}>Edit</Button>
+        <Button onClick={onDuplicate}>Duplicate</Button>
+        <Button onClick={onExport}>Export</Button>
+        <Button tone="danger" onClick={onDelete}>Delete</Button>
       </div>
     </div>
   );
@@ -473,16 +440,16 @@ export function PlateListsPanel(props: PlateListsControls) {
   return (
     <div className="flex flex-col gap-3">
       {storageError && (
-        <div className="p-2 rounded border border-red-500/30 bg-red-500/10">
-          <p className="text-[10px] font-mono text-red-400 leading-snug">{storageError}</p>
+        <div className="p-2 rounded-md border border-red-500/30 bg-red-500/10">
+          <FieldError>{storageError}</FieldError>
           <div className="mt-1.5">
-            <SmallButton tone="danger" onClick={handleResetStorage}>Reset Storage</SmallButton>
+            <Button tone="danger" onClick={handleResetStorage}>Reset Storage</Button>
           </div>
         </div>
       )}
 
       {editingId === null && (
-        <SmallButton tone="primary" onClick={() => setEditingId('new')}>+ New List</SmallButton>
+        <Button tone="primary" onClick={() => setEditingId('new')}>+ New List</Button>
       )}
 
       {editingId === 'new' && (
@@ -513,7 +480,7 @@ export function PlateListsPanel(props: PlateListsControls) {
         <div>
           <Label>Saved Lists ({lists.length})</Label>
           {lists.length === 0 ? (
-            <p className="text-[10px] font-mono text-white/25">No saved lists yet.</p>
+            <EmptyState message="No saved lists yet." hint="Click + New List above to save a reusable set of plates." />
           ) : (
             <div className="flex flex-col gap-2 max-h-96 overflow-y-auto pr-1">
               {lists.map(list => (
@@ -537,8 +504,8 @@ export function PlateListsPanel(props: PlateListsControls) {
         <div>
           <Label>Import / Export</Label>
           <div className="flex flex-wrap gap-1.5">
-            <SmallButton onClick={handleExportAll} disabled={lists.length === 0}>Export All</SmallButton>
-            <SmallButton onClick={() => fileInputRef.current?.click()}>Import JSON</SmallButton>
+            <Button onClick={handleExportAll} disabled={lists.length === 0}>Export All</Button>
+            <Button onClick={() => fileInputRef.current?.click()}>Import JSON</Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -551,7 +518,7 @@ export function PlateListsPanel(props: PlateListsControls) {
             <div className="mt-1.5 text-[10px] font-mono">
               <p className="text-emerald-400">Imported {lastImportResult.importedCount} list(s).</p>
               {lastImportResult.errors.length > 0 && (
-                <div className="mt-1 max-h-20 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 px-2 py-1">
+                <div className="mt-1 max-h-20 overflow-y-auto rounded-md border border-red-500/20 bg-red-500/5 px-2 py-1">
                   {lastImportResult.errors.map((err, i) => (
                     <p key={i} className="text-red-400/80 leading-snug truncate">{err}</p>
                   ))}

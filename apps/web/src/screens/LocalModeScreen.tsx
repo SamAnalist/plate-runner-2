@@ -14,6 +14,8 @@ import type { PlateQueueControls } from '../features/queue/usePlateQueue';
 import { SimulationScene } from '../components/simulation/SimulationScene';
 import { PlateInput } from '../components/controls/PlateInput';
 import { PlateQueuePanel } from '../components/controls/PlateQueuePanel';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
 
 export const QUEUE_ACTIVE_STATUSES = ['running', 'paused', 'waiting_for_signal', 'waiting_for_next'];
 
@@ -92,13 +94,9 @@ function CollapsibleSection({
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between py-1 mb-2 group"
       >
-        <p className="text-[10px] font-semibold text-white/35 uppercase tracking-[0.16em] group-hover:text-white/55 transition-colors">
+        <p className="text-[10px] font-semibold text-white/35 uppercase tracking-[0.16em] group-hover:text-white/55 transition-colors flex items-center gap-1.5">
           {title}
-          {badge && (
-            <span className="ml-2 px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-[9px]">
-              {badge}
-            </span>
-          )}
+          {badge && <Badge tone="info">{badge}</Badge>}
         </p>
         <span className="text-white/25 text-[10px] group-hover:text-white/45 transition-colors">
           {open ? '▾' : '▸'}
@@ -314,17 +312,15 @@ function GateSection({
 
       {isWaiting && (
         <>
-          <button
+          <Button
+            variant="solid"
+            tone="warn"
+            className="w-full animate-pulse disabled:animate-none"
             onClick={openGate}
             disabled={state.isPaused}
-            className="w-full py-2.5 rounded text-sm font-mono font-bold
-              bg-yellow-500/20 border-2 border-yellow-400/70 text-yellow-300
-              hover:bg-yellow-500/35 hover:border-yellow-300 transition-all
-              disabled:opacity-30 disabled:cursor-not-allowed disabled:animate-none
-              animate-pulse"
           >
             ⬆ Send Open Signal
-          </button>
+          </Button>
           {state.isPaused && (
             <p className="text-[10px] text-cyan-400/70 font-mono text-center -mt-1.5">
               Paused — resume to send signal
@@ -346,13 +342,9 @@ function GateSection({
                 hover:bg-emerald-500/15 transition-colors">
               Open
             </button>
-            <button onClick={closeGate} disabled={!state.gateOpen}
-              className="flex-1 py-1.5 rounded text-xs font-mono font-semibold
-                border border-red-500/40 text-red-400
-                disabled:opacity-30 disabled:cursor-not-allowed
-                hover:bg-red-500/15 transition-colors">
+            <Button variant="ghost" tone="danger" className="flex-1" onClick={closeGate} disabled={!state.gateOpen}>
               Close
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -517,39 +509,31 @@ export function LocalModeScreen({
                 </span>
               </div>
               {queueActive ? (
-                <p className="py-2 text-center text-[10px] font-mono text-cyan-400/70 border border-cyan-500/20 rounded-md bg-cyan-500/5">
-                  Controlled by Plate Queue
-                </p>
+                <div className="py-2 text-center">
+                  <Badge tone="info">Controlled by Plate Queue</Badge>
+                </div>
               ) : (
                 <div className="flex gap-2">
                   {!isRunning && !isGateOpening ? (
-                    <button onClick={start}
-                      className="flex-1 py-2 rounded-md text-sm font-mono font-bold
-                        bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/60 transition-colors">
+                    <Button variant="solid" tone="primary" className="flex-1" onClick={start}>
                       {state.phase === 'done' || isAtGate ? 'Restart' : 'Start'}
-                    </button>
+                    </Button>
                   ) : (
-                    <button onClick={stop}
-                      className="flex-1 py-2 rounded-md text-sm font-mono font-bold
-                        bg-red-600/80 hover:bg-red-600 text-white border border-red-500/60 transition-colors">
+                    <Button variant="solid" tone="danger" className="flex-1" onClick={stop}>
                       Stop
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    variant="solid"
+                    tone="neutral"
                     onClick={state.isPaused ? resume : pause}
                     disabled={!state.isPaused && (state.phase === 'idle' || state.phase === 'done')}
-                    className="px-3 py-2 rounded-md text-sm font-mono font-semibold
-                      bg-white/5 hover:bg-white/10 text-white/60 hover:text-white
-                      border border-white/12 transition-colors
-                      disabled:opacity-30 disabled:cursor-not-allowed">
+                  >
                     {state.isPaused ? '⏵ Resume' : '⏸ Pause'}
-                  </button>
-                  <button onClick={reset}
-                    className="px-3 py-2 rounded-md text-sm font-mono
-                      bg-white/5 hover:bg-white/10 text-white/60 hover:text-white
-                      border border-white/12 transition-colors">
+                  </Button>
+                  <Button variant="solid" tone="neutral" onClick={reset}>
                     Reset
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -638,35 +622,21 @@ export function LocalModeScreen({
               <SectionLabel>View Modes</SectionLabel>
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
+                    variant="ghost"
+                    tone={showDebug ? 'primary' : 'neutral'}
+                    className="flex-1"
                     onClick={() => onShowDebugChange(!showDebug)}
-                    className={`
-                      flex-1 py-1.5 rounded text-xs font-mono font-semibold
-                      border transition-all
-                      ${showDebug
-                        ? 'bg-purple-600/25 border-purple-500/45 text-purple-300'
-                        : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
-                    `}
                   >
                     {showDebug ? 'Debug: ON' : 'Debug: OFF'}
-                  </button>
+                  </Button>
                 </div>
-                <button
-                  onClick={onEnterFullscreen}
-                  className="py-1.5 rounded text-xs font-mono font-semibold
-                    bg-white/5 border border-white/12 text-white/50
-                    hover:text-white/80 hover:border-white/25 transition-all"
-                >
+                <Button variant="ghost" tone="neutral" onClick={onEnterFullscreen}>
                   ⛶  Fullscreen Scene
-                </button>
-                <button
-                  onClick={onEnterCamera}
-                  className="py-1.5 rounded text-xs font-mono font-semibold
-                    bg-white/5 border border-white/12 text-white/50
-                    hover:text-white/80 hover:border-white/25 transition-all"
-                >
+                </Button>
+                <Button variant="ghost" tone="neutral" onClick={onEnterCamera}>
                   ◉  Camera Mode
-                </button>
+                </Button>
               </div>
             </div>
           </div>

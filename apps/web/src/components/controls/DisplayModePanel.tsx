@@ -1,47 +1,17 @@
 import { useEffect, useState } from 'react';
 import type { PairingRequestSummary } from '@plate-runner/shared';
-import type { DisplayCommandListenerControls } from '../../features/display/useDisplayCommandListener';
+import type { DisplayCommandListenerControls, DisplayConnectionStatus } from '../../features/display/useDisplayCommandListener';
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
+import { Badge, type BadgeTone } from '../ui/Badge';
+import { EmptyState } from '../ui/EmptyState';
+import { FieldError } from '../ui/FieldError';
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1.5">{children}</p>;
-}
-
-function SmallButton({
-  onClick,
-  disabled,
-  children,
-  tone = 'neutral',
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-  tone?: 'neutral' | 'primary' | 'danger';
-}) {
-  const toneClasses: Record<string, string> = {
-    neutral: 'border-white/12 text-white/55 hover:text-white/85 hover:border-white/25 bg-white/5',
-    primary: 'border-blue-500/60 text-blue-300 hover:bg-blue-600/20 bg-blue-600/10',
-    danger:  'border-red-500/40 text-red-400 hover:bg-red-500/15 bg-white/5',
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`
-        px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold
-        border transition-all disabled:opacity-25 disabled:cursor-not-allowed
-        ${toneClasses[tone]}
-      `}
-    >
-      {children}
-    </button>
-  );
-}
-
-const STATUS_STYLE: Record<string, string> = {
-  disconnected: 'bg-white/8 text-white/40 border-white/15',
-  connected: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  unauthorized: 'bg-red-500/15 text-red-400 border-red-500/35',
-  error: 'bg-orange-500/15 text-orange-300 border-orange-500/30',
+const CONNECTION_TONE: Record<DisplayConnectionStatus, BadgeTone> = {
+  disconnected: 'neutral',
+  connected: 'success',
+  unauthorized: 'danger',
+  error: 'danger',
 };
 
 function useCountdown(expiresAt: string | undefined) {
@@ -68,14 +38,14 @@ function PairingRequestCard({
     ? `${Math.floor(remainingMs / 60000)}:${String(Math.floor((remainingMs % 60000) / 1000)).padStart(2, '0')}`
     : 'expired';
   return (
-    <div className="px-2.5 py-2 rounded bg-white/5 border border-cyan-500/25">
+    <div className="px-2.5 py-2 rounded-md bg-white/5 border border-cyan-500/25">
       <p className="text-[11px] font-mono text-white/80">{request.controllerName}</p>
       <p className="text-[9px] font-mono text-white/30">
         Requested {new Date(request.createdAt).toLocaleTimeString()} · expires in {remainingLabel}
       </p>
       <div className="mt-1.5 flex gap-2">
-        <SmallButton tone="primary" onClick={onApprove}>Approve</SmallButton>
-        <SmallButton tone="danger" onClick={onReject}>Reject</SmallButton>
+        <Button tone="primary" onClick={onApprove}>Approve</Button>
+        <Button tone="danger" onClick={onReject}>Reject</Button>
       </div>
     </div>
   );
@@ -107,8 +77,12 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
   if (!registration) {
     return (
       <div className="flex flex-col gap-3">
+        <p className="text-[10px] font-mono text-white/30 leading-snug">
+          Register this machine as a display to receive remote plates,
+          queues, and controls from a paired Controller.
+        </p>
         <div>
-          <p className="text-[10px] text-white/40 font-mono mb-1">API Base URL</p>
+          <Label>API Base URL</Label>
           <input
             type="text" value={apiBaseUrl} onChange={e => setApiBaseUrl(e.target.value)}
             placeholder="http://localhost:8787"
@@ -116,7 +90,7 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
           />
         </div>
         <div>
-          <p className="text-[10px] text-white/40 font-mono mb-1">API Key</p>
+          <Label>API Key</Label>
           <input
             type="text" value={apiKey} onChange={e => setApiKey(e.target.value)}
             placeholder="dev-local-key"
@@ -130,10 +104,10 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
             placeholder="Entrance Display 1"
             className="w-full mb-2 px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
           />
-          <SmallButton tone="primary" onClick={() => nameInput.trim() && registerDisplay(nameInput.trim())} disabled={!nameInput.trim()}>
+          <Button tone="primary" onClick={() => nameInput.trim() && registerDisplay(nameInput.trim())} disabled={!nameInput.trim()}>
             Register Display
-          </SmallButton>
-          {registerError && <p className="mt-1.5 text-[10px] font-mono text-red-400/80">{registerError}</p>}
+          </Button>
+          {registerError && <div className="mt-1.5"><FieldError>{registerError}</FieldError></div>}
         </div>
       </div>
     );
@@ -146,14 +120,14 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
         <p className="text-xs font-mono text-white/70">{registration.displayName}</p>
         <p className="text-[9px] font-mono text-white/25 truncate">{registration.displayId}</p>
         <div className="mt-1.5">
-          <SmallButton tone="danger" onClick={forgetRegistration}>Forget Registration</SmallButton>
+          <Button tone="danger" onClick={forgetRegistration}>Forget Registration</Button>
         </div>
       </div>
 
       <div>
         <Label>Pairing Requests ({pairingRequests.length})</Label>
         {pairingRequests.length === 0 ? (
-          <p className="text-[10px] font-mono text-white/25">No pending pairing requests.</p>
+          <EmptyState message="No pending pairing requests." hint="They'll appear here when a Controller enters your pairing code." />
         ) : (
           <div className="flex flex-col gap-1.5">
             {pairingRequests.map(r => (
@@ -171,7 +145,7 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
       <div>
         <Label>Pairing Code</Label>
         {pairingCode ? (
-          <div className="text-center py-3 rounded bg-white/5 border border-white/12">
+          <div className="text-center py-3 rounded-md bg-white/5 border border-white/12">
             <p className="text-3xl font-mono font-bold tracking-[0.3em] text-cyan-300">{pairingCode.code}</p>
             <p className="mt-1 text-[10px] font-mono text-white/40">
               {remainingLabel === 'expired' ? 'Expired' : `Expires in ${remainingLabel}`}
@@ -181,32 +155,31 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
           <p className="text-[10px] font-mono text-white/30 py-2">No active code.</p>
         )}
         <div className="mt-2">
-          <SmallButton onClick={generatePairingCode}>
+          <Button tone="primary" onClick={generatePairingCode}>
             {pairingCode ? 'Regenerate Code' : 'Generate Pairing Code'}
-          </SmallButton>
+          </Button>
         </div>
-        {pairingCodeError && <p className="mt-1.5 text-[10px] font-mono text-red-400/80">{pairingCodeError}</p>}
+        {pairingCodeError && <div className="mt-1.5"><FieldError>{pairingCodeError}</FieldError></div>}
       </div>
 
       <div>
         <Label>Listener</Label>
-        <button
+        <Button
+          variant="ghost"
+          tone={enabled ? 'primary' : 'neutral'}
+          className="w-full"
           onClick={() => setEnabled(!enabled)}
-          className={`w-full py-1.5 rounded text-xs font-mono font-semibold border transition-all ${
-            enabled ? 'bg-cyan-600/25 border-cyan-500/45 text-cyan-300' : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}`}
         >
           {enabled ? '● Listening for Remote Commands' : '○ Listen for Remote Commands'}
-        </button>
+        </Button>
         <div className="mt-1.5 flex items-center gap-2">
-          <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${STATUS_STYLE[connectionStatus]}`}>
-            {connectionStatus}
-          </span>
+          <Badge tone={CONNECTION_TONE[connectionStatus]}>{connectionStatus}</Badge>
           {enabled && <span className="text-[10px] font-mono text-white/30">Pending: <span className="text-white/60">{pendingCount}</span></span>}
         </div>
         {lastCommandAt && (
           <p className="mt-1 text-[9px] font-mono text-white/25">Last command: {new Date(lastCommandAt).toLocaleTimeString()}</p>
         )}
-        {lastError && <p className="mt-1 text-[10px] font-mono text-red-400/80">{lastError}</p>}
+        {lastError && <div className="mt-1"><FieldError>{lastError}</FieldError></div>}
         <p className="mt-1.5 text-[9px] text-white/25 font-mono leading-snug">
           Polls every 1.5s, heartbeats every 20s. Keeps listening in Camera Mode / Fullscreen even though this panel isn't visible there.
         </p>
@@ -218,11 +191,11 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
           <button onClick={refreshPairings} className="text-[9px] font-mono text-white/30 hover:text-white/60">↻ refresh</button>
         </div>
         {pairings.length === 0 ? (
-          <p className="text-[10px] font-mono text-white/25">No controllers paired yet.</p>
+          <EmptyState message="No controllers paired yet." hint="Generate a pairing code above and enter it on a Controller." />
         ) : (
           <div className="flex flex-col gap-1.5">
             {pairings.map(p => (
-              <div key={p.id} className="flex items-center justify-between px-2 py-1.5 rounded bg-white/5 border border-white/10">
+              <div key={p.id} className="flex items-center justify-between px-2 py-1.5 rounded-md bg-white/5 border border-white/10">
                 <div className="min-w-0">
                   <p className="text-[10px] font-mono text-white/70 truncate">{p.controllerName ?? p.name ?? 'Unnamed'}</p>
                   <p className="text-[9px] font-mono text-white/25">
@@ -230,7 +203,7 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
                   </p>
                 </div>
                 {!p.revokedAt && (
-                  <SmallButton tone="danger" onClick={() => revokePairing(p.id)}>Revoke</SmallButton>
+                  <Button tone="danger" onClick={() => revokePairing(p.id)}>Revoke</Button>
                 )}
               </div>
             ))}

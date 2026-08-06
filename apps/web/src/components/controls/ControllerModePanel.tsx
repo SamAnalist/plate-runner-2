@@ -15,31 +15,10 @@ import {
 } from '@plate-runner/shared';
 import type { RemoteControllerControls, RemoteActionResult } from '../../features/controller/useRemoteController';
 import { parsePlateQueueInput } from '../../features/queue/plateQueueParser';
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1.5">{children}</p>;
-}
-
-function SmallButton({
-  onClick, disabled, children, tone = 'neutral',
-}: {
-  onClick: () => void; disabled?: boolean; children: React.ReactNode; tone?: 'neutral' | 'primary' | 'danger';
-}) {
-  const toneClasses: Record<string, string> = {
-    neutral: 'border-white/12 text-white/55 hover:text-white/85 hover:border-white/25 bg-white/5',
-    primary: 'border-blue-500/60 text-blue-300 hover:bg-blue-600/20 bg-blue-600/10',
-    danger:  'border-red-500/40 text-red-400 hover:bg-red-500/15 bg-white/5',
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold border transition-all disabled:opacity-25 disabled:cursor-not-allowed ${toneClasses[tone]}`}
-    >
-      {children}
-    </button>
-  );
-}
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { EmptyState } from '../ui/EmptyState';
 
 function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
@@ -64,8 +43,8 @@ function Select<T extends string>({ value, onChange, options }: { value: T; onCh
 function ActionResultBadge({ result }: { result: RemoteActionResult | null }) {
   if (!result) return null;
   return result.ok
-    ? <p className="text-[10px] font-mono text-emerald-400/80">Sent — command {result.commandId.slice(0, 8)}</p>
-    : <p className="text-[10px] font-mono text-red-400/80">{result.error}</p>;
+    ? <Badge tone="success">Sent — {result.commandId.slice(0, 8)}</Badge>
+    : <Badge tone="danger">{result.error}</Badge>;
 }
 
 export function ControllerModePanel({ controller, localLists }: { controller: RemoteControllerControls; localLists: PlateList[] }) {
@@ -129,16 +108,16 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
           <div className="flex flex-col gap-2">
             <TextInput value={controllerName} onChange={setControllerName} placeholder="Controller name (e.g. Laptop Samuel)" />
             <TextInput value={pairCode} onChange={setPairCode} placeholder="6-digit code" />
-            <SmallButton
+            <Button
               tone="primary"
               disabled={!controllerName.trim() || !/^\d{6}$/.test(pairCode.trim())}
               onClick={() => { requestPairing(controllerName.trim(), pairCode.trim()); setPairCode(''); }}
             >
               Pair
-            </SmallButton>
+            </Button>
           </div>
         ) : (
-          <div className="px-2.5 py-2 rounded bg-white/5 border border-white/10">
+          <div className="px-2.5 py-2 rounded-md bg-white/5 border border-white/10">
             {(pairingRequest.phase === 'approval_pending' || pairingRequest.phase === 'finalizing') && (
               <p className="text-[11px] font-mono text-cyan-300 animate-pulse">
                 {pairingRequest.phase === 'finalizing' ? 'Finalizing…' : `Waiting for display approval${pairingRequest.displayName ? ` (${pairingRequest.displayName})` : ''}…`}
@@ -158,9 +137,9 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
             )}
             {(pairingRequest.phase === 'paired' || pairingRequest.phase === 'rejected' || pairingRequest.phase === 'expired' || pairingRequest.phase === 'error') && (
               <div className="mt-2">
-                <SmallButton onClick={dismissPairingRequest}>
+                <Button onClick={dismissPairingRequest}>
                   {pairingRequest.phase === 'paired' ? 'Done' : 'Try Again'}
-                </SmallButton>
+                </Button>
               </div>
             )}
           </div>
@@ -170,21 +149,21 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
       <div>
         <Label>Paired Displays ({activePairings.length})</Label>
         {activePairings.length === 0 ? (
-          <p className="text-[10px] font-mono text-white/25">No displays paired yet.</p>
+          <EmptyState message="No displays paired yet." hint="Pair one above using a 6-digit code from a Display's screen." />
         ) : (
           <div className="flex flex-col gap-1.5">
             {activePairings.map(p => (
               <div
                 key={p.displayId}
                 onClick={() => setSelectedDisplayId(p.displayId)}
-                className={`flex items-center justify-between px-2 py-1.5 rounded border cursor-pointer transition-all ${
+                className={`flex items-center justify-between px-2 py-1.5 rounded-md border cursor-pointer transition-all ${
                   effectiveDisplayId === p.displayId ? 'bg-blue-600/15 border-blue-500/40' : 'bg-white/5 border-white/10 hover:border-white/20'}`}
               >
                 <div className="min-w-0">
                   <p className="text-[10px] font-mono text-white/70 truncate">{p.displayName}</p>
                   <p className="text-[9px] font-mono text-white/25">paired {new Date(p.pairedAt).toLocaleString()}</p>
                 </div>
-                <SmallButton tone="danger" onClick={() => forgetPairing(p.displayId)}>Remove</SmallButton>
+                <Button tone="danger" onClick={() => forgetPairing(p.displayId)}>Remove</Button>
               </div>
             ))}
           </div>
@@ -206,7 +185,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
               </div>
               <Select value={placement} onChange={setPlacement} options={getPlacementsForDirection(direction)} />
               <Select value={gateMode} onChange={setGateMode} options={GATE_MODES} />
-              <SmallButton
+              <Button
                 tone="primary"
                 onClick={() => void sendPlate(effectiveDisplayId, {
                   plate, direction, detectorPlacement: placement, vehicleColor,
@@ -214,7 +193,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
                 }).then(setPlateResult)}
               >
                 Send Plate
-              </SmallButton>
+              </Button>
               <ActionResultBadge result={plateResult} />
             </div>
           </div>
@@ -234,7 +213,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
               </p>
             )}
             <div className="mt-2">
-              <SmallButton
+              <Button
                 tone="primary"
                 disabled={queuePreview.valid.length === 0}
                 onClick={() => void sendQueue(effectiveDisplayId, {
@@ -243,7 +222,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
                 }).then(setQueueResult)}
               >
                 Send Queue
-              </SmallButton>
+              </Button>
             </div>
             <ActionResultBadge result={queueResult} />
           </div>
@@ -251,11 +230,11 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
           <div>
             <Label>Control → {target?.displayName}</Label>
             <div className="grid grid-cols-3 gap-1.5">
-              <SmallButton onClick={() => void pause(effectiveDisplayId).then(setControlResult)}>Pause</SmallButton>
-              <SmallButton onClick={() => void resume(effectiveDisplayId).then(setControlResult)}>Resume</SmallButton>
-              <SmallButton onClick={() => void stop(effectiveDisplayId).then(setControlResult)}>Stop</SmallButton>
-              <SmallButton onClick={() => void skipCurrent(effectiveDisplayId).then(setControlResult)}>Skip</SmallButton>
-              <SmallButton onClick={() => void openGate(effectiveDisplayId).then(setControlResult)}>Open Gate</SmallButton>
+              <Button onClick={() => void pause(effectiveDisplayId).then(setControlResult)}>Pause</Button>
+              <Button onClick={() => void resume(effectiveDisplayId).then(setControlResult)}>Resume</Button>
+              <Button onClick={() => void stop(effectiveDisplayId).then(setControlResult)}>Stop</Button>
+              <Button onClick={() => void skipCurrent(effectiveDisplayId).then(setControlResult)}>Skip</Button>
+              <Button onClick={() => void openGate(effectiveDisplayId).then(setControlResult)}>Open Gate</Button>
             </div>
             <div className="mt-1.5"><ActionResultBadge result={controlResult} /></div>
           </div>
@@ -263,7 +242,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
           <div>
             <Label>Send List → {target?.displayName}</Label>
             {localLists.length === 0 ? (
-              <p className="text-[10px] font-mono text-white/25">No local Plate Lists — create one in Local Mode first.</p>
+              <EmptyState message="No local Plate Lists." hint="Create one from the Plate Lists screen first." />
             ) : (
               <div className="flex flex-col gap-2">
                 <select
@@ -274,7 +253,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
                   <option value="">Select a list…</option>
                   {localLists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.plates.length} plates)</option>)}
                 </select>
-                <SmallButton
+                <Button
                   tone="primary"
                   disabled={!selectedListId}
                   onClick={() => {
@@ -284,7 +263,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
                   }}
                 >
                   Run Remote List
-                </SmallButton>
+                </Button>
                 <ActionResultBadge result={listResult} />
               </div>
             )}

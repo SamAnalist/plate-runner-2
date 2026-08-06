@@ -1,45 +1,14 @@
-import type { ApiCommandListenerControls } from '../../features/api/useApiCommandListener';
+import type { ApiCommandListenerControls, ApiConnectionStatus } from '../../features/api/useApiCommandListener';
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
+import { Badge, type BadgeTone } from '../ui/Badge';
+import { FieldError } from '../ui/FieldError';
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1.5">{children}</p>;
-}
-
-function SmallButton({
-  onClick,
-  disabled,
-  children,
-  tone = 'neutral',
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-  tone?: 'neutral' | 'primary' | 'danger';
-}) {
-  const toneClasses: Record<string, string> = {
-    neutral: 'border-white/12 text-white/55 hover:text-white/85 hover:border-white/25 bg-white/5',
-    primary: 'border-blue-500/60 text-blue-300 hover:bg-blue-600/20 bg-blue-600/10',
-    danger:  'border-red-500/40 text-red-400 hover:bg-red-500/15 bg-white/5',
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`
-        px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold
-        border transition-all disabled:opacity-25 disabled:cursor-not-allowed
-        ${toneClasses[tone]}
-      `}
-    >
-      {children}
-    </button>
-  );
-}
-
-const STATUS_STYLE: Record<string, string> = {
-  disconnected: 'bg-white/8 text-white/40 border-white/15',
-  connected: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  unauthorized: 'bg-red-500/15 text-red-400 border-red-500/35',
-  error: 'bg-orange-500/15 text-orange-300 border-orange-500/30',
+const CONNECTION_TONE: Record<ApiConnectionStatus, BadgeTone> = {
+  disconnected: 'neutral',
+  connected: 'success',
+  unauthorized: 'danger',
+  error: 'danger',
 };
 
 export function LocalApiPanel({ listener }: { listener: ApiCommandListenerControls }) {
@@ -51,7 +20,7 @@ export function LocalApiPanel({ listener }: { listener: ApiCommandListenerContro
         <Label>Connection</Label>
         <div className="flex flex-col gap-2">
           <div>
-            <p className="text-[10px] text-white/40 font-mono mb-1">API Base URL</p>
+            <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1">API Base URL</p>
             <input
               type="text"
               value={apiBaseUrl}
@@ -61,7 +30,7 @@ export function LocalApiPanel({ listener }: { listener: ApiCommandListenerContro
             />
           </div>
           <div>
-            <p className="text-[10px] text-white/40 font-mono mb-1">API Key</p>
+            <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1">API Key</p>
             <input
               type="text"
               value={apiKey}
@@ -71,24 +40,23 @@ export function LocalApiPanel({ listener }: { listener: ApiCommandListenerContro
             />
           </div>
           <div className="flex items-center gap-2">
-            <SmallButton onClick={testConnection}>Test Connection</SmallButton>
-            <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${STATUS_STYLE[connectionStatus]}`}>
-              {connectionStatus}
-            </span>
+            <Button tone="primary" onClick={testConnection}>Test Connection</Button>
+            <Badge tone={CONNECTION_TONE[connectionStatus]}>{connectionStatus}</Badge>
           </div>
-          {lastError && <p className="text-[10px] font-mono text-red-400/80">{lastError}</p>}
+          {lastError && <FieldError>{lastError}</FieldError>}
         </div>
       </div>
 
       <div>
         <Label>Listener</Label>
-        <button
+        <Button
+          variant="ghost"
+          tone={enabled ? 'primary' : 'neutral'}
+          className="w-full"
           onClick={() => setEnabled(!enabled)}
-          className={`w-full py-1.5 rounded text-xs font-mono font-semibold border transition-all ${
-            enabled ? 'bg-cyan-600/25 border-cyan-500/45 text-cyan-300' : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}`}
         >
           {enabled ? '● Listening for API Commands' : '○ Listen for API Commands'}
-        </button>
+        </Button>
         {enabled && (
           <p className="mt-1.5 text-[10px] font-mono text-white/30">
             Pending commands: <span className="text-white/60">{pendingCount}</span>

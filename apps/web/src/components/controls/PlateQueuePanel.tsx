@@ -2,61 +2,29 @@ import { useMemo, useState } from 'react';
 import type { PlateQueueItemStatus, PlateQueueMode } from '@plate-runner/shared';
 import type { PlateQueueControls } from '../../features/queue/usePlateQueue';
 import { parsePlateQueueInput } from '../../features/queue/plateQueueParser';
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
+import { Badge, type BadgeTone } from '../ui/Badge';
+import { FieldError } from '../ui/FieldError';
 
-// ─── Shared bits (mirrors ControlPanel's local primitives) ─────────────────
-
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] text-white/35 uppercase tracking-[0.16em] mb-1.5">{children}</p>
-  );
-}
-
-function SmallButton({
-  onClick,
-  disabled,
-  children,
-  tone = 'neutral',
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-  tone?: 'neutral' | 'primary' | 'danger' | 'warn';
-}) {
-  const toneClasses: Record<string, string> = {
-    neutral: 'border-white/12 text-white/55 hover:text-white/85 hover:border-white/25 bg-white/5',
-    primary: 'border-blue-500/60 text-blue-300 hover:bg-blue-600/20 bg-blue-600/10',
-    danger:  'border-red-500/40 text-red-400 hover:bg-red-500/15 bg-white/5',
-    warn:    'border-yellow-400/50 text-yellow-300 hover:bg-yellow-500/15 bg-white/5',
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`
-        px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold
-        border transition-all disabled:opacity-25 disabled:cursor-not-allowed
-        ${toneClasses[tone]}
-      `}
-    >
-      {children}
-    </button>
-  );
-}
-
-const STATUS_BADGE: Record<PlateQueueItemStatus, string> = {
-  pending:            'bg-white/8 text-white/40 border-white/12',
-  running:            'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse',
-  waiting_for_signal: 'bg-yellow-500/20 text-yellow-300 border-yellow-400/40 animate-pulse',
-  completed:          'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  skipped:            'bg-white/8 text-white/35 border-white/15 line-through',
-  failed:             'bg-red-500/15 text-red-400 border-red-500/35',
+const STATUS_TONE: Record<PlateQueueItemStatus, BadgeTone> = {
+  pending: 'neutral',
+  running: 'success',
+  waiting_for_signal: 'warning',
+  completed: 'info',
+  skipped: 'neutral',
+  failed: 'danger',
 };
 
 function StatusBadge({ status }: { status: PlateQueueItemStatus }) {
   return (
-    <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border shrink-0 ${STATUS_BADGE[status]}`}>
+    <Badge
+      tone={STATUS_TONE[status]}
+      pulse={status === 'running' || status === 'waiting_for_signal'}
+      className={`shrink-0 ${status === 'skipped' ? 'line-through' : ''}`}
+    >
       {status}
-    </span>
+    </Badge>
   );
 }
 
@@ -111,15 +79,15 @@ export function PlateQueuePanel(props: PlateQueueControls) {
             {' · '}
             invalid <span className="text-red-400">{preview.invalid.length}</span>
           </span>
-          <SmallButton tone="primary" onClick={() => loadQueue(raw)} disabled={preview.total === 0}>
+          <Button tone="primary" onClick={() => loadQueue(raw)} disabled={preview.total === 0}>
             Apply Queue
-          </SmallButton>
+          </Button>
         </div>
         {loadError && (
-          <p className="mt-1 text-[10px] text-red-400 font-mono leading-snug">{loadError}</p>
+          <div className="mt-1"><FieldError>{loadError}</FieldError></div>
         )}
         {preview.invalid.length > 0 && (
-          <div className="mt-1.5 max-h-16 overflow-y-auto rounded border border-red-500/20 bg-red-500/5 px-2 py-1">
+          <div className="mt-1.5 max-h-16 overflow-y-auto rounded-md border border-red-500/20 bg-red-500/5 px-2 py-1">
             {preview.invalid.slice(0, 20).map((inv, i) => (
               <p key={i} className="text-[9px] font-mono text-red-400/80 leading-snug truncate">
                 "{inv.raw}" — {inv.reason}
@@ -145,7 +113,7 @@ export function PlateQueuePanel(props: PlateQueueControls) {
                 <button
                   key={m}
                   onClick={() => setQueueConfig({ ...queueConfig, mode: m })}
-                  className={`px-2 py-1 rounded text-[10px] font-mono font-semibold border transition-all ${
+                  className={`px-2.5 py-1.5 rounded text-xs font-mono font-semibold border transition-all ${
                     queueConfig.mode === m
                       ? 'bg-blue-600/80 border-blue-500/70 text-white'
                       : 'bg-white/5 border-white/12 text-white/50 hover:text-white/80'}`}
@@ -169,15 +137,14 @@ export function PlateQueuePanel(props: PlateQueueControls) {
             />
           </div>
 
-          <button
+          <Button
+            variant="ghost"
+            tone={queueConfig.loop ? 'primary' : 'neutral'}
+            className="w-full"
             onClick={() => setQueueConfig({ ...queueConfig, loop: !queueConfig.loop })}
-            className={`w-full py-1.5 rounded text-xs font-mono font-semibold border transition-all ${
-              queueConfig.loop
-                ? 'bg-cyan-600/25 border-cyan-500/45 text-cyan-300'
-                : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}`}
           >
             {queueConfig.loop ? '↻ Loop: ON' : '↻ Loop: OFF'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -206,17 +173,17 @@ export function PlateQueuePanel(props: PlateQueueControls) {
       <div>
         <Label>Playback Controls</Label>
         <div className="grid grid-cols-2 gap-1.5">
-          <SmallButton tone="primary" onClick={runQueue} disabled={!canRun}>▶ Run Queue</SmallButton>
+          <Button tone="primary" onClick={runQueue} disabled={!canRun}>▶ Run Queue</Button>
           {canPause ? (
-            <SmallButton tone="warn" onClick={pauseQueue} disabled={!canPause}>⏸ Pause Vehicle</SmallButton>
+            <Button tone="warn" onClick={pauseQueue} disabled={!canPause}>⏸ Pause Vehicle</Button>
           ) : (
-            <SmallButton tone="warn" onClick={resumeQueue} disabled={!canResume}>⏵ Resume Vehicle</SmallButton>
+            <Button tone="warn" onClick={resumeQueue} disabled={!canResume}>⏵ Resume Vehicle</Button>
           )}
-          <SmallButton tone="danger" onClick={stopQueue} disabled={!canStop}>■ Stop Queue</SmallButton>
-          <SmallButton onClick={skipCurrent} disabled={!canSkip}>⏭ Skip Current</SmallButton>
-          <SmallButton onClick={nextVehicle} disabled={!canNext}>⏩ Next Vehicle</SmallButton>
-          <SmallButton onClick={resetQueue} disabled={!canReset}>↺ Reset Status</SmallButton>
-          <SmallButton tone="danger" onClick={clearQueue} disabled={!canClear}>✕ Clear Queue</SmallButton>
+          <Button tone="danger" onClick={stopQueue} disabled={!canStop}>■ Stop Queue</Button>
+          <Button onClick={skipCurrent} disabled={!canSkip}>⏭ Skip Current</Button>
+          <Button onClick={nextVehicle} disabled={!canNext}>⏩ Next Vehicle</Button>
+          <Button onClick={resetQueue} disabled={!canReset}>↺ Reset Status</Button>
+          <Button tone="danger" onClick={clearQueue} disabled={!canClear}>✕ Clear Queue</Button>
         </div>
         <p className="mt-1.5 text-[9px] text-white/25 font-mono leading-snug">
           Pause freezes the current vehicle in place — motion, gate arm, and timers all stop until Resume.
@@ -231,7 +198,7 @@ export function PlateQueuePanel(props: PlateQueueControls) {
             {items.map((item, i) => (
               <div
                 key={item.id}
-                className={`flex items-center gap-2 px-2 py-1 rounded text-[10px] font-mono
+                className={`flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-mono
                   ${i === currentIndex ? 'bg-white/8 border border-white/15' : 'bg-white/3'}`}
               >
                 <span className="text-white/25 w-6 shrink-0 text-right">{i + 1}.</span>

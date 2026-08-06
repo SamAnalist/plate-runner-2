@@ -3,6 +3,7 @@ import type { SimulationControls } from '../hooks/useSimulation';
 import type { DisplayCommandListenerControls } from '../features/display/useDisplayCommandListener';
 import { SimulationScene } from '../components/simulation/SimulationScene';
 import { DisplayModePanel } from '../components/controls/DisplayModePanel';
+import { Button } from '../components/ui/Button';
 
 interface DisplayModeScreenProps {
   config: SimulationConfig;
@@ -35,22 +36,12 @@ export function DisplayModeScreen({
             <DisplayModePanel listener={displayCommandListener} />
           </div>
           <div className="px-4 py-3 border-t border-white/8 shrink-0 flex flex-col gap-1.5">
-            <button
-              onClick={onEnterCamera}
-              className="py-1.5 rounded text-xs font-mono font-semibold
-                bg-white/5 border border-white/12 text-white/50
-                hover:text-white/80 hover:border-white/25 transition-all"
-            >
+            <Button variant="ghost" tone="neutral" onClick={onEnterCamera}>
               ◉  Camera Mode
-            </button>
-            <button
-              onClick={onEnterFullscreen}
-              className="py-1.5 rounded text-xs font-mono font-semibold
-                bg-white/5 border border-white/12 text-white/50
-                hover:text-white/80 hover:border-white/25 transition-all"
-            >
+            </Button>
+            <Button variant="ghost" tone="neutral" onClick={onEnterFullscreen}>
               ⛶  Fullscreen Scene
-            </button>
+            </Button>
           </div>
         </div>
       </aside>
