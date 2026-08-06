@@ -2175,3 +2175,52 @@ sync, no render/scene work — pure pairing hardening.
 - If real multi-device LAN testing surfaces a need for a controller to
   cancel its own pending request, that's a small, additive follow-up (a
   `POST /api/controllers/pairing-requests/:id/cancel` mirroring `reject`).
+
+---
+
+## Real LAN Manual Testing — Validation Session
+
+Not a new macro phase — a support/debugging session validating the "Real
+LAN Manual Testing Readiness" work with actual physical hardware (a Mac
+running the backend + frontend, a phone as the second device, connected via
+the phone's own personal hotspot after a router-level client-isolation
+issue ruled out testing on the original home network).
+
+### Result
+
+Full Display ↔ Controller remote-control flow confirmed working
+end-to-end across two real devices: pairing request → approval → finalize
+→ `Send Plate` / `Send Queue` / `Pause` / `Resume` / `Open Gate` / `Stop`,
+Camera Mode keeping the listener active with the panel hidden, and a
+backend restart preserving the display/pairing/token without needing to
+re-pair.
+
+### Bugs found and fixed
+
+1. **Vite dev server wasn't LAN-reachable** — `apps/web/vite.config.ts` had
+   no `server.host` config, so `pnpm dev`/`pnpm dev:web` only bound to
+   `localhost`, unlike the backend (which already bound `0.0.0.0`
+   unconditionally). A second device could reach the backend but couldn't
+   load the frontend page at all. Fixed with `server: { host: true }`.
+   Commit `6243cfd`.
+2. **Documentation gap**: on iOS Safari, a CORS-rejected request (origin
+   missing from `PLATE_RUNNER_CORS_ORIGINS`) surfaces as the generic "Load
+   failed" — no mention of CORS anywhere, easy to misdiagnose as a
+   connectivity problem. Documented the exact wording plus a `curl -X
+   OPTIONS` diagnostic command in `MANUAL_TESTING_GUIDE.md`'s
+   troubleshooting table. Commit `f85ce24`.
+
+Neither required touching pairing logic, the API, or any architecture —
+both were config/docs-level, per this session's explicit constraints (no
+new features, no automated tests, no refactors).
+
+### Known limitation confirmed in practice
+
+Router-level client/AP isolation (common on ISP-provided routers) can
+silently block device-to-device LAN traffic even when both devices show
+the same Wi-Fi network — symptoms look identical to a firewall or CORS
+problem but aren't fixable from the app side. Workaround used here: a
+phone personal hotspot, where the phone itself is the access point and
+isolation between "itself and a connected client" doesn't apply. Worth
+keeping in mind for anyone else running this same test on a network they
+don't control.
