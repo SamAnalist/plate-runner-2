@@ -9,7 +9,7 @@ export function ExecutionHistoryScreen({ history }: { history: ExecutionHistoryC
           Execution History
         </h1>
         <p className="text-xs text-white/35 font-mono mt-1">
-          Review local execution logs.
+          A record of every past Plate List run.
         </p>
       </div>
       <ExecutionHistoryPanel history={history} />

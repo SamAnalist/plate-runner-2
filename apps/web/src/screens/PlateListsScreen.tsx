@@ -22,7 +22,7 @@ export function PlateListsScreen({ plateLists, onNavigateToLocal }: PlateListsSc
           Plate Lists
         </h1>
         <p className="text-xs text-white/35 font-mono mt-1">
-          Create, import, export, and run saved plate lists.
+          Create, import, export, and run saved sets of plates.
         </p>
       </div>
       <PlateListsPanel {...withNavigateOnRun} />

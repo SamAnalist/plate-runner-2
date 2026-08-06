@@ -25,7 +25,7 @@ export function SchedulerScreen({ scheduler, lists, queueActive, onNavigateToLoc
           Scheduler
         </h1>
         <p className="text-xs text-white/35 font-mono mt-1">
-          Schedule saved lists to run automatically.
+          Run saved Plate Lists automatically, on a schedule.
         </p>
       </div>
       <SchedulerPanel scheduler={withNavigateOnRun} lists={lists} queueActive={queueActive} />

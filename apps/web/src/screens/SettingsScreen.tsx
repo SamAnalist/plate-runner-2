@@ -59,7 +59,7 @@ export function SettingsScreen({
           Settings / API
         </h1>
         <p className="text-xs text-white/35 font-mono mt-1">
-          Configure API connection and local listener.
+          API connection, System Status, Screen Saver, backups, and local storage.
         </p>
       </div>
 

@@ -14,6 +14,7 @@ import type { PlateQueueControls } from '../features/queue/usePlateQueue';
 import { SimulationScene } from '../components/simulation/SimulationScene';
 import { PlateInput } from '../components/controls/PlateInput';
 import { PlateQueuePanel } from '../components/controls/PlateQueuePanel';
+import { SceneQuickControls } from '../components/simulation/SceneQuickControls';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 
@@ -389,13 +390,24 @@ export function LocalModeScreen({
 
   return (
     <div className="flex h-full">
-      <div className="flex-1 flex items-center justify-center p-6 min-w-0">
+      <div className="relative flex-1 flex items-center justify-center p-6 min-w-0">
         <SimulationScene
           config={config}
           simulation={simulation}
           showDebug={showDebug}
           showAnchorOverlay={showAnchorOverlay}
           showMotionPathOverlay={showMotionPathOverlay}
+        />
+        <SceneQuickControls
+          isRunning={isRunning && !isGateOpening}
+          isPaused={state.isPaused}
+          isGateOpening={isGateOpening}
+          isDone={state.phase === 'done'}
+          onStart={start}
+          onPause={pause}
+          onResume={resume}
+          canSkip={queueActive}
+          onSkip={plateQueue.skipCurrent}
         />
       </div>
       <aside className="w-72 shrink-0 border-l border-white/8 overflow-y-auto">

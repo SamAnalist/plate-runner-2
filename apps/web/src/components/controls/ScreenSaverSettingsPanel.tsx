@@ -20,9 +20,10 @@ export function ScreenSaverSettingsPanel({ screenSaver }: { screenSaver: ScreenS
     <div className="flex flex-col gap-3">
       <Label>Screen Saver</Label>
       <p className="text-[9px] font-mono text-white/25 leading-snug -mt-1.5">
-        Shows a full-screen, CSS-only animation after a period of inactivity —
-        useful when this screen stays open for a camera or display for a long
-        time. Any activity, including a remote command, dismisses it.
+        Shows a lightweight full-screen animation after a period of
+        inactivity — useful when this screen is left open for a camera or
+        as a Display for a long time. Any activity, including a remote
+        command, dismisses it.
       </p>
 
       <Button

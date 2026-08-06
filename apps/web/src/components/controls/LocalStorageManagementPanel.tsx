@@ -51,8 +51,8 @@ export function LocalStorageManagementPanel({
     },
     {
       key: 'remote',
-      title: 'Remote Pairings local credentials',
-      description: 'Forgets this Controller\'s paired displays and this Display\'s own registration. You will need to re-pair afterward.',
+      title: 'Remote Pairing Credentials',
+      description: 'Forgets this Controller\'s paired Displays and this Display\'s own registration. You will need to re-pair afterward.',
       confirmMessage: 'Reset remote pairing credentials? You will need to register/re-pair again.',
       onReset: onResetRemoteCredentials,
       danger: true,
