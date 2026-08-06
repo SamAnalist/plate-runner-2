@@ -138,11 +138,13 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
 
     // End of queue reached.
     if (queueConfigRef.current.loop && list.length > 0) {
-      setItems(prev => prev.map(it => ({ ...it, status: 'pending' })));
       if (queueConfigRef.current.mode === 'manual_next') {
-        setCurrentIndex(0);
+        // Defer the actual reset-and-restart to nextVehicle() — currentIndex stays put
+        // so nextVehicle's `currentIndex + 1` math has a single, consistent meaning
+        // regardless of whether waiting_for_next was reached via completion or a loop wrap.
         setQueueStatus('waiting_for_next');
       } else {
+        setItems(prev => prev.map(it => ({ ...it, status: 'pending' })));
         setQueueStatus('running');
         startItemAt(0);
       }
@@ -281,11 +283,33 @@ export function usePlateQueue({ config, onConfigChange, simulation }: UsePlateQu
     advance();
   }, [applyItemStatus, cancelCurrentVehicle, clearGapTimer, advance]);
 
+  /**
+   * Explicitly moves to the next item — distinct from advance() (which only
+   * *decides* whether to auto-continue or pause for confirmation after an
+   * item finishes). nextVehicle always actually starts the next item; it
+   * must not delegate to advance(), which in manual_next mode would just
+   * re-set status back to waiting_for_next instead of progressing.
+   */
   const nextVehicle = useCallback(() => {
     if (queueStatusRef.current !== 'waiting_for_next') return;
-    setQueueStatus('running');
-    advance();
-  }, [advance]);
+    const list = itemsRef.current;
+    const next = currentIndexRef.current + 1;
+
+    if (next < list.length) {
+      setQueueStatus('running');
+      startItemAt(next);
+      return;
+    }
+
+    if (queueConfigRef.current.loop && list.length > 0) {
+      const resetItems = list.map(it => ({ ...it, status: 'pending' as PlateQueueItemStatus }));
+      setItems(resetItems);
+      setQueueStatus('running');
+      startItemAt(0, resetItems);
+    } else {
+      setQueueStatus('completed');
+    }
+  }, [startItemAt]);
 
   const clearQueue = useCallback(() => {
     clearGapTimer();

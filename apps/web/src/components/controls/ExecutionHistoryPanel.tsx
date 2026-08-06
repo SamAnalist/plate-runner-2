@@ -107,6 +107,12 @@ export function ExecutionHistoryPanel({ history }: { history: ExecutionHistoryCo
     }
   }
 
+  function handleResetStorage() {
+    if (window.confirm('Reset execution history storage? All saved history will be permanently deleted.')) {
+      clearHistory();
+    }
+  }
+
   function handleExport() {
     downloadJSON('plate-runner-execution-history.json', exportHistoryToJSON());
   }
@@ -117,9 +123,12 @@ export function ExecutionHistoryPanel({ history }: { history: ExecutionHistoryCo
   return (
     <div className="flex flex-col gap-3">
       {storageError && (
-        <p className="text-[10px] font-mono text-red-400 leading-snug p-2 rounded border border-red-500/30 bg-red-500/10">
-          {storageError}
-        </p>
+        <div className="p-2 rounded border border-red-500/30 bg-red-500/10">
+          <p className="text-[10px] font-mono text-red-400 leading-snug">{storageError}</p>
+          <div className="mt-1.5">
+            <SmallButton tone="danger" onClick={handleResetStorage}>Reset Storage</SmallButton>
+          </div>
+        </div>
       )}
 
       <div className="flex gap-1.5">
