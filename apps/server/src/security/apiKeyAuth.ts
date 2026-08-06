@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { timingSafeEqualStrings } from './timingSafeCompare';
 
 /**
  * Checks x-api-key, falling back to `Authorization: Bearer <key>`. Replies
@@ -14,7 +15,7 @@ export function createApiKeyAuth(apiKey: string) {
       : undefined;
     const providedKey = (typeof headerKey === 'string' ? headerKey : undefined) ?? bearerKey;
 
-    if (!providedKey || providedKey !== apiKey) {
+    if (!providedKey || !timingSafeEqualStrings(providedKey, apiKey)) {
       return reply.code(401).send({ ok: false, error: 'unauthorized' });
     }
   };

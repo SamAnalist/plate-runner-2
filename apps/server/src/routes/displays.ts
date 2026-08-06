@@ -19,8 +19,11 @@ export async function registerDisplaysRoutes(
   displayService: DisplayService,
   pairingService: PairingService,
   commandService: CommandService,
+  pairingRateLimitPerMinute: number,
 ): Promise<void> {
-  fastify.post('/displays/register', async (request, reply) => {
+  fastify.post('/displays/register', {
+    config: { rateLimit: { max: pairingRateLimitPerMinute, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
     const body = (request.body ?? {}) as Record<string, unknown>;
     const result = displayService.register(body.name);
     if (!result.ok) return reply.code(400).send({ ok: false, error: result.error });
@@ -37,7 +40,7 @@ export async function registerDisplaysRoutes(
     });
 
     scope.post('/displays/:displayId/pairing-code', {
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: pairingRateLimitPerMinute, timeWindow: '1 minute' } },
     }, async (request, reply) => {
       const { displayId } = request.params as { displayId: string };
       const result = pairingService.requestCode(displayId);

@@ -28,9 +28,15 @@ const CONTROL_TYPES: { path: string; type: SimulationCommandType }[] = [
  * local /api/simulate* routes. controllerAuth already verified the token
  * belongs to a non-revoked pairing for exactly this displayId.
  */
-export async function registerRemoteRoutes(fastify: FastifyInstance, commandService: CommandService, remoteRepo: RemoteRepo): Promise<void> {
-  // Stricter than the general 100/min — remote command creation is a more sensitive action.
-  const REMOTE_RATE_LIMIT = { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } };
+export async function registerRemoteRoutes(
+  fastify: FastifyInstance,
+  commandService: CommandService,
+  remoteRepo: RemoteRepo,
+  remoteRateLimitPerMinute: number,
+): Promise<void> {
+  // Stricter than the general limit — remote command creation is a more sensitive action.
+  // Configurable via PLATE_RUNNER_RATE_LIMIT_REMOTE_PER_MIN (default 30).
+  const REMOTE_RATE_LIMIT = { config: { rateLimit: { max: remoteRateLimitPerMinute, timeWindow: '1 minute' } } };
 
   await fastify.register(async (scope) => {
     scope.addHook('preHandler', createControllerAuth(remoteRepo));

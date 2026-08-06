@@ -14,9 +14,10 @@ export async function registerControllersRoutes(
   fastify: FastifyInstance,
   pairingService: PairingService,
   failedAttempts: FailedAttemptsTracker,
+  pairingRateLimitPerMinute: number,
 ): Promise<void> {
   fastify.post('/controllers/pair', {
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    config: { rateLimit: { max: pairingRateLimitPerMinute, timeWindow: '1 minute' } },
   }, async (request, reply) => {
     if (failedAttempts.isBlocked(request.ip)) {
       return reply.code(429).send({ ok: false, error: 'too_many_failed_attempts' });

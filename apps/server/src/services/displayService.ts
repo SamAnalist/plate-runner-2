@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DisplayDevice, DevicePairingSummary } from '@plate-runner/shared';
 import type { RemoteRepo } from '../storage/remoteRepo';
 import { generateSecureToken, hashToken } from '../security/tokens';
+import { timingSafeEqualStrings } from '../security/timingSafeCompare';
 import { validateName } from './validation';
 
 interface ServiceLogger {
@@ -49,7 +50,7 @@ export function createDisplayService(repo: RemoteRepo, logger: ServiceLogger) {
     if (!secret) return false;
     const display = repo.getDisplayById(displayId);
     if (!display) return false;
-    return hashToken(secret) === display.secretHash;
+    return timingSafeEqualStrings(hashToken(secret), display.secretHash);
   }
 
   function heartbeat(displayId: string): void {
