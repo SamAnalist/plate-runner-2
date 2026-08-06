@@ -23,6 +23,7 @@ import { registerCommandsRoutes } from './routes/commands';
 import { registerListsRoutes } from './routes/lists';
 import { registerDisplaysRoutes } from './routes/displays';
 import { registerControllersRoutes } from './routes/controllers';
+import { registerRemoteRoutes } from './routes/remote';
 
 async function main() {
   const config = loadConfig();
@@ -72,6 +73,7 @@ async function main() {
     await registerListsRoutes(apiScope, listService, commandService);
     await registerDisplaysRoutes(apiScope, displayService, pairingService, commandService);
     await registerControllersRoutes(apiScope, pairingService);
+    await registerRemoteRoutes(apiScope, commandService, remoteRepo);
   }, { prefix: '/api' });
 
   try {
