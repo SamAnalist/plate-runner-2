@@ -17,7 +17,7 @@ Backward Compatibility below).
 | | 6-digit pairing code | `displaySecret` / `controllerToken` |
 |---|---|---|
 | Purpose | One-time claim ticket | The actual, long-lived credential |
-| Lifetime | 5 minutes (same TTL covers the whole request→approve→finalize flow) | Until revoked, or — for `controllerToken` only, since the Security Hardening phase — until an optional `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` expiry passes (unset = never expires, the original behavior; `displaySecret` has no expiry option) |
+| Lifetime | 5 minutes (same TTL covers the whole request→approve→finalize flow) | Until revoked, or until an optional TTL expiry passes — `controllerToken` via `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` (since the Security Hardening phase), `displaySecret` via `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS` (since the Display Secret Lifecycle Hardening phase). Both unset = never expires. |
 | Generated with | `crypto.randomInt` | `crypto.randomBytes(32)` (256 bits) |
 | Stored server-side as | Plaintext (short-lived, low stakes) | SHA-256 hash only — **never plaintext** |
 | Shown to the user | Yes, large on the Display's screen | Once, at finalize time, then never again |
@@ -137,6 +137,40 @@ controller-authenticated request with that token is checked against
 or cache to invalidate. Verified again this phase against a
 finalize-created pairing (not just Phase 5's auto-approve-created ones).
 
+## Display revocation cascades to its pairings (Display Secret Lifecycle Hardening)
+
+`POST /api/displays/:displayId/revoke` (display-secret-authenticated) does
+more than mark the display itself revoked (see SECURITY_NOTES.md's
+"Display secret lifecycle" section for the display-secret side of this).
+It also cascades to everything that display paired with:
+
+- Every `device_pairings` row for that display gets its `revokedAt` set
+  (`revokeAllPairingsForDisplay`) — any controller still holding a token
+  for this display is rejected on its very next request.
+- Any live/unconsumed `pairing_sessions` row for that display (i.e. not
+  already `used`/`rejected`/`expired`) is transitioned to `cancelled`
+  (`cancelActivePairingSessionsForDisplay`) — this is the first code path
+  that actually sets the `cancelled` `PairingSessionStatus` value; it was
+  previously modeled in the shared type but unreachable (see the "Low"
+  risk entry for it in `SECURITY_AUDIT_RAILWAY_READINESS.md`, now
+  resolved).
+
+**Why cascade rather than leave pairings dangling:** revoking a display is
+meant to mean "this display is gone, nothing should be able to talk to it
+anymore." Leaving its existing controller pairings valid would defeat that
+— a controller could keep sending remote commands to a `displayId` whose
+owner explicitly revoked it. A pending pairing request left in
+`approval_pending` against a revoked display would also never get a
+decision, so cancelling it lets a waiting controller's poll resolve to a
+terminal state instead of hanging until the 5-minute TTL expires on its
+own.
+
+**Design payoff — zero changes needed in `controllerAuth.ts`:** because
+cascading revocation flips `device_pairings.revokedAt`, the existing
+controller-auth check (`pairing.revokedAt` → `401`) already rejects any
+token for a revoked display without any new code path. The cascade was
+implemented entirely in the display-revoke handler and the repo layer.
+
 ## Controller auth on every remote request
 
 Unchanged from Phase 5: `x-controller-token` (or `Authorization: Bearer`)
@@ -200,9 +234,11 @@ display/pairing reads still succeed with no errors.
   `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` is set, in which case they also
   stop authenticating (`401 token_expired`) once that TTL passes — empty/
   unset by default, recommended 30–90 days for a public deployment (see
-  `RAILWAY_DEPLOYMENT_PLAN.md`). Display secrets have no equivalent TTL
-  or revocation path at all — flagged as a Medium risk in
-  `SECURITY_AUDIT_RAILWAY_READINESS.md`.
+  `RAILWAY_DEPLOYMENT_PLAN.md`). Display secrets now have the same
+  optional-TTL and explicit-revocation treatment via
+  `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS` and `POST
+  /api/displays/:displayId/{rotate-secret,revoke}` — see
+  SECURITY_NOTES.md's "Display secret lifecycle" section.
 - Max 5 concurrent `approval_pending` requests per display — a 6th
   attempt gets `409 too_many_pending_requests` (added in the Security
   Hardening phase).

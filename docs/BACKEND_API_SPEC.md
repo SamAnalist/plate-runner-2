@@ -33,6 +33,7 @@ before any real production deployment.
 | `PLATE_RUNNER_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8080` | Comma-separated allowlist. In development, unset falls back to the default with a `console.warn`. **In production, unset aborts startup — no fallback.** |
 | `PLATE_RUNNER_BODY_LIMIT_BYTES` | `1000000` | Fastify's global request body size cap. |
 | `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` | (unset = never expires) | Optional controller-token TTL — see [PAIRING_SPEC.md](PAIRING_SPEC.md). |
+| `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS` | (unset = never expires) | Optional display-secret TTL, applied to new/rotated secrets only (not retroactive) — see [SECURITY_NOTES.md](SECURITY_NOTES.md)'s "Display secret lifecycle" section. |
 | `PLATE_RUNNER_RATE_LIMIT_GENERAL_PER_MIN` | `100` | Global `/api/*` rate limit. |
 | `PLATE_RUNNER_RATE_LIMIT_REMOTE_PER_MIN` | `30` | `/api/remote/*` rate limit. |
 | `PLATE_RUNNER_RATE_LIMIT_PAIRING_PER_MIN` | `10` | Pairing-code/pair/register rate limit. |
@@ -166,6 +167,52 @@ no longer returns a token directly), `GET
 `/api/remote/displays/:displayId/*` — see
 [PAIRING_SPEC.md](PAIRING_SPEC.md) and
 [REMOTE_COMMANDS_SPEC.md](REMOTE_COMMANDS_SPEC.md) for the full reference.
+
+### Display secret lifecycle (Display Secret Lifecycle Hardening)
+
+All three are display-secret-authenticated (`x-display-secret` /
+`Authorization: Bearer`, same as the rest of `/api/displays/:displayId/*`).
+See [SECURITY_NOTES.md](SECURITY_NOTES.md)'s "Display secret lifecycle"
+section and [PAIRING_SPEC.md](PAIRING_SPEC.md)'s cascade-on-revoke section
+for the full design.
+
+#### `GET /api/displays/:displayId` — safe metadata
+
+Returns display metadata, never `secretHash`:
+
+```json
+{
+  "ok": true,
+  "displayId": "…",
+  "name": "…",
+  "secretExpiresAt": null,
+  "secretLastUsedAt": "2026-08-06T00:00:00.000Z",
+  "revokedAt": null
+}
+```
+
+#### `POST /api/displays/:displayId/rotate-secret`
+
+Generates a new secret, invalidates the old one immediately, returns the
+new plaintext value once:
+
+```json
+{
+  "ok": true,
+  "displayId": "…",
+  "displaySecret": "<new plaintext, shown once>",
+  "secretExpiresAt": null
+}
+```
+
+#### `POST /api/displays/:displayId/revoke`
+
+Revokes the display and cascades: revokes all of its `device_pairings`,
+cancels any live `pairing_sessions`.
+
+```json
+{ "ok": true, "displayId": "…", "revokedAt": "2026-08-06T00:00:00.000Z" }
+```
 
 ## Files
 

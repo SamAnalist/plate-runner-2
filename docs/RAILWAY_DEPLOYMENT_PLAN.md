@@ -45,7 +45,9 @@ port, causing the deploy's health check to fail. Fixed in
 
 Optional (all have safe defaults):
 `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` (recommend 30–90 for a public
-deployment), `PLATE_RUNNER_BODY_LIMIT_BYTES`,
+deployment), `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS` (same 30–90 day
+recommendation, applied to new/rotated display secrets only — see
+`SECURITY_NOTES.md`), `PLATE_RUNNER_BODY_LIMIT_BYTES`,
 `PLATE_RUNNER_RATE_LIMIT_GENERAL_PER_MIN`,
 `PLATE_RUNNER_RATE_LIMIT_REMOTE_PER_MIN`,
 `PLATE_RUNNER_RATE_LIMIT_PAIRING_PER_MIN`.
@@ -127,6 +129,9 @@ Before the first real Railway deploy:
 - [ ] `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` set if this deployment should
       have controller tokens expire (recommended for anything beyond a
       short-lived demo).
+- [ ] `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS` set if this deployment should
+      have display secrets expire (same recommendation as above; not
+      retroactive, only applies to newly registered/rotated displays).
 - [ ] Re-read `SECURITY_AUDIT_RAILWAY_READINESS.md`'s Known Risks —
       confirm none of the Medium risks are unacceptable for this
       deployment's actual use case.

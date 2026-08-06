@@ -43,6 +43,23 @@ This computer shows the simulation and listens for remote commands.
    listener and the pairing-request polling (instantiated at the `App.tsx`
    level, not inside the panel) keep running.
 6. **Paired controllers** are listed with a Revoke button.
+7. **Manage its own secret lifecycle** (Display Secret Lifecycle
+   Hardening phase) — a "Display Security" section shows the secret's
+   status (active/expired/revoked), its expiration date (or "No
+   expiration configured") and last-used time, plus two confirm-gated
+   actions: **Rotate Secret** (invalidates the current secret and shows
+   the new one once) and **Unregister Display** (revokes the display
+   server-side, which cascades to revoke all its paired controllers and
+   cancel any in-flight pairing request, then clears local storage). The
+   older **Forget Registration** action (local-only, no server call)
+   stays available as a fallback for when the server-side secret is
+   already expired/revoked and an authenticated revoke call would itself
+   fail. If the command listener's poll gets a `401`, it now surfaces
+   the specific reason (`display_revoked` / `display_secret_expired`)
+   and points at Forget Registration. See
+   [SECURITY_NOTES.md](SECURITY_NOTES.md)'s "Display secret lifecycle"
+   section and [PAIRING_SPEC.md](PAIRING_SPEC.md)'s cascade-on-revoke
+   section for the full mechanics.
 
 ### Controller
 

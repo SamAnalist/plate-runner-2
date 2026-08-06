@@ -58,7 +58,7 @@ limits, HTTP security headers, Railway's `PORT` convention).
 | Mechanism | Comparison | Notes |
 |---|---|---|
 | API key (`x-api-key` / `Bearer`) | `crypto.timingSafeEqual` (was `===`) | Required, min 32 chars, must not be `dev-local-key`, when `PLATE_RUNNER_ENV=production` |
-| Display secret (`x-display-secret`) | SHA-256 hash compared via `timingSafeEqual` (was `===`) | No expiry (see Known Risks) |
+| Display secret (`x-display-secret`) | SHA-256 hash compared via `timingSafeEqual` (was `===`) | Now supports an optional TTL (`PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS`) and explicit revocation, mirroring the controller-token row below |
 | Controller token (`x-controller-token`) | SHA-256 hash → indexed DB lookup (already timing-safe by construction — a lookup, not a compare) | Now supports an optional TTL (`PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS`); revoked/expired both 401 |
 | Pairing code | Exact-match DB lookup scoped to `status='pending'` | `crypto.randomInt`, 5-min TTL, single-use (can't be reused once claimed) |
 
@@ -125,11 +125,13 @@ All `/api/*` routes (API key required), with additional layers:
   are both fixed this phase.
 
 **Medium**
-- **Display secrets never expire and have no revocation path** — only
-  controller tokens gained a TTL/expiry this phase. A leaked display
-  secret is valid forever until the operator manually intervenes (there's
-  no "revoke this display" endpoint, only re-registration which mints a
-  *new* display identity and abandons the old one, which still works).
+- ~~Display secrets never expire and have no revocation path~~ —
+  **Resolved in the Display Secret Lifecycle Hardening phase.** Display
+  secrets now support an optional TTL (`PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS`,
+  unset = never expires, matching the original controller-token treatment)
+  and an explicit `POST /api/displays/:displayId/revoke` endpoint, which
+  also cascades to revoke that display's `device_pairings` and cancel any
+  live `pairing_sessions` — see SECURITY_NOTES.md and PAIRING_SPEC.md.
 - **No automated test suite** — every change in this project (including
   this phase) is verified by manual/scripted QA, not CI-enforced tests.
   Regressions are possible in future changes without someone re-running
@@ -148,8 +150,10 @@ All `/api/*` routes (API key required), with additional layers:
   window, low real-world risk).
 - No `PRAGMA foreign_keys` enforcement between related tables — data
   integrity relies on application logic, not the DB schema.
-- The `cancelled` `PairingSessionStatus` value is modeled in the shared
-  type but no code path ever sets it — dead code, not a vulnerability.
+- ~~The `cancelled` `PairingSessionStatus` value is modeled in the shared
+  type but no code path ever sets it~~ — **Resolved in the Display Secret
+  Lifecycle Hardening phase.** Revoking a display now cancels any of its
+  live pairing sessions, the first real path that sets this status.
 - Helmet's default CSP is a no-op for this JSON API (no HTML responses)
   — harmless, just not meaningfully protective either.
 
@@ -176,8 +180,8 @@ All `/api/*` routes (API key required), with additional layers:
 
 ## Optional fixes after Railway (deliberately deferred)
 
-- Display secret revocation/expiry (mirrors what controller tokens got
-  this phase).
+- ~~Display secret revocation/expiry~~ — done in the Display Secret
+  Lifecycle Hardening phase (see Known Risks above).
 - DB-level `UNIQUE`/foreign-key constraints (schema-migration risk on an
   existing SQLite file not currently justified without a concrete
   incident).
@@ -200,9 +204,10 @@ sensitive production traffic/data) once the operator follows
 API key, setting `PLATE_RUNNER_ENV=production`, `PLATE_RUNNER_CORS_ORIGINS`,
 and a Railway Volume for storage.
 
-**Not** marked `READY_FOR_RAILWAY_PRODUCTION` — the Medium risks above
-(no display-secret revocation, no automated tests, no automated DB
-backups, no WAF) are real and should be either fixed or explicitly
-accepted by whoever owns the production launch decision before this
-handles real user/business-sensitive traffic. None of them block a
-staging deploy used for demos or internal validation.
+**Not** marked `READY_FOR_RAILWAY_PRODUCTION` — the remaining Medium risks
+above (no automated tests, no automated DB backups, no WAF) are real and
+should be either fixed or explicitly accepted by whoever owns the
+production launch decision before this handles real user/business-
+sensitive traffic. None of them block a staging deploy used for demos or
+internal validation. (Display-secret revocation/expiry, previously listed
+here, was resolved in the Display Secret Lifecycle Hardening phase.)

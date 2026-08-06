@@ -2851,3 +2851,123 @@ suite, no automated SQLite backups, no WAF beyond in-app rate limiting.
   actually deploying (still not done this phase).
 - Consider display-secret revocation as a follow-up, mirroring what
   controller tokens got this phase.
+
+## Phase — Display Secret Lifecycle Hardening
+
+### Goal
+
+Close the Medium risk flagged in `SECURITY_AUDIT_RAILWAY_READINESS.md` —
+display secrets had no revocation or expiry path, unlike controller
+tokens, which gained an optional TTL in the prior phase. Mirror that same
+lifecycle pattern (hash-only storage, `lastUsedAt`, `revokedAt`, optional
+TTL) onto `displaySecret`.
+
+### Implemented
+
+- 3 new nullable columns on `display_devices`: `secretLastUsedAt`,
+  `secretExpiresAt`, `revokedAt` — added via the existing idempotent
+  `ensureColumn` migration helper, fully backward compatible (existing
+  rows default to "never expires, not revoked").
+- New optional env var `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS` — unset
+  (default) means display secrets never expire; a positive integer N
+  applies only to newly registered or rotated secrets, not retroactively.
+- Display auth (`verifySecret`) now returns a discriminated result
+  instead of a boolean, checked on every `/api/displays/:displayId/*`
+  request except `/register`: not-found and hash-mismatch both collapse
+  to the same `401 invalid_display_secret` (no existence leak), plus
+  separate `401 display_revoked` and `401 display_secret_expired`
+  outcomes. Successful auth updates `secretLastUsedAt`.
+- `POST /api/displays/:displayId/rotate-secret` — mints and returns a new
+  plaintext secret once, invalidates the old hash immediately, computes a
+  fresh `secretExpiresAt` from the TTL env var.
+- `POST /api/displays/:displayId/revoke` — sets `revokedAt`, and cascades:
+  revokes every `device_pairings` row for that display
+  (`revokeAllPairingsForDisplay`) and cancels any live `pairing_sessions`
+  row for it (`cancelActivePairingSessionsForDisplay`), the first real
+  code path to set the `cancelled` `PairingSessionStatus` value.
+  `controllerAuth.ts` needed no changes — its existing `pairing.revokedAt`
+  check already rejects tokens for a revoked display once the cascade
+  runs.
+- `GET /api/displays/:displayId` — new read route returning safe display
+  metadata (`secretExpiresAt`, `secretLastUsedAt`, `revokedAt`), never
+  `secretHash`.
+- Frontend: Display Mode panel gained a "Display Security" section
+  (status badge, expiration/last-used, confirm-gated Rotate Secret and
+  strong-confirm-gated Unregister Display actions). Unregister clears
+  local storage and stops the listener only on a successful server call;
+  the pre-existing local-only "Forget Registration" stays as a fallback
+  for when the server-side secret is already expired/revoked. A `401`
+  from the 1.5s command poll now surfaces the specific reason
+  (`display_revoked` / `display_secret_expired`).
+- No env vars needed for existing deployments to keep working unchanged —
+  NULL columns mean "not revoked, never expires."
+
+### Files Changed
+
+- `apps/server/src/storage/db.ts` — 3 new nullable columns via `ensureColumn`
+- `apps/server/src/storage/remoteRepo.ts` — read/write helpers for the new columns, cascade queries
+- `apps/server/src/config.ts` — `readDisplaySecretTtlDays`
+- `apps/server/src/services/displayService.ts` — `verifySecret` discriminated result, `touchSecretLastUsed`, rotate/revoke logic
+- `apps/server/src/security/displayAuth.ts` — preHandler updated for the new verification outcomes
+- `apps/server/src/routes/displays.ts` — `GET /:displayId`, `POST /:displayId/rotate-secret`, `POST /:displayId/revoke`
+- `apps/server/src/index.ts` — route registration
+- `packages/shared/src/types/remote.ts` — updated display types for the new fields
+- `apps/web/src/features/display/useDisplayCommandListener.ts` — surfaces `display_revoked`/`display_secret_expired` on 401
+- `apps/web/src/components/controls/DisplayModePanel.tsx` — "Display Security" section, rotate/unregister UI
+- `.env.example`, `.env.production.example`, `.env.railway.example` — `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS` (commented out / `=90` / `=30` respectively, mirroring the pairing-token TTL var)
+- `docs/SECURITY_NOTES.md` — new "Display secret lifecycle" section, out-of-scope list updated
+- `docs/PAIRING_SPEC.md` — new cascade-on-revoke section, credential table and Known Limitations updated
+- `docs/SECURITY_AUDIT_RAILWAY_READINESS.md` — risk table entry and Final Decision updated to reflect resolution
+- `docs/BACKEND_API_SPEC.md` — 3 new routes documented, env var added to the reference table
+- `docs/RAILWAY_DEPLOYMENT_PLAN.md` — new env var next to the pairing-token TTL guidance
+- `docs/REMOTE_MODE_SPEC.md` — Display lifecycle description extended with rotate/revoke
+
+### Decisions
+
+- TTL applies only at register/rotate time, not retroactively — an
+  existing display with `secretExpiresAt = NULL` keeps working forever
+  even if the operator sets the env var later, until that display's
+  secret is next rotated. Matches the existing
+  `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` behavior exactly, for consistency.
+- Revoking a display cascades to its pairings and pending sessions rather
+  than leaving them dangling — "revoked" is meant to mean "this display
+  is gone," and a controller holding a still-valid token for a revoked
+  display would defeat that. This also gave `controllerAuth.ts` a free
+  correctness win: zero code changes needed there.
+- Not-found vs. wrong-secret are collapsed into the same
+  `401 invalid_display_secret` response, matching the existing philosophy
+  elsewhere in this stack of not leaking whether an identifier exists.
+
+### Manual Testing
+
+- Registered a display, confirmed `GET /api/displays/:displayId` returns
+  `secretExpiresAt: null`, `secretLastUsedAt: null`, `revokedAt: null`.
+- Sent an authenticated request, confirmed `secretLastUsedAt` updates.
+- Rotated the secret, confirmed the old secret immediately gets
+  `401 invalid_display_secret` and the new one works.
+- Revoked the display, confirmed the display itself gets
+  `401 display_revoked`, an existing controller token for it also gets
+  rejected, and a pending pairing request for it moves to `cancelled`.
+- Set a short `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS` value, registered a
+  new display, confirmed it starts rejecting with
+  `401 display_secret_expired` once the TTL passes.
+- Started the server against an existing database with pre-phase display
+  rows (NULL columns) and confirmed they keep authenticating unchanged.
+- Exercised the new Display Security UI: rotate, unregister (confirmed
+  local storage clears only on success), and a simulated 401 surfacing
+  the specific reason.
+
+### Known Limitations
+
+- TTL is not retroactive — operators wanting to force-expire all existing
+  display secrets still need to manually rotate or revoke each one.
+- No bulk revoke/rotate across multiple displays — one at a time via the
+  UI or API.
+
+### Next Steps
+
+- Consider the same lifecycle treatment (or a shared abstraction) if a
+  third credential type is ever introduced.
+- Revisit `RAILWAY_DEPLOYMENT_PLAN.md`'s pre-deploy checklist in practice
+  once an actual Railway deployment happens, to confirm the new TTL var
+  behaves as documented under real conditions.

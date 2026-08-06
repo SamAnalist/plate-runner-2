@@ -67,6 +67,70 @@ detail (token hashing, revocation, code expiry) lives in
   valid code. `finalize` is also structurally one-time: a second call sees
   `status === 'used'` and 409s with `token_already_issued`.
 
+## Display secret lifecycle (Display Secret Lifecycle Hardening phase)
+
+Mirrors the controller-token lifecycle above, applied to `displaySecret` —
+closing the gap flagged as a Medium risk in
+[SECURITY_AUDIT_RAILWAY_READINESS.md](SECURITY_AUDIT_RAILWAY_READINESS.md).
+
+- **Generation/hashing unchanged**: still `crypto.randomBytes(32)`, still
+  only the SHA-256 hash persisted (`display_devices.secretHash`), still
+  returned in plaintext exactly once (at registration, or now also at
+  rotation — see below).
+- **Verification** (`security/displayAuth.ts`, `services/displayService.ts`'s
+  `verifySecret`) now returns a discriminated result instead of a boolean,
+  checked on every authenticated request under `/api/displays/:displayId/*`
+  (except `/register`): display exists and the hash matches
+  (`timingSafeEqualStrings`) — a not-found display and a hash mismatch both
+  map to the same `401 invalid_display_secret`, so a caller can't
+  distinguish "wrong secret" from "no such display"; the display isn't
+  revoked (`401 display_revoked`); the secret isn't expired (`401
+  display_secret_expired`). The secret itself is never logged, on success or
+  failure.
+- **`secretLastUsedAt`**: updated on every successful authenticated request
+  (`touchSecretLastUsed`), same idea as `device_pairings` already had no
+  equivalent for — this is a new field, `display_devices.secretLastUsedAt`.
+- **Rotation**: `POST /api/displays/:displayId/rotate-secret`
+  (display-secret-authenticated, so a caller needs the *current* valid
+  secret to rotate it) generates a new 256-bit secret, hashes it, computes a
+  fresh `secretExpiresAt` from the TTL env var, and overwrites
+  `secretHash`/`secretExpiresAt` in place. The old secret's hash is gone
+  immediately — it stops authenticating the instant rotation succeeds, no
+  grace period. Returns the new plaintext secret once. Logs
+  `display_secret_rotated`, no secret value in the log.
+- **Revocation**: `POST /api/displays/:displayId/revoke` (same auth
+  pattern) sets `display_devices.revokedAt`. Every subsequent request with
+  that display's secret gets `401 display_revoked` immediately. **Cascades**:
+  also revokes every `device_pairings` row for that display
+  (`revokeAllPairingsForDisplay`) and cancels any live/unconsumed
+  `pairing_sessions` row for that display (`cancelActivePairingSessionsForDisplay`,
+  status → `cancelled`) — see [PAIRING_SPEC.md](PAIRING_SPEC.md) for the
+  full cascade rationale. Logs `display_revoked`.
+- **Optional expiration**: `PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS`
+  (`config.ts`'s `readDisplaySecretTtlDays`) — unset/blank (default) means
+  display secrets never expire, unchanged from before this phase. A
+  positive integer N means a *newly created or rotated* secret expires N
+  days after creation/rotation; **not retroactive** — an existing display
+  with `secretExpiresAt = NULL` keeps authenticating forever even if the
+  env var is set later, until it's next rotated. Mirrors
+  `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS`'s existing treatment exactly.
+  Recommended 30–90 days for a Railway deployment (same guidance as the
+  controller-token TTL — see `RAILWAY_DEPLOYMENT_PLAN.md`).
+- **Backward compatibility**: the 3 new `display_devices` columns
+  (`secretLastUsedAt`, `secretExpiresAt`, `revokedAt`) are nullable, added
+  via the existing idempotent `ensureColumn` migration helper. Every
+  existing row gets NULL for all three — never expires, never revoked,
+  `secretLastUsedAt` simply unset until next use. Zero behavior change for
+  an existing display with zero env vars set.
+- **Frontend**: Display Mode's panel gained a "Display Security" section
+  (status badge, expiration/last-used display, confirm-gated Rotate
+  Secret and Unregister Display actions). The pre-existing local-only
+  "Forget Registration" escape hatch is kept for the case where the
+  server-side secret is already revoked/expired and an authenticated
+  revoke call would itself fail. A 401 from the command listener now
+  surfaces the specific reason (`display_revoked` / `display_secret_expired`)
+  to the user.
+
 ## Validation
 
 - Every plate/enum/config value accepted by the backend goes through the
@@ -155,10 +219,6 @@ nginx's stock defaults with zero custom headers.
   is still "restart with a new env var," unchanged.
 - Per-endpoint-type payload size tiers (SECURITY_SPEC.md §4.3) — only a
   flat, now-configurable global cap exists.
-- Display secret revocation/expiry — controller tokens gained an optional
-  TTL this phase (`PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS`); display secrets
-  did not get an equivalent. Flagged as a Medium risk in
-  SECURITY_AUDIT_RAILWAY_READINESS.md.
 - A controller cannot self-cancel a pairing request it created, or
   self-inspect/self-revoke its own pairing — those actions are
   display-secret-authenticated only. See PAIRING_SPEC.md's Known
@@ -168,6 +228,12 @@ nginx's stock defaults with zero custom headers.
 Display-side pairing confirmation — pairing no longer auto-approves on a
 valid code; see [PAIRING_SPEC.md](PAIRING_SPEC.md) for the full
 request/approve/finalize flow.
+
+**Resolved in the Display Secret Lifecycle Hardening phase** (was listed
+as out of scope above, and as a Medium risk in
+SECURITY_AUDIT_RAILWAY_READINESS.md): display secrets now support
+`lastUsedAt`, rotation, revocation, and an optional TTL — see "Display
+secret lifecycle" above.
 
 ## Local-only assumption
 
