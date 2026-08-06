@@ -13,6 +13,7 @@ import { createDisplayService } from './services/displayService';
 import { createPairingService } from './services/pairingService';
 import { createApiKeyAuth } from './security/apiKeyAuth';
 import { registerRateLimit } from './security/rateLimit';
+import { createFailedAttemptsTracker } from './security/failedPairingAttempts';
 import { loggerOptions, registerRequestLogger } from './logging/requestLogger';
 import { registerHealthRoute } from './routes/health';
 import { registerStatusRoute } from './routes/status';
@@ -39,6 +40,7 @@ async function main() {
   const listService = createListService(listsRepo);
   const displayService = createDisplayService(remoteRepo, fastify.log);
   const pairingService = createPairingService(remoteRepo, fastify.log);
+  const failedAttempts = createFailedAttemptsTracker();
 
   await fastify.register(cors, {
     origin: (origin, cb) => {
@@ -80,7 +82,7 @@ async function main() {
     await registerCommandsRoutes(apiScope, commandService);
     await registerListsRoutes(apiScope, listService, commandService);
     await registerDisplaysRoutes(apiScope, displayService, pairingService, commandService);
-    await registerControllersRoutes(apiScope, pairingService);
+    await registerControllersRoutes(apiScope, pairingService, failedAttempts);
     await registerRemoteRoutes(apiScope, commandService, remoteRepo);
   }, { prefix: '/api' });
 
