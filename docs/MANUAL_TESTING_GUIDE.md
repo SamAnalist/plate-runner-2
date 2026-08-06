@@ -178,7 +178,132 @@ the steps above pointing the Local API / Remote Mode panels at
 To stop: `docker compose down` (add `-v` only if you want to also delete
 all saved data).
 
-## 10. What "broken" looks like
+## 10. Real LAN Testing: Two Computers
+
+Everything in section 7 above used two browser *tabs* on one machine. This
+section is the real version: two separate computers on the same Wi-Fi/LAN,
+one acting as the Display, the other as the Controller. Backend can run
+either directly (`pnpm dev:server`) or via Docker on whichever computer you
+pick to host it — "Computer A" below.
+
+### 1. On Computer A — start the backend
+
+1. **Find Computer A's local IP address**:
+   - macOS: `ipconfig getifaddr en0` (or check System Settings → Wi-Fi → Details)
+   - Windows: `ipconfig` → look for "IPv4 Address" under your active adapter
+   - Linux: `ip addr show` or `hostname -I`
+
+   It'll look like `192.168.1.50` or `10.0.0.23`. Write it down.
+
+2. **Start the backend**, telling it to also accept the browser origins
+   you'll open on Computer B (replace `192.168.1.50` with Computer A's own
+   IP from step 1 — the frontend on Computer A will be opened using that
+   same IP from Computer B's point of view):
+
+   ```bash
+   PLATE_RUNNER_CORS_ORIGINS=http://localhost:5173,http://192.168.1.50:5173 pnpm dev
+   ```
+
+   Or with Docker (`.env` file or inline):
+
+   ```bash
+   PLATE_RUNNER_CORS_ORIGINS=http://localhost:5173,http://localhost:8080,http://192.168.1.50:5173,http://192.168.1.50:8080 \
+     docker compose up --build
+   ```
+
+3. Watch the backend's startup log — it prints its own detected LAN
+   address, e.g. `also reachable from other devices on this network at:
+   http://192.168.1.50:8787`. Confirm this matches what you found in step 1.
+
+4. **Confirm `/health` responds locally first**, before involving a second
+   machine at all:
+   ```bash
+   curl http://192.168.1.50:8787/health
+   ```
+   (Not `localhost` — use the actual LAN IP, to prove it's reachable the
+   same way Computer B will reach it.)
+
+### 2. On Computer B — connect to Computer A
+
+1. Open a browser to Computer A's frontend: `http://192.168.1.50:5173`
+   (`pnpm dev`) or `http://192.168.1.50:8080` (Docker). Computer B does
+   **not** need its own copy of the code running — it's just a browser
+   pointed at Computer A's frontend.
+2. In whichever panel you'll use (Local API / Display Mode / Controller
+   Mode), set **API Base URL** to `http://192.168.1.50:8787` — Computer A's
+   IP and backend port, not `localhost` (from Computer B, `localhost` means
+   Computer B itself, which has nothing listening on 8787).
+3. Click **Test Connection** — it should say `connected`. If it doesn't,
+   see Troubleshooting below before going further.
+
+### 3. Display flow (pick either computer)
+
+You can run Display Mode on Computer A (alongside the backend) or Computer
+B — it just needs a browser pointed at *a* frontend and an API Base URL
+pointed at Computer A's backend. For this walkthrough, Display runs on
+Computer A:
+
+1. On Computer A, open `http://localhost:5173` (or `:8080` local, since
+   it's the same machine as the backend) → **Display** tab.
+2. Register the display, generate a pairing code, click **Listen for
+   Remote Commands**.
+
+### 4. Controller flow (the other computer)
+
+1. On Computer B, go to the **Controller** tab (already pointed at
+   Computer A's backend from step 2 above).
+2. Enter the controller name and the 6-digit code shown on Computer A.
+3. Wait for "Waiting for display approval…".
+4. On Computer A's Display tab, **Approve** the incoming request.
+5. Computer B's Controller tab should show "Paired successfully" within a
+   couple seconds.
+6. From Computer B, test each action against Computer A's Display:
+   - Send a single plate → confirm the car runs on Computer A's screen.
+   - Send a queue (a few comma/newline-separated plates).
+   - Pause, then Resume.
+   - Open Gate (if the plate's gate mode is `wait_for_signal`).
+   - Stop.
+
+Every one of these is a real network round-trip between two physical
+machines — this is the scenario Remote Mode is actually built for.
+
+### 5. Camera Mode across the network
+
+1. On Computer A (Display), click **Camera Mode** — the control panel
+   disappears, full-screen simulation only.
+2. From Computer B (Controller), send another plate.
+3. Confirm it still runs on Computer A's screen — the listener keeps
+   polling even with no visible UI, and this now proves it over a real
+   network, not just within one browser process.
+4. Exit Camera Mode on Computer A (Escape or the small EXIT button).
+
+### 6. Restart test
+
+1. Stop and restart the backend on Computer A (`Ctrl+C` then `pnpm
+   dev:server` again, or `docker compose restart plate-runner-server`).
+2. On Computer A's Display tab, confirm the registered display and its
+   paired controller are still listed (may need a page refresh + clicking
+   "↻ refresh" under Paired Controllers).
+3. From Computer B's Controller tab — **without re-pairing** — send another
+   command (e.g. Pause). It should still work: the `controllerToken` is
+   stored in Computer B's browser `localStorage` from the original pairing,
+   and the backend's SQLite data (including that pairing) survived the
+   restart. If Computer B's token had been revoked or the backend's data
+   directory was wiped, this step would correctly fail with `401` instead.
+
+### 7. Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Test Connection fails / times out | Wrong IP, or Computer A's firewall is blocking the port | Re-check the IP with `ipconfig`/`ip addr`; on macOS, System Settings → Network → Firewall may need to allow incoming connections for `node`; on Windows, allow the port through Windows Defender Firewall |
+| Test Connection gets a response but pairing/data never updates, or the browser console shows a CORS error | Computer B's browser origin isn't in `PLATE_RUNNER_CORS_ORIGINS` | Restart the backend with Computer B's actual origin added (see step 1.2) — CORS errors are silent in the UI but visible in the browser DevTools Console/Network tab |
+| `401 unauthorized` on every request | API key mismatch, or you forgot to pass `x-api-key` somewhere custom | Confirm both machines are using the same `PLATE_RUNNER_API_KEY` value (defaults to `dev-local-key` if unset — fine for LAN testing, just make sure it's the *same* default on both ends, i.e. don't set it on one machine and not the other) |
+| Server appears to start but `curl` from Computer B hangs or refuses | Server bound only to `localhost` | Shouldn't happen — this codebase always binds `0.0.0.0` — but confirm you didn't run the server through an SSH tunnel or port-forward that only maps loopback |
+| Port already in use on startup | Another process (maybe a previous test run) still holds port 8787/5173/8080 | `lsof -i :8787` (macOS/Linux) or `netstat -ano \| findstr 8787` (Windows) to find and stop it |
+| Docker: Computer B can't reach the server at all | Docker isn't publishing the port to the host's real network interface | Confirm `docker compose ps` shows `0.0.0.0:8787->8787/tcp` (not `127.0.0.1:8787->...`) — this repo's `docker-compose.yml` already publishes this way by default, so this would indicate a locally modified compose file |
+| Browser shows a generic "can't connect" / "site can't be reached" | Wrong protocol/IP/port typo, or the two computers aren't actually on the same network (e.g. one is on a guest Wi-Fi network isolated from the other) | Double-check the exact URL; confirm both computers can `ping` each other's IP first, before involving the app at all |
+
+## 11. What "broken" looks like
 
 Stop and report an issue if you see any of:
 
@@ -193,7 +318,7 @@ Stop and report an issue if you see any of:
 - Any API key, token, or pairing code appearing in the terminal output
   where the server is running.
 
-## 11. Where to look for more detail
+## 12. Where to look for more detail
 
 - [RELEASE_CANDIDATE_QA.md](RELEASE_CANDIDATE_QA.md) — full QA results and known limitations.
 - [BACKEND_API_SPEC.md](BACKEND_API_SPEC.md) / [API_COMMANDS_SPEC.md](API_COMMANDS_SPEC.md) — every backend endpoint.

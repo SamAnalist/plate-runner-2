@@ -51,6 +51,40 @@ Or without Docker: `pnpm dev` (runs `dev:web` + `dev:server` concurrently),
 `pnpm dev:web`, `pnpm dev:server`, `pnpm server:start` (production-mode
 server only, no watch).
 
+## LAN Access (real two-computer testing)
+
+Both `docker compose`'s port mappings (`8787:8787`, `8080:80`) and the
+`tsx`-run backend (`fastify.listen({ host: '0.0.0.0' })`, unconditional —
+not configurable, since there's no reason for it to ever be narrower on a
+local/LAN box) already bind to **every** network interface, not just
+`localhost` — so a second computer on the same network can already reach
+either setup at `http://<this-machine's-LAN-IP>:8787` / `:8080` with no
+code changes. Starting the backend (Docker or `tsx`) prints its detected
+LAN IP(s) directly to the console on startup, e.g.:
+
+```
+plate-runner-server listening on http://localhost:8787 (storage: sqlite)
+  also reachable from other devices on this network at: http://192.168.1.50:8787
+```
+
+The one thing that **does** need to be set explicitly for a second machine
+to work is `PLATE_RUNNER_CORS_ORIGINS` — the default only allows
+`localhost:5173`/`:8080`, so a browser opened on the *second* computer
+(pointed at either machine's frontend) needs its actual origin added, e.g.:
+
+```bash
+PLATE_RUNNER_CORS_ORIGINS=http://localhost:5173,http://localhost:8080,http://192.168.1.50:5173,http://192.168.1.50:8080 \
+  docker compose up --build
+```
+
+See `.env.example` and
+[MANUAL_TESTING_GUIDE.md](MANUAL_TESTING_GUIDE.md)'s "Real LAN Testing: Two
+Computers" section for the full walkthrough — including what CORS actually
+does and doesn't block here (a missing origin doesn't stop the *backend*
+from processing the request; it stops the *browser* from letting frontend
+JS read the response, which is what makes Test Connection/pairing/etc. look
+like they're failing when it's really a CORS misconfiguration).
+
 ## pnpm/Node version pinning
 
 Root `package.json` pins `"packageManager": "pnpm@11.9.0"`. Without this,
@@ -85,5 +119,6 @@ verified against this lockfile.
 - `plate-runner-web`'s nginx config is the image default (no API reverse
   proxy) — the frontend talks to `plate-runner-server` directly via the
   configurable Local API base URL, not through nginx.
-- No `.env.example` file yet — env var overrides must be set manually
-  (`PLATE_RUNNER_API_KEY=... docker compose up` or a self-authored `.env`).
+- No dedicated `.env` file support in `docker-compose.yml` beyond Compose's
+  own default `.env` file lookup — copy `.env.example` to `.env` at the repo
+  root, or set overrides inline (`PLATE_RUNNER_API_KEY=... docker compose up`).
