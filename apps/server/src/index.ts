@@ -1,8 +1,9 @@
 import { networkInterfaces } from 'node:os';
-import Fastify from 'fastify';
+import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 
-import { loadConfig } from './config';
+import { loadConfig, ConfigError } from './config';
 import { initStorage } from './storage/db';
 import { createCommandsRepo } from './storage/commandsRepo';
 import { createListsRepo } from './storage/listsRepo';
@@ -28,26 +29,38 @@ import { registerControllersRoutes } from './routes/controllers';
 import { registerRemoteRoutes } from './routes/remote';
 
 async function main() {
-  const config = loadConfig();
+  let config: ReturnType<typeof loadConfig>;
+  try {
+    config = loadConfig();
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      console.error(`✖ Startup aborted: ${err.message}`);
+      process.exit(1);
+    }
+    throw err;
+  }
+
   const storage = initStorage(config.storagePath);
   const commandsRepo = createCommandsRepo(storage);
   const listsRepo = createListsRepo(storage);
   const remoteRepo = createRemoteRepo(storage);
 
   const statusService = createStatusService(commandsRepo, storage);
-  // 1MB — generous for JSON simulation/list payloads, small enough to reject abuse before it reaches route handlers.
-  const fastify = Fastify({ logger: loggerOptions, bodyLimit: 1_000_000 });
+  const fastify = Fastify({ logger: loggerOptions, bodyLimit: config.bodyLimitBytes });
   const commandService = createCommandService(commandsRepo, fastify.log);
   const listService = createListService(listsRepo);
   const displayService = createDisplayService(remoteRepo, fastify.log);
-  const pairingService = createPairingService(remoteRepo, fastify.log);
+  const pairingService = createPairingService(remoteRepo, fastify.log, config.pairingTokenTtlDays);
   const failedAttempts = createFailedAttemptsTracker();
+
+  await fastify.register(helmet);
 
   await fastify.register(cors, {
     origin: (origin, cb) => {
       // No Origin header (curl, server-to-server) — allow, there's nothing to check against.
       // A disallowed origin gets no CORS headers (browsers enforce that client-side) rather
       // than an error — the request itself isn't blocked server-side, just not marked cross-origin-safe.
+      // Non-browser clients are gated by the API key, not CORS — this is intentional, not a gap.
       cb(null, !origin || config.corsOrigins.includes(origin));
     },
   });
@@ -69,27 +82,39 @@ async function main() {
     }
   });
 
+  // Never leak a stack trace in an HTTP response, in any environment. In production also
+  // genericize the message for unexpected (5xx) errors — the real error is still logged
+  // server-side via request.log.error, just not echoed back to the caller.
+  fastify.setErrorHandler((error: FastifyError, request, reply) => {
+    request.log.error({ err: error, event: 'unhandled_error' }, 'request error');
+    const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 500 && config.isProduction) {
+      return reply.code(statusCode).send({ ok: false, error: 'internal_error' });
+    }
+    return reply.code(statusCode).send({ ok: false, error: error.message });
+  });
+
   // Unauthenticated — registered directly on the root instance.
   await registerHealthRoute(fastify);
 
   // Everything under /api requires the API key and is rate-limited.
   await fastify.register(async (apiScope) => {
     apiScope.addHook('onRequest', createApiKeyAuth(config.apiKey));
-    await registerRateLimit(apiScope);
+    await registerRateLimit(apiScope, config.rateLimits.generalPerMinute);
     await registerStatusRoute(apiScope, statusService);
     await registerSimulateRoutes(apiScope, commandService);
     await registerSimulationControlRoutes(apiScope, commandService);
     await registerSimulationCommandsRoutes(apiScope, commandService);
     await registerCommandsRoutes(apiScope, commandService);
     await registerListsRoutes(apiScope, listService, commandService);
-    await registerDisplaysRoutes(apiScope, displayService, pairingService, commandService);
-    await registerControllersRoutes(apiScope, pairingService, failedAttempts);
-    await registerRemoteRoutes(apiScope, commandService, remoteRepo);
+    await registerDisplaysRoutes(apiScope, displayService, pairingService, commandService, config.rateLimits.pairingPerMinute);
+    await registerControllersRoutes(apiScope, pairingService, failedAttempts, config.rateLimits.pairingPerMinute);
+    await registerRemoteRoutes(apiScope, commandService, remoteRepo, config.rateLimits.remotePerMinute);
   }, { prefix: '/api' });
 
   try {
     await fastify.listen({ port: config.port, host: '0.0.0.0' });
-    console.log(`plate-runner-server listening on http://localhost:${config.port} (storage: ${storage.persistent ? 'sqlite' : 'in-memory fallback'})`);
+    console.log(`plate-runner-server listening on http://localhost:${config.port} (storage: ${storage.persistent ? 'sqlite' : 'in-memory fallback'}, env: ${config.isProduction ? 'production' : 'development'})`);
     for (const address of lanAddresses()) {
       console.log(`  also reachable from other devices on this network at: http://${address}:${config.port}`);
     }
