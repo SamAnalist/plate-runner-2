@@ -71,7 +71,8 @@ function ActionResultBadge({ result }: { result: RemoteActionResult | null }) {
 export function ControllerModePanel({ controller, localLists }: { controller: RemoteControllerControls; localLists: PlateList[] }) {
   const {
     apiBaseUrl, setApiBaseUrl, apiKey, setApiKey,
-    pairedDisplays, pairWithCode, forgetPairing, pairError,
+    pairedDisplays, forgetPairing,
+    pairingRequest, requestPairing, dismissPairingRequest,
     sendPlate, sendQueue, pause, resume, stop, skipCurrent, openGate,
   } = controller;
 
@@ -124,18 +125,46 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
 
       <div>
         <Label>Pair Display</Label>
-        <div className="flex flex-col gap-2">
-          <TextInput value={controllerName} onChange={setControllerName} placeholder="Controller name (e.g. Laptop Samuel)" />
-          <TextInput value={pairCode} onChange={setPairCode} placeholder="6-digit code" />
-          <SmallButton
-            tone="primary"
-            disabled={!controllerName.trim() || !/^\d{6}$/.test(pairCode.trim())}
-            onClick={() => void pairWithCode(controllerName.trim(), pairCode.trim()).then(() => setPairCode(''))}
-          >
-            Pair
-          </SmallButton>
-          {pairError && <p className="text-[10px] font-mono text-red-400/80">{pairError}</p>}
-        </div>
+        {!pairingRequest ? (
+          <div className="flex flex-col gap-2">
+            <TextInput value={controllerName} onChange={setControllerName} placeholder="Controller name (e.g. Laptop Samuel)" />
+            <TextInput value={pairCode} onChange={setPairCode} placeholder="6-digit code" />
+            <SmallButton
+              tone="primary"
+              disabled={!controllerName.trim() || !/^\d{6}$/.test(pairCode.trim())}
+              onClick={() => { requestPairing(controllerName.trim(), pairCode.trim()); setPairCode(''); }}
+            >
+              Pair
+            </SmallButton>
+          </div>
+        ) : (
+          <div className="px-2.5 py-2 rounded bg-white/5 border border-white/10">
+            {(pairingRequest.phase === 'approval_pending' || pairingRequest.phase === 'finalizing') && (
+              <p className="text-[11px] font-mono text-cyan-300 animate-pulse">
+                {pairingRequest.phase === 'finalizing' ? 'Finalizing…' : `Waiting for display approval${pairingRequest.displayName ? ` (${pairingRequest.displayName})` : ''}…`}
+              </p>
+            )}
+            {pairingRequest.phase === 'paired' && (
+              <p className="text-[11px] font-mono text-emerald-400">Paired successfully with {pairingRequest.displayName}.</p>
+            )}
+            {pairingRequest.phase === 'rejected' && (
+              <p className="text-[11px] font-mono text-red-400">Pairing rejected by display.</p>
+            )}
+            {pairingRequest.phase === 'expired' && (
+              <p className="text-[11px] font-mono text-orange-400">Pairing code expired.</p>
+            )}
+            {pairingRequest.phase === 'error' && (
+              <p className="text-[11px] font-mono text-red-400">{pairingRequest.error ?? 'Something went wrong.'}</p>
+            )}
+            {(pairingRequest.phase === 'paired' || pairingRequest.phase === 'rejected' || pairingRequest.phase === 'expired' || pairingRequest.phase === 'error') && (
+              <div className="mt-2">
+                <SmallButton onClick={dismissPairingRequest}>
+                  {pairingRequest.phase === 'paired' ? 'Done' : 'Try Again'}
+                </SmallButton>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div>

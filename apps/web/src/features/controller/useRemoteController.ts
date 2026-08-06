@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   Direction,
   DetectorPlacement,
@@ -36,6 +36,22 @@ export interface RunQueueArgs {
 
 export type RemoteActionResult = { ok: true; commandId: string } | { ok: false; error: string };
 
+/**
+ * approval_pending — request created, polling for the display's decision.
+ * approved/finalizing — display approved, exchanging it for a token.
+ * paired — finalize succeeded, token stored.
+ * rejected/expired/error — terminal, no token; user can retry with a fresh code.
+ */
+export type PairingRequestPhase = 'approval_pending' | 'approved' | 'finalizing' | 'paired' | 'rejected' | 'expired' | 'error';
+
+export interface PairingRequestState {
+  phase: PairingRequestPhase;
+  pairingRequestId?: string;
+  displayId?: string;
+  displayName?: string;
+  error?: string;
+}
+
 export interface RemoteControllerControls {
   apiBaseUrl: string;
   setApiBaseUrl: (v: string) => void;
@@ -43,9 +59,11 @@ export interface RemoteControllerControls {
   setApiKey: (v: string) => void;
 
   pairedDisplays: PairedDisplay[];
-  pairWithCode: (controllerName: string, code: string) => Promise<RemoteActionResult>;
   forgetPairing: (displayId: string) => void;
-  pairError: string | null;
+
+  pairingRequest: PairingRequestState | null;
+  requestPairing: (controllerName: string, code: string) => void;
+  dismissPairingRequest: () => void;
 
   sendPlate: (displayId: string, args: RunPlateArgs) => Promise<RemoteActionResult>;
   sendQueue: (displayId: string, args: RunQueueArgs) => Promise<RemoteActionResult>;
@@ -60,6 +78,7 @@ export interface RemoteControllerControls {
 const DEFAULT_BASE_URL = 'http://localhost:8787';
 const DEFAULT_API_KEY = 'dev-local-key';
 const STORAGE_KEY = 'platerunner_controller_pairings';
+const POLL_MS = 1500;
 
 function loadPairings(): PairedDisplay[] {
   try {
@@ -81,16 +100,18 @@ function savePairings(pairings: PairedDisplay[]): void {
 }
 
 /**
- * Controller Mode's remote-control surface — pairs with displays via a
- * 6-digit code and sends fire-and-forget commands to them. No polling: each
- * action just creates a SimulationCommand on the backend; the target
- * display's own listener (useDisplayCommandListener) does the actual work.
+ * Controller Mode's remote-control surface. Pairing is a three-step flow
+ * (request -> display approves/rejects -> finalize) — no token is ever
+ * held locally until finalize succeeds. Everything else (sendPlate,
+ * control commands, etc.) is fire-and-forget: each just creates a
+ * SimulationCommand on the backend, the target display's own listener
+ * (useDisplayCommandListener) does the actual work.
  */
 export function useRemoteController(): RemoteControllerControls {
   const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_BASE_URL);
   const [apiKey, setApiKey] = useState(DEFAULT_API_KEY);
   const [pairedDisplays, setPairedDisplays] = useState<PairedDisplay[]>(() => loadPairings());
-  const [pairError, setPairError] = useState<string | null>(null);
+  const [pairingRequest, setPairingRequest] = useState<PairingRequestState | null>(null);
 
   const apiBaseUrlRef = useRef(apiBaseUrl); apiBaseUrlRef.current = apiBaseUrl;
   const apiKeyRef = useRef(apiKey); apiKeyRef.current = apiKey;
@@ -109,36 +130,89 @@ export function useRemoteController(): RemoteControllerControls {
     });
   }, []);
 
-  const pairWithCode = useCallback(async (controllerName: string, code: string): Promise<RemoteActionResult> => {
-    setPairError(null);
-    try {
-      const res = await rawFetch('/api/controllers/pair', {
-        method: 'POST',
-        body: JSON.stringify({ controllerName, code }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.ok) {
-        const error = data?.error ?? `HTTP ${res.status}`;
-        setPairError(error);
-        return { ok: false, error };
+  const requestPairing = useCallback((controllerName: string, code: string) => {
+    setPairingRequest({ phase: 'approval_pending' });
+    void (async () => {
+      try {
+        const res = await rawFetch('/api/controllers/pair', {
+          method: 'POST',
+          body: JSON.stringify({ controllerName, code }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.ok) {
+          setPairingRequest({ phase: 'error', error: data?.error ?? `HTTP ${res.status}` });
+          return;
+        }
+        setPairingRequest({
+          phase: 'approval_pending',
+          pairingRequestId: data.pairingRequestId,
+          displayId: data.displayId,
+          displayName: data.displayName,
+        });
+      } catch (err) {
+        setPairingRequest({ phase: 'error', error: err instanceof Error ? err.message : 'Could not reach server' });
       }
-      const pairing: PairedDisplay = {
-        displayId: data.displayId,
-        displayName: data.displayName,
-        controllerId: data.controllerId,
-        controllerToken: data.controllerToken,
-        pairedAt: new Date().toISOString(),
-      };
-      const next = [...pairedDisplaysRef.current.filter(p => p.displayId !== pairing.displayId), pairing];
-      savePairings(next);
-      setPairedDisplays(next);
-      return { ok: true, commandId: data.pairingId };
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'Could not reach server';
-      setPairError(error);
-      return { ok: false, error };
-    }
+    })();
   }, [rawFetch]);
+
+  const dismissPairingRequest = useCallback(() => setPairingRequest(null), []);
+
+  const finalize = useCallback((pairingRequestId: string, displayId: string, displayName: string) => {
+    setPairingRequest({ phase: 'finalizing', pairingRequestId, displayId, displayName });
+    void (async () => {
+      try {
+        const res = await rawFetch(`/api/controllers/pairing-requests/${pairingRequestId}/finalize`, { method: 'POST' });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.ok) {
+          setPairingRequest({ phase: 'error', displayId, displayName, error: data?.error ?? `HTTP ${res.status}` });
+          return;
+        }
+        const pairing: PairedDisplay = {
+          displayId: data.displayId,
+          displayName,
+          controllerId: data.controllerId,
+          controllerToken: data.controllerToken,
+          pairedAt: new Date().toISOString(),
+        };
+        const next = [...pairedDisplaysRef.current.filter(p => p.displayId !== pairing.displayId), pairing];
+        savePairings(next);
+        setPairedDisplays(next);
+        setPairingRequest({ phase: 'paired', displayId, displayName });
+      } catch (err) {
+        setPairingRequest({ phase: 'error', displayId, displayName, error: err instanceof Error ? err.message : 'Could not reach server' });
+      }
+    })();
+  }, [rawFetch]);
+
+  // Poll the request's status while awaiting the display's decision.
+  useEffect(() => {
+    if (!pairingRequest || pairingRequest.phase !== 'approval_pending' || !pairingRequest.pairingRequestId) return;
+    const { pairingRequestId } = pairingRequest;
+
+    const tick = async () => {
+      try {
+        const res = await rawFetch(`/api/controllers/pairing-requests/${pairingRequestId}`);
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.ok) {
+          setPairingRequest({ phase: 'error', error: data?.error ?? `HTTP ${res.status}` });
+          return;
+        }
+        if (data.status === 'approved') {
+          finalize(pairingRequestId, data.displayId, data.displayName);
+        } else if (data.status === 'rejected') {
+          setPairingRequest({ phase: 'rejected', displayId: data.displayId, displayName: data.displayName });
+        } else if (data.status === 'expired') {
+          setPairingRequest({ phase: 'expired', displayId: data.displayId, displayName: data.displayName });
+        }
+        // status === 'approval_pending' -> keep polling, no state change needed.
+      } catch (err) {
+        setPairingRequest({ phase: 'error', error: err instanceof Error ? err.message : 'Could not reach server' });
+      }
+    };
+
+    const interval = setInterval(() => { void tick(); }, POLL_MS);
+    return () => clearInterval(interval);
+  }, [pairingRequest, rawFetch, finalize]);
 
   const forgetPairing = useCallback((displayId: string) => {
     const next = pairedDisplaysRef.current.filter(p => p.displayId !== displayId);
@@ -177,7 +251,8 @@ export function useRemoteController(): RemoteControllerControls {
 
   return {
     apiBaseUrl, setApiBaseUrl, apiKey, setApiKey,
-    pairedDisplays, pairWithCode, forgetPairing, pairError,
+    pairedDisplays, forgetPairing,
+    pairingRequest, requestPairing, dismissPairingRequest,
     sendPlate, sendQueue, pause, resume, stop, skipCurrent, openGate, setConfig,
   };
 }
