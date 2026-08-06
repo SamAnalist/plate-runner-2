@@ -12,6 +12,7 @@ import { usePlateQueue } from './features/queue/usePlateQueue';
 import { usePlateLists } from './features/lists/usePlateLists';
 import { useExecutionHistory } from './features/history/useExecutionHistory';
 import { useLocalScheduler } from './features/scheduler/useLocalScheduler';
+import { useApiCommandListener } from './features/api/useApiCommandListener';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
@@ -50,6 +51,7 @@ export default function App() {
   const executionHistory = useExecutionHistory({ plateQueue });
   const plateLists = usePlateLists({ config, onConfigChange: handleConfigChange, plateQueue, executionHistory });
   const scheduler = useLocalScheduler({ plateLists, plateQueue, executionHistory });
+  const apiCommandListener = useApiCommandListener({ simulation, plateQueue, plateLists });
 
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
@@ -115,6 +117,7 @@ export default function App() {
             plateLists={plateLists}
             scheduler={scheduler}
             executionHistory={executionHistory}
+            apiCommandListener={apiCommandListener}
             onConfigChange={handleConfigChange}
             showDebug={showDebug}
             onShowDebugChange={setShowDebug}

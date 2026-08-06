@@ -33,6 +33,22 @@ async function main() {
   await fastify.register(cors, { origin: true });
   registerRequestLogger(fastify);
 
+  // External API callers commonly send Content-Type: application/json with no body on
+  // bodiless POSTs (e.g. claim/complete/pause). Fastify's default parser rejects that
+  // combination outright — treat an empty body as {} instead of 400ing every such call.
+  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const raw = body as string;
+    if (raw.trim() === '') {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(raw));
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  });
+
   // Unauthenticated — registered directly on the root instance.
   await registerHealthRoute(fastify);
 

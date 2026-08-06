@@ -13,12 +13,14 @@ import type { PlateQueueControls } from '../../features/queue/usePlateQueue';
 import type { PlateListsControls } from '../../features/lists/usePlateLists';
 import type { LocalSchedulerControls } from '../../features/scheduler/useLocalScheduler';
 import type { ExecutionHistoryControls } from '../../features/history/useExecutionHistory';
+import type { ApiCommandListenerControls } from '../../features/api/useApiCommandListener';
 import { getPlacementsForDirection } from '@plate-runner/shared';
 import { PlateInput } from './PlateInput';
 import { PlateQueuePanel } from './PlateQueuePanel';
 import { PlateListsPanel } from './PlateListsPanel';
 import { SchedulerPanel } from './SchedulerPanel';
 import { ExecutionHistoryPanel } from './ExecutionHistoryPanel';
+import { LocalApiPanel } from './LocalApiPanel';
 
 interface ControlPanelProps {
   config: SimulationConfig;
@@ -27,6 +29,7 @@ interface ControlPanelProps {
   plateLists: PlateListsControls;
   scheduler: LocalSchedulerControls;
   executionHistory: ExecutionHistoryControls;
+  apiCommandListener: ApiCommandListenerControls;
   onConfigChange: (c: SimulationConfig) => void;
   showDebug: boolean;
   onShowDebugChange: (v: boolean) => void;
@@ -384,6 +387,7 @@ export function ControlPanel({
   plateLists,
   scheduler,
   executionHistory,
+  apiCommandListener,
   onConfigChange,
   showDebug,
   onShowDebugChange,
@@ -619,6 +623,17 @@ export function ControlPanel({
           defaultOpen={false}
         >
           <ExecutionHistoryPanel history={executionHistory} />
+        </CollapsibleSection>
+
+        <Divider />
+
+        {/* ── Local API ─────────────────────────────────────────────────── */}
+        <CollapsibleSection
+          title="Local API"
+          badge={apiCommandListener.enabled ? apiCommandListener.connectionStatus.toUpperCase() : undefined}
+          defaultOpen={false}
+        >
+          <LocalApiPanel listener={apiCommandListener} />
         </CollapsibleSection>
 
         <Divider />

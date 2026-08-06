@@ -53,6 +53,7 @@ const VEHICLE_COLOR_HEX: Record<VehicleColor, string> = {
 const TRIGGERED_BY_LABEL: Record<ScheduledExecutionRecord['triggeredBy'], string> = {
   manual_list_run: 'manual',
   schedule: 'schedule',
+  api_command: 'api',
   import_test: 'import test',
   unknown: 'unknown',
 };

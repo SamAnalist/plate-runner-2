@@ -6,8 +6,8 @@ import type { ScheduleId } from './scheduler';
 export type ExecutionStatus = 'started' | 'completed' | 'stopped' | 'failed' | 'skipped';
 export const EXECUTION_STATUSES: ExecutionStatus[] = ['started', 'completed', 'stopped', 'failed', 'skipped'];
 
-export type TriggeredBy = 'manual_list_run' | 'schedule' | 'import_test' | 'unknown';
-export const TRIGGERED_BY_VALUES: TriggeredBy[] = ['manual_list_run', 'schedule', 'import_test', 'unknown'];
+export type TriggeredBy = 'manual_list_run' | 'schedule' | 'api_command' | 'import_test' | 'unknown';
+export const TRIGGERED_BY_VALUES: TriggeredBy[] = ['manual_list_run', 'schedule', 'api_command', 'import_test', 'unknown'];
 
 export interface ScheduledExecutionRecord {
   id: string;

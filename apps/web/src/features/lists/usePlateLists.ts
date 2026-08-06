@@ -6,6 +6,7 @@ import {
   type PlateList,
   type PlateListSimulationDefaults,
   type SimulationConfig,
+  type TriggeredBy,
 } from '@plate-runner/shared';
 import {
   getPlateLists,
@@ -68,6 +69,12 @@ export interface PlateListsControls {
   loadListIntoQueue: (id: string) => void;
   /** Used by useLocalScheduler: same as runList, but with a pre-ordered plate array (e.g. shuffled) and triggeredBy: 'schedule'. */
   runListForSchedule: (id: string, opts: { plates: string[]; scheduleId: string }) => RunResult;
+  /**
+   * Used by useApiCommandListener: runs a full PlateList snapshot directly
+   * (no local-storage lookup — the snapshot may not even exist locally,
+   * e.g. it was embedded in a run_plate/run_queue/run_list API command payload).
+   */
+  runListSnapshot: (list: PlateList, triggeredBy: TriggeredBy) => void;
 
   exportListToJSON: (id: string) => string | null;
   exportAllToJSON: () => string;
@@ -134,11 +141,11 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
     };
   }, []);
 
-  /** Shared by runList/runListForSchedule: applies defaults, starts an execution record, queues the deferred queue-start. */
+  /** Shared by runList/runListForSchedule/runListSnapshot: applies defaults, starts an execution record, queues the deferred queue-start. */
   const executeList = useCallback((
     list: PlateList,
     plates: string[],
-    triggeredBy: 'manual_list_run' | 'schedule',
+    triggeredBy: TriggeredBy,
     scheduleId?: string,
   ) => {
     onConfigChange(applyListDefaults(list));
@@ -170,6 +177,10 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
     if (!list) return { ok: false, reason: 'missing_list' };
     executeList(list, opts.plates, 'schedule', opts.scheduleId);
     return { ok: true };
+  }, [executeList]);
+
+  const runListSnapshot = useCallback((list: PlateList, triggeredBy: TriggeredBy) => {
+    executeList(list, list.plates, triggeredBy);
   }, [executeList]);
 
   const loadListIntoQueue = useCallback((id: string) => {
@@ -264,6 +275,7 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
     runList,
     loadListIntoQueue,
     runListForSchedule,
+    runListSnapshot,
     exportListToJSON,
     exportAllToJSON,
     importFromJSON,
