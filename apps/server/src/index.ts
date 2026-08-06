@@ -7,6 +7,7 @@ import { createCommandsRepo } from './storage/commandsRepo';
 import { createListsRepo } from './storage/listsRepo';
 import { createStatusService } from './services/statusService';
 import { createCommandService } from './services/commandService';
+import { createListService } from './services/listService';
 import { createApiKeyAuth } from './security/apiKeyAuth';
 import { registerRateLimit } from './security/rateLimit';
 import { loggerOptions, registerRequestLogger } from './logging/requestLogger';
@@ -16,17 +17,18 @@ import { registerSimulateRoutes } from './routes/simulate';
 import { registerSimulationControlRoutes } from './routes/simulationControl';
 import { registerSimulationCommandsRoutes } from './routes/simulationCommands';
 import { registerCommandsRoutes } from './routes/commands';
+import { registerListsRoutes } from './routes/lists';
 
 async function main() {
   const config = loadConfig();
   const storage = initStorage(config.storagePath);
   const commandsRepo = createCommandsRepo(storage);
   const listsRepo = createListsRepo(storage);
-  void listsRepo; // wired into routes in a later phase commit
 
   const statusService = createStatusService(commandsRepo, storage);
   const fastify = Fastify({ logger: loggerOptions });
   const commandService = createCommandService(commandsRepo, fastify.log);
+  const listService = createListService(listsRepo);
 
   await fastify.register(cors, { origin: true });
   registerRequestLogger(fastify);
@@ -43,6 +45,7 @@ async function main() {
     await registerSimulationControlRoutes(apiScope, commandService);
     await registerSimulationCommandsRoutes(apiScope, commandService);
     await registerCommandsRoutes(apiScope, commandService);
+    await registerListsRoutes(apiScope, listService, commandService);
   }, { prefix: '/api' });
 
   try {
