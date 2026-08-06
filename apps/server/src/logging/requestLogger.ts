@@ -19,6 +19,17 @@ export const loggerOptions: PinoLoggerOptions = {
       };
     },
   },
+  // Defense-in-depth on top of the serializer above (which already excludes headers
+  // entirely) — guards against a future log call that accidentally logs raw headers.
+  redact: {
+    paths: [
+      'req.headers["x-api-key"]',
+      'req.headers["x-display-secret"]',
+      'req.headers["x-controller-token"]',
+      'req.headers.authorization',
+    ],
+    censor: '[redacted]',
+  },
 };
 
 /**
