@@ -28,15 +28,21 @@ This computer shows the simulation and listens for remote commands.
    `localStorage` so a reload doesn't require re-registering).
 2. **Generate a pairing code** — a 6-digit code, 5-minute TTL, shown large
    with a live countdown. Regenerating cancels the prior pending code.
-3. **Enable the listener** — polls `GET
+3. **Approve or reject incoming pairing requests** (Phase 5.1) — a
+   "Pairing Requests" card, polled every 2s, shows each controller waiting
+   on a decision (name, requested-at, expires-in). Nothing is granted
+   automatically; see [PAIRING_SPEC.md](PAIRING_SPEC.md) for the full
+   request/approve/finalize flow.
+4. **Enable the listener** — polls `GET
    /api/displays/:displayId/commands/pending` every 1.5s (same cadence as
    Local Mode's Local API listener), executing whatever it finds through the
    same dispatch core (`run_plate`, `run_queue`, `run_list`, `pause`,
    `resume`, `stop`, `skip_current`, `open_gate`, `set_config`).
-4. Camera Mode / Fullscreen work exactly as before — the Display panel is
-   hidden, but the listener (instantiated at the `App.tsx` level, not inside
-   the panel) keeps polling and executing.
-5. **Paired controllers** are listed with a Revoke button.
+5. Camera Mode / Fullscreen work exactly as before — the Display panel
+   (including the pairing-requests card) is hidden, but both the command
+   listener and the pairing-request polling (instantiated at the `App.tsx`
+   level, not inside the panel) keep running.
+6. **Paired controllers** are listed with a Revoke button.
 
 ### Controller
 
@@ -44,10 +50,14 @@ This computer sends commands to one or more paired displays. No large
 simulation view (per spec — a controller doesn't need to render a scene at
 all); the panel takes the full width instead.
 
-1. **Pair** with a display using its 6-digit code — receives a
-   `controllerToken`, stored per-display in this browser's `localStorage`
-   (`platerunner_controller_pairings`, an array — one controller can pair
-   with multiple displays).
+1. **Request pairing** with a display using its 6-digit code, then wait
+   for the display to approve or reject — the UI shows "Waiting for
+   display approval…", then either finalizes automatically (and stores a
+   `controllerToken` per-display in this browser's `localStorage`,
+   `platerunner_controller_pairings` — one controller can pair with
+   multiple displays) or shows why it didn't (rejected/expired/error), with
+   a way to retry. See [PAIRING_SPEC.md](PAIRING_SPEC.md) for the full
+   state machine.
 2. Select a paired display as the **target** (click its row).
 3. Send a single plate, a queue (pasted/typed, same parser as Local Mode's
    queue input), a locally-stored Plate List's snapshot, or a control

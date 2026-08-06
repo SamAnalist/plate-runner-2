@@ -1,4 +1,4 @@
-# Security Notes — Local Backend (Macro Phase 4 + Macro Phase 5)
+# Security Notes — Local Backend (Macro Phase 4 + Macro Phase 5 + Macro Phase 5.1)
 
 Implementation-level notes for the local backend and Remote Mode. The
 broader, longer-lived policy document is
@@ -43,6 +43,11 @@ detail (token hashing, revocation, code expiry) lives in
   (neither is a field the serializer ever includes).
 - 6-digit pairing codes are generated with `crypto.randomInt`, expire after
   5 minutes, and are never treated as a credential — see PAIRING_SPEC.md.
+- **Phase 5.1**: token minting is deferred to an explicit `finalize` step,
+  only reachable after the Display owner approves the request — a
+  controller can no longer obtain a token unilaterally just by knowing a
+  valid code. `finalize` is also structurally one-time: a second call sees
+  `status === 'used'` and 409s with `token_already_issued`.
 
 ## Validation
 
@@ -70,6 +75,13 @@ detail (token hashing, revocation, code expiry) lives in
   local status polling.
 - Still per-IP, still basic — SECURITY_SPEC.md §4.4's per-API-key/per-
   pairing tiers are a further-future refinement, not implemented.
+- **Failed-attempt guard (Phase 5.1)**: on top of the 10/min route limit,
+  an in-memory sliding-window tracker
+  (`security/failedPairingAttempts.ts`) blocks an IP with `429
+  too_many_failed_attempts` after 5 failed `POST /api/controllers/pair`
+  attempts within 5 minutes (bad format, unknown code, expired code all
+  count). Resets on server restart — acceptable for local/LAN, not a
+  production-grade defense.
 
 ## CORS
 
@@ -103,10 +115,17 @@ coarser but closes the "unbounded body" gap that existed before.
   credentials — those are already hashed, see above).
 - Per-endpoint-type payload size tiers (SECURITY_SPEC.md §4.3) — only a
   flat global cap exists.
-- Manual Display-side pairing confirmation — pairing auto-approves on a
-  valid code; see PAIRING_SPEC.md's Known Limitations.
-- Pairing brute-force protection beyond the flat 10/min rate limit — no
-  lockout/backoff scheme.
+- Pairing brute-force protection beyond the rate limit + failed-attempt
+  counter — no lockout/backoff scheme, and the counter is in-memory only.
+- A controller cannot self-cancel a pairing request it created, or
+  self-inspect/self-revoke its own pairing — those actions are
+  display-secret-authenticated only. See PAIRING_SPEC.md's Known
+  Limitations.
+
+**Resolved this phase** (was listed as out of scope in Phase 5): manual
+Display-side pairing confirmation — pairing no longer auto-approves on a
+valid code; see [PAIRING_SPEC.md](PAIRING_SPEC.md) for the full
+request/approve/finalize flow.
 
 ## Local-only assumption
 

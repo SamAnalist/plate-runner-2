@@ -2044,3 +2044,134 @@ render scenes, visual calibration, real ANPR/AI.
   state machine already supports inserting an `approved` step).
 - Cloud deployment, user accounts, and multi-tenant hosting remain
   explicitly out of scope until a future phase requests them.
+
+---
+
+## Phase 1.0 — Remote Mode Hardening + Manual Pairing Approval (Macro Phase 5.1)
+
+### Goal
+
+Close out Remote Mode with a short hardening/UX pass: replace pairing's
+auto-approve with explicit Display-side approval, add a failed-attempt
+guard on top of the existing rate limits, and leave Remote Mode ready for
+real LAN testing. No cloud, no WebSocket, no user accounts, no list/history
+sync, no render/scene work — pure pairing hardening.
+
+### Implemented
+
+- **New pairing states**: `PairingSessionStatus` gains `approval_pending`
+  (a controller claimed the code, awaiting the display) and `rejected`.
+  Kept `'pending'` rather than renaming it — a cosmetic change with no
+  behavioral gain.
+- **Token minting deferred to `finalize`, not `approve`** — approving only
+  flips a status column; no `controller_devices`/`device_pairings` row
+  exists until the controller explicitly finalizes. A controller that
+  never finalizes (crash, closed tab) leaves nothing orphaned.
+- **`POST /api/controllers/pair`** now creates an `approval_pending`
+  request and returns no token. **`GET
+  /api/controllers/pairing-requests/:id`** lets the controller poll status
+  (never returns a token). **`POST .../finalize`** is the one place a
+  plaintext `controllerToken` is ever produced — a second call 409s with
+  `token_already_issued`.
+- **`GET /api/displays/:displayId/pairing-requests`**,
+  **`POST .../approve`**, **`POST .../reject`** — display-secret-
+  authenticated, let the Display owner see and decide on pending requests.
+- **Lazy expiry**: a shared `resolveSession` helper expires
+  `pending`/`approval_pending`/`approved` sessions past their `expiresAt`
+  on every read/write — an `approval_pending` or `approved` request
+  expires on the *same* TTL as the original code, no separate timer.
+- **Failed-attempt guard**: in-memory sliding-window tracker, 5 failed
+  `POST /api/controllers/pair` attempts / 5 minutes / IP → `429`, stacking
+  with the existing 10/min route rate limit.
+- **Frontend**: `useDisplayCommandListener` gains `pairingRequests` (polled
+  every 2s, independent of the command-listener toggle) and
+  `approveRequest`/`rejectRequest`; `DisplayModePanel` gets a "Pairing
+  Requests" card. `useRemoteController`'s one-shot pairing call became a
+  stateful `requestPairing` → poll → auto-finalize flow
+  (`pairingRequest.phase`); `ControllerModePanel`'s Pair section now shows
+  "Waiting for display approval…" → "Paired successfully" /
+  "Pairing rejected by display" / "Pairing code expired" / an error, each
+  with a way back to retry.
+
+### Files Changed
+
+- `packages/shared/src/types/remote.ts` — `approval_pending`/`rejected` statuses, `PairingSession.controllerName`, new `PairingRequestSummary`
+- `apps/server/src/storage/db.ts` — additive `pairing_sessions.controllerName` column (idempotent migration)
+- `apps/server/src/storage/remoteRepo.ts` — `getSessionById`, `listApprovalPendingForDisplay`, `updateSession` persists `controllerName`
+- `apps/server/src/services/pairingService.ts` — rewritten: `resolveSession`, `createPairingRequest`, `getRequestStatus`, `approveRequest`, `rejectRequest`, `finalizePairing`, `listPendingRequestsForDisplay`
+- `apps/server/src/security/failedPairingAttempts.ts` — created
+- `apps/server/src/routes/controllers.ts` — rewritten for the new flow
+- `apps/server/src/routes/displays.ts` — three new pairing-request routes
+- `apps/server/src/index.ts` — wires the failed-attempt tracker
+- `apps/web/src/features/display/useDisplayCommandListener.ts` — pairing-request state/polling/approve/reject
+- `apps/web/src/components/controls/DisplayModePanel.tsx` — "Pairing Requests" card
+- `apps/web/src/features/controller/useRemoteController.ts` — rewritten pairing flow
+- `apps/web/src/components/controls/ControllerModePanel.tsx` — pairing state-machine UI
+- `docs/PAIRING_SPEC.md` — rewritten for the new flow (state machine, errors reference, backward compatibility)
+- `docs/REMOTE_MODE_SPEC.md`, `docs/SECURITY_NOTES.md`, `docs/BACKEND_API_SPEC.md` — updated
+
+### Decisions
+
+- **`'pending'` kept, not renamed to `code_pending`** — see above.
+- **Token minting deferred to `finalize`** — see above; this is the single
+  most important design decision this phase, since it's what makes
+  approval meaningfully safer than the old auto-approve flow rather than
+  just adding a UI speed bump in front of the same outcome.
+- **Double-finalize guard reuses the existing `status` field** (`'used'`
+  means already issued) rather than adding a dedicated
+  `tokenIssued`/`pairingId` bookkeeping column — one less thing to keep in
+  sync.
+- **Controller polling (`GET .../pairing-requests/:id`) needs no auth
+  beyond the API key** — the `pairingRequestId` is a UUID capability token
+  in its own right, and nothing sensitive (no token, no `controllerId`) is
+  returned by it before finalize.
+- **Failed-attempt tracking is in-memory**, matching the spec's explicit
+  "puede ser in-memory" allowance — documented as resetting on restart.
+
+### Manual Testing (23/23 scenarios)
+
+1. Local Mode regression-checked via `pnpm typecheck`/`pnpm build` and the Playwright runs below running alongside it — unaffected.
+2. Display registers via `POST /api/displays/register` — confirmed via curl and the UI.
+3. Display generates a 6-digit code — confirmed format, `expiresAt`, and the live countdown in the UI.
+4. Controller submits a valid code — `POST /api/controllers/pair` returns `approval_pending`, no token, confirmed via curl and the two-tab Playwright UI test.
+5. Controller shows "Waiting for display approval…" — confirmed in the UI screenshot.
+6. Display sees the pending request — confirmed via `GET .../pairing-requests` (curl) and the UI ("Approval Controller" shown on the Display tab).
+7. Display approves — `POST .../approve` confirmed via curl and clicking Approve in the UI.
+8. Controller finalizes and receives the token — confirmed via curl (`POST .../finalize` → `controllerToken`) and the UI showing "Paired successfully".
+9. Controller sends a plate to the Display — confirmed via the UI ("Sent — command ...").
+10. Display executes the command — confirmed via screenshot (top bar shows the controller-supplied plate `APRV001`).
+11. Display rejects a second request — confirmed via curl and a dedicated Playwright test clicking Reject.
+12. Controller sees "Pairing rejected by display" — confirmed in that same test.
+13. Expired code can't create a request — manually expired a session in SQLite, confirmed `410 code has expired`.
+14. Expired `approval_pending` request can't be approved — manually expired a request in SQLite, confirmed `410 request has expired` on approve, and the controller's poll shows `status: 'expired'`.
+15. Second finalize returns no token — confirmed `409 token_already_issued` via curl.
+16. Token never appears in logs — grepped server logs after every test run (raw process and Docker); zero real matches (one false-positive substring in a floating-point `responseTime` value, verified not the actual code).
+17. Revoking a (finalize-created) pairing invalidates its token — confirmed via curl: a remote command worked before revoke, `401`'d immediately after.
+18. Same as #17 — confirmed the revoked-token 401 explicitly with a follow-up remote command attempt.
+19. Controller with a valid token for a different display gets `403` — confirmed via curl (`this controller is not paired with that display`).
+20. Docker restart preserves pairings created via the new flow — registered, requested, approved, and finalized a pairing entirely inside `docker compose`, restarted the server container, confirmed `GET .../pairings` still showed it.
+21. Pre-5.1 pairings still work — started the server against a Phase 5 (auto-approve-era) database; it started cleanly, `/api/status` and display/pairing reads succeeded with the old rows intact.
+22. Camera Mode hides the pairing UI but approval still functions — confirmed via Playwright: "Pairing Requests" card hidden in Camera Mode, and a request created/approved from outside while the display stayed in Camera Mode both succeeded.
+23. No console errors — zero across every Playwright run this phase (single-display, two-tab approve flow, two-tab reject flow, Camera Mode).
+
+### Known Limitations
+
+- Pairing brute-force protection is a flat rate limit + in-memory
+  failed-attempt counter, not a lockout/backoff scheme; the counter resets
+  on server restart.
+- No pairing/token expiry beyond explicit revocation once finalized.
+- A controller cannot self-cancel a request it created, or self-inspect/
+  self-revoke its own pairing — those remain display-secret-authenticated
+  only.
+- `DisplayModePanel`'s "Paired Controllers" count doesn't auto-refresh the
+  instant a controller finalizes elsewhere — it refreshes on approve and on
+  manual "↻ refresh", which is enough for the approval flow itself to work
+  correctly but can show a stale count until the next refresh trigger.
+
+### Next Steps
+
+- Cloud deployment, user accounts, and WebSocket remain explicitly out of
+  scope until a future phase requests them.
+- If real multi-device LAN testing surfaces a need for a controller to
+  cancel its own pending request, that's a small, additive follow-up (a
+  `POST /api/controllers/pairing-requests/:id/cancel` mirroring `reject`).

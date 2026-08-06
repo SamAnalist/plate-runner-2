@@ -144,11 +144,15 @@ Each creates the correspondingly-typed command (`pause`, `resume`, `stop`,
   embeds the **full list snapshot** at the time of the call (not just the id),
   so a concurrent edit/delete of the list can't race the eventual execution.
 
-### Display, pairing, and remote routes (Phase 5)
+### Display, pairing, and remote routes (Phase 5 / 5.1)
 
 `POST /api/displays/register`, display-secret-authenticated
 `/api/displays/:displayId/*` (heartbeat, pairing-code, pairings, revoke,
-commands), `POST /api/controllers/pair`, and controller-token-authenticated
+commands, **pairing-requests + approve/reject — Phase 5.1**),
+`POST /api/controllers/pair` (creates a pairing *request* as of Phase 5.1,
+no longer returns a token directly), `GET
+/api/controllers/pairing-requests/:id` and `POST .../finalize` (Phase
+5.1), and controller-token-authenticated
 `/api/remote/displays/:displayId/*` — see
 [PAIRING_SPEC.md](PAIRING_SPEC.md) and
 [REMOTE_COMMANDS_SPEC.md](REMOTE_COMMANDS_SPEC.md) for the full reference.
