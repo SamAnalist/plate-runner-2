@@ -32,7 +32,71 @@ const SCHEMA = `
     updatedAt           TEXT NOT NULL,
     version             INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS display_devices (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    secretHash  TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    createdAt   TEXT NOT NULL,
+    updatedAt   TEXT NOT NULL,
+    lastSeenAt  TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS controller_devices (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    createdAt   TEXT NOT NULL,
+    updatedAt   TEXT NOT NULL,
+    lastSeenAt  TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS pairing_sessions (
+    id          TEXT PRIMARY KEY,
+    displayId   TEXT NOT NULL,
+    code        TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    createdAt   TEXT NOT NULL,
+    expiresAt   TEXT NOT NULL,
+    approvedAt  TEXT,
+    usedAt      TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_pairing_sessions_display_status ON pairing_sessions(displayId, status);
+  CREATE INDEX IF NOT EXISTS idx_pairing_sessions_code ON pairing_sessions(code);
+
+  CREATE TABLE IF NOT EXISTS device_pairings (
+    id          TEXT PRIMARY KEY,
+    displayId   TEXT NOT NULL,
+    controllerId TEXT NOT NULL,
+    tokenHash   TEXT NOT NULL,
+    name        TEXT,
+    createdAt   TEXT NOT NULL,
+    lastUsedAt  TEXT,
+    revokedAt   TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_device_pairings_display ON device_pairings(displayId);
+  CREATE INDEX IF NOT EXISTS idx_device_pairings_tokenHash ON device_pairings(tokenHash);
 `;
+
+/**
+ * Idempotently adds a column to an already-existing table if it's not there
+ * yet — CREATE TABLE IF NOT EXISTS alone can't do this for a table that
+ * predates the column (e.g. simulation_commands rows from before Phase 5).
+ * Never destroys existing data.
+ */
+function ensureColumn(db: Database.Database, table: string, column: string, ddl: string): void {
+  const columns = db.pragma(`table_info(${table})`) as { name: string }[];
+  if (!columns.some(c => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
+}
+
+function applyMigrations(db: Database.Database): void {
+  ensureColumn(db, 'simulation_commands', 'displayId', 'displayId TEXT');
+  ensureColumn(db, 'simulation_commands', 'source', "source TEXT NOT NULL DEFAULT 'unknown'");
+  ensureColumn(db, 'simulation_commands', 'createdByControllerId', 'createdByControllerId TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_commands_displayId ON simulation_commands(displayId)');
+}
 
 /**
  * Opens (creating if needed) the SQLite database under storagePath. Never
@@ -47,6 +111,7 @@ export function initStorage(storagePath: string): StorageHandle {
     const db = new Database(filePath);
     db.pragma('journal_mode = WAL');
     db.exec(SCHEMA);
+    applyMigrations(db);
     return { db, persistent: true };
   } catch (err) {
     console.error(
@@ -55,6 +120,7 @@ export function initStorage(storagePath: string): StorageHandle {
     );
     const db = new Database(':memory:');
     db.exec(SCHEMA);
+    applyMigrations(db);
     return { db, persistent: false };
   }
 }

@@ -14,7 +14,7 @@ const CONTROL_ROUTES: { path: string; type: SimulationCommandType }[] = [
 export async function registerSimulationControlRoutes(fastify: FastifyInstance, commandService: CommandService): Promise<void> {
   for (const { path, type } of CONTROL_ROUTES) {
     fastify.post(path, async (request, reply) => {
-      const command = commandService.createCommand(type, {}, request.ip);
+      const command = commandService.createCommand(type, {}, request.ip, { source: 'local_api' });
       return reply.send({ ok: true, commandId: command.id });
     });
   }

@@ -17,7 +17,7 @@ export async function registerSimulationCommandsRoutes(fastify: FastifyInstance,
     if (typeof type !== 'string' || !SIMULATION_COMMAND_TYPES.includes(type as SimulationCommandType)) {
       return reply.code(400).send({ ok: false, error: `invalid or missing type — must be one of ${SIMULATION_COMMAND_TYPES.join(', ')}` });
     }
-    const command = commandService.createCommand(type as SimulationCommandType, body.payload ?? null, request.ip);
+    const command = commandService.createCommand(type as SimulationCommandType, body.payload ?? null, request.ip, { source: 'local_api' });
     return reply.send({ ok: true, commandId: command.id, status: command.status });
   });
 

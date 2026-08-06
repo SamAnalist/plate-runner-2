@@ -39,7 +39,7 @@ export async function registerListsRoutes(fastify: FastifyInstance, listService:
     const { id } = request.params as { id: string };
     const list = listService.getById(id);
     if (!list) return reply.code(404).send({ ok: false, error: 'not_found' });
-    const command = commandService.createCommand('run_list', { listId: id, list }, request.ip);
+    const command = commandService.createCommand('run_list', { listId: id, list }, request.ip, { source: 'local_api' });
     return reply.send({ ok: true, commandId: command.id, status: command.status });
   });
 }

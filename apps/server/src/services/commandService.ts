@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { SimulationCommand, SimulationCommandStatus, SimulationCommandType } from '@plate-runner/shared';
+import type { SimulationCommand, SimulationCommandStatus, SimulationCommandType, CommandSource } from '@plate-runner/shared';
 import type { CommandsRepo } from '../storage/commandsRepo';
 
 interface CommandLogger {
@@ -15,8 +15,19 @@ export type FailResult = { ok: true; command: SimulationCommand } | { ok: false;
  * ('cancelled' is a defined status with no endpoint that sets it yet —
  * reserved for future use, same as the 'set_config' command type.)
  */
+export interface CreateCommandOptions {
+  displayId?: string;
+  source?: CommandSource;
+  createdByControllerId?: string;
+}
+
 export function createCommandService(repo: CommandsRepo, logger: CommandLogger) {
-  function createCommand(type: SimulationCommandType, payload: unknown, sourceIp: string): SimulationCommand {
+  function createCommand(
+    type: SimulationCommandType,
+    payload: unknown,
+    sourceIp: string,
+    opts: CreateCommandOptions = {},
+  ): SimulationCommand {
     const now = new Date().toISOString();
     const command: SimulationCommand = {
       id: randomUUID(),
@@ -25,9 +36,12 @@ export function createCommandService(repo: CommandsRepo, logger: CommandLogger) 
       status: 'pending',
       createdAt: now,
       updatedAt: now,
+      displayId: opts.displayId,
+      source: opts.source ?? 'unknown',
+      createdByControllerId: opts.createdByControllerId,
     };
     repo.insert(command);
-    logger.info({ commandId: command.id, type, sourceIp, createdAt: now }, 'command created');
+    logger.info({ commandId: command.id, type, sourceIp, displayId: opts.displayId, source: command.source, createdAt: now }, 'command created');
     return command;
   }
 
@@ -35,8 +49,8 @@ export function createCommandService(repo: CommandsRepo, logger: CommandLogger) 
     return repo.getById(id);
   }
 
-  function listPending(): SimulationCommand[] {
-    return repo.listPending();
+  function listPending(displayId?: string): SimulationCommand[] {
+    return repo.listPending(displayId);
   }
 
   function listAll(limit?: number): SimulationCommand[] {

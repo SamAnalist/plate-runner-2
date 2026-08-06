@@ -11,6 +11,9 @@ interface CommandRow {
   claimedAt: string | null;
   completedAt: string | null;
   error: string | null;
+  displayId: string | null;
+  source: string;
+  createdByControllerId: string | null;
 }
 
 function rowToCommand(row: CommandRow): SimulationCommand {
@@ -24,13 +27,16 @@ function rowToCommand(row: CommandRow): SimulationCommand {
     claimedAt: row.claimedAt ?? undefined,
     completedAt: row.completedAt ?? undefined,
     error: row.error ?? undefined,
+    displayId: row.displayId ?? undefined,
+    source: (row.source ?? 'unknown') as SimulationCommand['source'],
+    createdByControllerId: row.createdByControllerId ?? undefined,
   };
 }
 
 export function createCommandsRepo({ db }: StorageHandle) {
   const insertStmt = db.prepare(`
-    INSERT INTO simulation_commands (id, type, payload, status, createdAt, updatedAt, claimedAt, completedAt, error)
-    VALUES (@id, @type, @payload, @status, @createdAt, @updatedAt, @claimedAt, @completedAt, @error)
+    INSERT INTO simulation_commands (id, type, payload, status, createdAt, updatedAt, claimedAt, completedAt, error, displayId, source, createdByControllerId)
+    VALUES (@id, @type, @payload, @status, @createdAt, @updatedAt, @claimedAt, @completedAt, @error, @displayId, @source, @createdByControllerId)
   `);
   const updateStmt = db.prepare(`
     UPDATE simulation_commands
@@ -38,7 +44,8 @@ export function createCommandsRepo({ db }: StorageHandle) {
     WHERE id = @id
   `);
   const getStmt = db.prepare(`SELECT * FROM simulation_commands WHERE id = ?`);
-  const listPendingStmt = db.prepare(`SELECT * FROM simulation_commands WHERE status = 'pending' ORDER BY createdAt ASC`);
+  const listPendingGlobalStmt = db.prepare(`SELECT * FROM simulation_commands WHERE status = 'pending' AND displayId IS NULL ORDER BY createdAt ASC`);
+  const listPendingForDisplayStmt = db.prepare(`SELECT * FROM simulation_commands WHERE status = 'pending' AND displayId = ? ORDER BY createdAt ASC`);
   const listAllStmt = db.prepare(`SELECT * FROM simulation_commands ORDER BY createdAt DESC LIMIT ?`);
   const listByStatusStmt = db.prepare(`SELECT * FROM simulation_commands WHERE status = ? ORDER BY createdAt DESC LIMIT ?`);
   const countByStatusStmt = db.prepare(`SELECT COUNT(*) as count FROM simulation_commands WHERE status = ?`);
@@ -57,6 +64,9 @@ export function createCommandsRepo({ db }: StorageHandle) {
         claimedAt: command.claimedAt ?? null,
         completedAt: command.completedAt ?? null,
         error: command.error ?? null,
+        displayId: command.displayId ?? null,
+        source: command.source,
+        createdByControllerId: command.createdByControllerId ?? null,
       });
     },
     update(command: SimulationCommand): void {
@@ -73,8 +83,12 @@ export function createCommandsRepo({ db }: StorageHandle) {
       const row = getStmt.get(id) as CommandRow | undefined;
       return row ? rowToCommand(row) : null;
     },
-    listPending(): SimulationCommand[] {
-      return (listPendingStmt.all() as CommandRow[]).map(rowToCommand);
+    /** No displayId -> global/local-mode pending commands. With displayId -> that display's own pending commands only. */
+    listPending(displayId?: string): SimulationCommand[] {
+      const rows = displayId
+        ? (listPendingForDisplayStmt.all(displayId) as CommandRow[])
+        : (listPendingGlobalStmt.all() as CommandRow[]);
+      return rows.map(rowToCommand);
     },
     listAll(limit = 200): SimulationCommand[] {
       return (listAllStmt.all(limit) as CommandRow[]).map(rowToCommand);

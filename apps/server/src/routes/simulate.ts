@@ -35,7 +35,7 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
       vehicleColor: body.vehicleColor,
       gateConfig: body.gateConfig,
       queueConfig: body.queueConfig,
-    }, request.ip);
+    }, request.ip, { source: 'local_api' });
 
     return reply.send({ ok: true, commandId: command.id, status: command.status });
   });
@@ -61,7 +61,7 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
       vehicleColor: body.vehicleColor,
       gateConfig: body.gateConfig,
       queueConfig: body.queueConfig,
-    }, request.ip);
+    }, request.ip, { source: 'local_api' });
 
     return reply.send({ ok: true, commandId: command.id, status: command.status });
   });

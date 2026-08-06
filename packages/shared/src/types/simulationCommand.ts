@@ -1,6 +1,7 @@
 import type { Direction, DetectorPlacement, VehicleColor, GateConfig } from './simulation';
 import type { PlateQueueConfig } from './queue';
 import type { PlateList, PlateListId } from './plateList';
+import type { CommandSource } from './remote';
 
 export type SimulationCommandType =
   | 'run_plate'
@@ -37,6 +38,12 @@ export interface SimulationCommand {
   /** ISO timestamp. */
   completedAt?: string;
   error?: string;
+  /** Set for remote-controller-created commands — the display this command targets. Undefined/null for local/global commands. */
+  displayId?: string;
+  /** Where this command came from. Defaults to 'unknown' for any pre-Phase-5 row missing the column. */
+  source: CommandSource;
+  /** Set for remote-controller-created commands — which controller device created it. */
+  createdByControllerId?: string;
 }
 
 // ─── Per-type payload shapes ────────────────────────────────────────────
@@ -70,4 +77,18 @@ export interface RunQueuePayload {
 export interface RunListPayload {
   listId: PlateListId;
   list: PlateList;
+}
+
+/**
+ * Partial simulation config change, applied directly to the display's local
+ * SimulationConfig by the command listener (see useApiCommandListener /
+ * useDisplayCommandListener's onSetConfig). All fields optional — only the
+ * ones present are changed.
+ */
+export interface SetConfigPayload {
+  direction?: Direction;
+  detectorPlacement?: DetectorPlacement;
+  vehicleColor?: VehicleColor;
+  gateConfig?: GateConfig;
+  queueConfig?: PlateQueueConfig;
 }

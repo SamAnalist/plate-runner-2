@@ -4,5 +4,6 @@ export * from './types/plateList';
 export * from './types/scheduler';
 export * from './types/executionHistory';
 export * from './types/simulationCommand';
+export * from './types/remote';
 export * from './validators/plate';
 export * from './directionPlacement';
