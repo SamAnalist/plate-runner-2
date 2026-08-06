@@ -8,9 +8,17 @@
 
 export type RemoteRole = 'display' | 'controller';
 
-export type PairingSessionStatus = 'pending' | 'approved' | 'expired' | 'cancelled' | 'used';
+/**
+ * pending          — code generated, unclaimed.
+ * approval_pending — a controller claimed the code; awaiting the display's decision.
+ * approved         — display approved; no token minted yet (see finalize).
+ * rejected         — display rejected; terminal, no token ever issued.
+ * used             — controller finalized; token issued. Terminal.
+ */
+export type PairingSessionStatus =
+  | 'pending' | 'approval_pending' | 'approved' | 'rejected' | 'expired' | 'cancelled' | 'used';
 export const PAIRING_SESSION_STATUSES: PairingSessionStatus[] = [
-  'pending', 'approved', 'expired', 'cancelled', 'used',
+  'pending', 'approval_pending', 'approved', 'rejected', 'expired', 'cancelled', 'used',
 ];
 
 /** Where a SimulationCommand came from — see packages/shared/src/types/simulationCommand.ts. */
@@ -35,6 +43,17 @@ export interface PairingSession {
   expiresAt: string;
   approvedAt?: string;
   usedAt?: string;
+  /** Set once a controller claims the code (status -> approval_pending). */
+  controllerName?: string;
+}
+
+/** Display-facing view of a pending pairing request — see PAIRING_SPEC.md. */
+export interface PairingRequestSummary {
+  pairingRequestId: string;
+  controllerName: string;
+  createdAt: string;
+  expiresAt: string;
+  status: PairingSessionStatus;
 }
 
 /**

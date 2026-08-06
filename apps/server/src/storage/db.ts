@@ -96,6 +96,9 @@ function applyMigrations(db: Database.Database): void {
   ensureColumn(db, 'simulation_commands', 'source', "source TEXT NOT NULL DEFAULT 'unknown'");
   ensureColumn(db, 'simulation_commands', 'createdByControllerId', 'createdByControllerId TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_commands_displayId ON simulation_commands(displayId)');
+  // Macro Phase 5.1 — manual pairing approval: set when a controller claims a code
+  // (status -> approval_pending), read back when finalize() creates the controller device.
+  ensureColumn(db, 'pairing_sessions', 'controllerName', 'controllerName TEXT');
 }
 
 /**

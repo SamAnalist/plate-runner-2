@@ -20,6 +20,7 @@ interface PairingSessionRow {
   expiresAt: string;
   approvedAt: string | null;
   usedAt: string | null;
+  controllerName: string | null;
 }
 
 interface DevicePairingRow {
@@ -73,6 +74,7 @@ function rowToSession(row: PairingSessionRow): PairingSession {
     expiresAt: row.expiresAt,
     approvedAt: row.approvedAt ?? undefined,
     usedAt: row.usedAt ?? undefined,
+    controllerName: row.controllerName ?? undefined,
   };
 }
 
@@ -127,13 +129,19 @@ export function createRemoteRepo({ db }: StorageHandle) {
     VALUES (@id, @displayId, @code, @status, @createdAt, @expiresAt, @approvedAt, @usedAt)
   `);
   const updateSessionStmt = db.prepare(`
-    UPDATE pairing_sessions SET status = @status, approvedAt = @approvedAt, usedAt = @usedAt WHERE id = @id
+    UPDATE pairing_sessions
+    SET status = @status, approvedAt = @approvedAt, usedAt = @usedAt, controllerName = @controllerName
+    WHERE id = @id
   `);
   const getPendingSessionForDisplayStmt = db.prepare(`
     SELECT * FROM pairing_sessions WHERE displayId = ? AND status = 'pending' ORDER BY createdAt DESC LIMIT 1
   `);
   const getSessionByCodeStmt = db.prepare(`
     SELECT * FROM pairing_sessions WHERE code = ? AND status = 'pending' ORDER BY createdAt DESC LIMIT 1
+  `);
+  const getSessionByIdStmt = db.prepare(`SELECT * FROM pairing_sessions WHERE id = ?`);
+  const listApprovalPendingForDisplayStmt = db.prepare(`
+    SELECT * FROM pairing_sessions WHERE displayId = ? AND status = 'approval_pending' ORDER BY createdAt ASC
   `);
   const expirePendingForDisplayStmt = db.prepare(`
     UPDATE pairing_sessions SET status = 'expired' WHERE displayId = ? AND status = 'pending'
@@ -194,12 +202,20 @@ export function createRemoteRepo({ db }: StorageHandle) {
       const row = getSessionByCodeStmt.get(code) as PairingSessionRow | undefined;
       return row ? rowToSession(row) : null;
     },
+    getSessionById(id: string): PairingSession | null {
+      const row = getSessionByIdStmt.get(id) as PairingSessionRow | undefined;
+      return row ? rowToSession(row) : null;
+    },
+    listApprovalPendingForDisplay(displayId: string): PairingSession[] {
+      return (listApprovalPendingForDisplayStmt.all(displayId) as PairingSessionRow[]).map(rowToSession);
+    },
     updateSession(session: PairingSession): void {
       updateSessionStmt.run({
         id: session.id,
         status: session.status,
         approvedAt: session.approvedAt ?? null,
         usedAt: session.usedAt ?? null,
+        controllerName: session.controllerName ?? null,
       });
     },
     expirePendingForDisplay(displayId: string): void {
