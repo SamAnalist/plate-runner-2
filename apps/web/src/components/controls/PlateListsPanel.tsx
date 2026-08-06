@@ -17,6 +17,8 @@ import { Label } from '../ui/Label';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { FieldError } from '../ui/FieldError';
+import { downloadJSON } from '../../lib/downloadJSON';
+import { generateRandomPlates } from '../../features/lists/randomPlateGenerator';
 
 function MiniToggle<T extends string>({
   options,
@@ -43,18 +45,6 @@ function MiniToggle<T extends string>({
       ))}
     </div>
   );
-}
-
-function downloadJSON(filename: string, content: string) {
-  const blob = new Blob([content], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 function slugify(name: string): string {
@@ -160,6 +150,9 @@ function ListForm({
 }) {
   const [form, setForm] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  const [genCount, setGenCount] = useState(10);
+  const [genDigits, setGenDigits] = useState(6);
+  const [genPrefix, setGenPrefix] = useState('');
 
   function set<K extends keyof ListFormState>(key: K, value: ListFormState[K]) {
     setForm(f => ({ ...f, [key]: value }));
@@ -226,6 +219,47 @@ function ListForm({
           {' · '}valid <span className="text-emerald-400">{preview.valid.length}</span>
           {' · '}invalid <span className="text-red-400">{preview.invalid.length}</span>
         </p>
+
+        <div className="mt-2 p-2 rounded-md border border-white/10 bg-white/3 flex flex-col gap-1.5">
+          <p className="text-[9px] text-white/35 uppercase tracking-widest">Random Plate Generator</p>
+          <div className="flex gap-1.5 items-center flex-wrap">
+            <label className="flex items-center gap-1 text-[9px] font-mono text-white/40">
+              Count
+              <input
+                type="number" min={1} max={500} value={genCount}
+                onChange={e => setGenCount(Number(e.target.value))}
+                className="w-14 px-1.5 py-1 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none"
+              />
+            </label>
+            <label className="flex items-center gap-1 text-[9px] font-mono text-white/40">
+              Digits
+              <input
+                type="number" min={1} max={11} value={genDigits}
+                onChange={e => setGenDigits(Number(e.target.value))}
+                className="w-14 px-1.5 py-1 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none"
+              />
+            </label>
+            <label className="flex items-center gap-1 text-[9px] font-mono text-white/40">
+              Prefix
+              <input
+                type="text" value={genPrefix} placeholder="GE" maxLength={8}
+                onChange={e => setGenPrefix(e.target.value)}
+                className="w-16 px-1.5 py-1 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none uppercase"
+              />
+            </label>
+            <Button
+              tone="primary"
+              onClick={() => set('platesRaw', generateRandomPlates({ count: genCount, digitCount: genDigits, prefix: genPrefix }).join('\n'))}
+            >
+              Generate
+            </Button>
+          </div>
+          <p className="text-[9px] font-mono text-white/25 leading-snug">
+            Replaces the Plates box above with {genCount} random plates
+            (e.g. {genPrefix ? `${genPrefix.toUpperCase().replace(/[^A-Z0-9]/g, '')}` : 'GE'}
+            {Array.from({ length: Math.max(genDigits, 1) }).map(() => '#').join('')}). No hyphens/spaces — plates must be A–Z0–9 only.
+          </p>
+        </div>
       </div>
 
       <div>
@@ -401,6 +435,7 @@ export function PlateListsPanel(props: PlateListsControls) {
     exportListToJSON, exportAllToJSON, importFromJSON,
   } = props;
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
+  const [showImportFormat, setShowImportFormat] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editingList = editingId && editingId !== 'new' ? lists.find(l => l.id === editingId) ?? null : null;
@@ -503,9 +538,12 @@ export function PlateListsPanel(props: PlateListsControls) {
       {editingId === null && (
         <div>
           <Label>Import / Export</Label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 items-center">
             <Button onClick={handleExportAll} disabled={lists.length === 0}>Export All</Button>
             <Button onClick={() => fileInputRef.current?.click()}>Import JSON</Button>
+            <Button variant="ghost" onClick={() => setShowImportFormat(v => !v)}>
+              ⓘ Format
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -514,6 +552,30 @@ export function PlateListsPanel(props: PlateListsControls) {
               className="hidden"
             />
           </div>
+          {showImportFormat && (
+            <div className="mt-1.5 p-2.5 rounded-md border border-white/10 bg-white/3 text-[10px] font-mono text-white/50 leading-snug">
+              <p className="text-white/70 mb-1">Import JSON accepts either shape:</p>
+              <p className="text-white/40">1. A single list (from "Export" on one list):</p>
+              <pre className="mt-1 mb-2 p-1.5 rounded bg-black/30 text-[9px] text-white/45 overflow-x-auto">{
+`{
+  "schemaVersion": 1,
+  "type": "plate_runner_plate_list",
+  "data": { "name": "...", "plates": ["ABC123"], ... }
+}`
+              }</pre>
+              <p className="text-white/40">2. A collection (from "Export All"):</p>
+              <pre className="mt-1 p-1.5 rounded bg-black/30 text-[9px] text-white/45 overflow-x-auto">{
+`{
+  "schemaVersion": 1,
+  "type": "plate_runner_plate_list_collection",
+  "data": [ { "name": "...", "plates": ["ABC123"], ... }, ... ]
+}`
+              }</pre>
+              <p className="mt-1.5 text-white/30">
+                Plates must be A–Z0–9 only (no hyphens/spaces), max 12 characters. Use "Export"/"Export All" to see the exact shape from your own data.
+              </p>
+            </div>
+          )}
           {lastImportResult && (
             <div className="mt-1.5 text-[10px] font-mono">
               <p className="text-emerald-400">Imported {lastImportResult.importedCount} list(s).</p>

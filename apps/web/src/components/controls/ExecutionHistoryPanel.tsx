@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Badge, type BadgeTone } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { FieldError } from '../ui/FieldError';
+import { downloadJSON } from '../../lib/downloadJSON';
 
 const STATUS_TONE: Record<ExecutionStatus, BadgeTone> = {
   started: 'success',
@@ -27,18 +28,6 @@ const TRIGGERED_BY_LABEL: Record<ScheduledExecutionRecord['triggeredBy'], string
   import_test: 'import test',
   unknown: 'unknown',
 };
-
-function downloadJSON(filename: string, content: string) {
-  const blob = new Blob([content], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
 
 function RecordRow({ record }: { record: ScheduledExecutionRecord }) {
   return (
