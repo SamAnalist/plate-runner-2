@@ -26,10 +26,20 @@ before any real production deployment.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `PLATE_RUNNER_API_KEY` | `dev-local-key` | Logs a loud `console.warn` on startup if unset — louder wording when `NODE_ENV=production`. |
-| `PLATE_RUNNER_SERVER_PORT` | `8787` | |
-| `PLATE_RUNNER_STORAGE_PATH` | `./data` | Created if missing. SQLite file lives at `<path>/plate-runner.sqlite3`. |
-| `PLATE_RUNNER_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8080` | Comma-separated allowlist. Unset falls back to the default with a `console.warn` (Phase 5). |
+| `PLATE_RUNNER_ENV` | (unset) | Set to `production` to enable hard production validation — see below. Independent of `NODE_ENV`. |
+| `PLATE_RUNNER_API_KEY` | `dev-local-key` | In development: logs a `console.warn` if unset. **When `PLATE_RUNNER_ENV=production`: required, must be ≥32 chars, must not be `dev-local-key` — startup aborts otherwise.** |
+| `PLATE_RUNNER_SERVER_PORT` | `8787` | Only used if the `PORT` env var (Railway's convention) is absent. |
+| `PLATE_RUNNER_STORAGE_PATH` | `./data` | Created if missing. SQLite file lives at `<path>/plate-runner.sqlite3`. Warns loudly in production if left at the default (likely means no persistent volume was configured). |
+| `PLATE_RUNNER_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8080` | Comma-separated allowlist. In development, unset falls back to the default with a `console.warn`. **In production, unset aborts startup — no fallback.** |
+| `PLATE_RUNNER_BODY_LIMIT_BYTES` | `1000000` | Fastify's global request body size cap. |
+| `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` | (unset = never expires) | Optional controller-token TTL — see [PAIRING_SPEC.md](PAIRING_SPEC.md). |
+| `PLATE_RUNNER_RATE_LIMIT_GENERAL_PER_MIN` | `100` | Global `/api/*` rate limit. |
+| `PLATE_RUNNER_RATE_LIMIT_REMOTE_PER_MIN` | `30` | `/api/remote/*` rate limit. |
+| `PLATE_RUNNER_RATE_LIMIT_PAIRING_PER_MIN` | `10` | Pairing-code/pair/register rate limit. |
+
+See [SECURITY_AUDIT_RAILWAY_READINESS.md](SECURITY_AUDIT_RAILWAY_READINESS.md)
+and [RAILWAY_DEPLOYMENT_PLAN.md](RAILWAY_DEPLOYMENT_PLAN.md) for the full
+production/deployment picture.
 
 ## API security
 

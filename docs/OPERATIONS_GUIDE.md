@@ -41,12 +41,30 @@ block and how to diagnose it: [MANUAL_TESTING_GUIDE.md](MANUAL_TESTING_GUIDE.md)
 
 | Variable | Default | Notes |
 |---|---|---|
-| `PLATE_RUNNER_API_KEY` | `dev-local-key` | Required header (`x-api-key`) on every `/api/*` route. |
-| `PLATE_RUNNER_SERVER_PORT` | `8787` | Backend listen port. |
+| `PLATE_RUNNER_ENV` | (unset) | Set to `production` to require a real API key/CORS allowlist — see Production/Railway below. |
+| `PLATE_RUNNER_API_KEY` | `dev-local-key` | Required header (`x-api-key`) on every `/api/*` route. Mandatory (≥32 chars, not the dev default) when `PLATE_RUNNER_ENV=production`. |
+| `PLATE_RUNNER_SERVER_PORT` | `8787` | Backend listen port — only used if `PORT` (Railway's convention) isn't set. |
 | `PLATE_RUNNER_STORAGE_PATH` | `./data` (local) / `/data` (Docker) | SQLite file location. |
-| `PLATE_RUNNER_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8080` | Comma-separated allowed browser origins. |
+| `PLATE_RUNNER_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8080` | Comma-separated allowed browser origins. Required (no fallback) when `PLATE_RUNNER_ENV=production`. |
+| `PLATE_RUNNER_BODY_LIMIT_BYTES` | `1000000` | Request body size cap. |
+| `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` | (unset = never) | Optional controller-token expiry. |
+| `PLATE_RUNNER_RATE_LIMIT_GENERAL_PER_MIN` / `_REMOTE_PER_MIN` / `_PAIRING_PER_MIN` | `100` / `30` / `10` | Per-tier rate limits. |
 
-See `.env.example` at the repo root for a ready-to-copy starting point.
+See `.env.example` at the repo root for local development, and
+`.env.production.example` / `.env.railway.example` for a hardened,
+non-local deployment.
+
+## Production / Railway
+
+For anything beyond local/LAN use, see
+[SECURITY_AUDIT_RAILWAY_READINESS.md](SECURITY_AUDIT_RAILWAY_READINESS.md)
+(current security posture and known risks) and
+[RAILWAY_DEPLOYMENT_PLAN.md](RAILWAY_DEPLOYMENT_PLAN.md) (services, env
+vars, volume setup, pre-deploy checklist). In short: set
+`PLATE_RUNNER_ENV=production`, generate a real `PLATE_RUNNER_API_KEY`
+(`openssl rand -hex 32`), set `PLATE_RUNNER_CORS_ORIGINS` explicitly, and
+point `PLATE_RUNNER_STORAGE_PATH` at a persistent volume — the server
+refuses to start in production without the first three.
 
 ## CORS
 

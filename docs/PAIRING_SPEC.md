@@ -17,7 +17,7 @@ Backward Compatibility below).
 | | 6-digit pairing code | `displaySecret` / `controllerToken` |
 |---|---|---|
 | Purpose | One-time claim ticket | The actual, long-lived credential |
-| Lifetime | 5 minutes (same TTL covers the whole request→approve→finalize flow) | Until revoked |
+| Lifetime | 5 minutes (same TTL covers the whole request→approve→finalize flow) | Until revoked, or — for `controllerToken` only, since the Security Hardening phase — until an optional `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` expiry passes (unset = never expires, the original behavior; `displaySecret` has no expiry option) |
 | Generated with | `crypto.randomInt` | `crypto.randomBytes(32)` (256 bits) |
 | Stored server-side as | Plaintext (short-lived, low stakes) | SHA-256 hash only — **never plaintext** |
 | Shown to the user | Yes, large on the Display's screen | Once, at finalize time, then never again |
@@ -196,8 +196,16 @@ display/pairing reads still succeed with no errors.
 - Pairing brute-force protection is a flat rate limit + in-memory counter,
   not a lockout/backoff scheme — acceptable for a local/LAN threat model,
   not for internet exposure.
-- No pairing/token expiry beyond explicit revocation — a finalized
-  controller token is valid indefinitely until someone revokes it.
+- Controller tokens are valid indefinitely (until revoked) unless
+  `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` is set, in which case they also
+  stop authenticating (`401 token_expired`) once that TTL passes — empty/
+  unset by default, recommended 30–90 days for a public deployment (see
+  `RAILWAY_DEPLOYMENT_PLAN.md`). Display secrets have no equivalent TTL
+  or revocation path at all — flagged as a Medium risk in
+  `SECURITY_AUDIT_RAILWAY_READINESS.md`.
+- Max 5 concurrent `approval_pending` requests per display — a 6th
+  attempt gets `409 too_many_pending_requests` (added in the Security
+  Hardening phase).
 - `GET /api/displays/:displayId/pairings` and the pairing-requests
   approve/reject routes require the display's own secret — a controller
   cannot self-inspect, self-cancel, or self-revoke its own pairing/request;

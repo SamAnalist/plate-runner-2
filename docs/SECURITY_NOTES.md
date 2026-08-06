@@ -8,11 +8,29 @@ implemented against it and what's explicitly deferred. Pairing-specific
 detail (token hashing, revocation, code expiry) lives in
 [PAIRING_SPEC.md](PAIRING_SPEC.md) — this document only summarizes it.
 
+> **Updated by the Security Hardening + Railway Readiness phase.** The
+> "Local-only assumption" section below explicitly called for a re-audit
+> once exposure beyond a trusted LAN was on the table — that's this phase.
+> See [SECURITY_AUDIT_RAILWAY_READINESS.md](SECURITY_AUDIT_RAILWAY_READINESS.md)
+> for the current, authoritative audit (assets/trust boundaries/known
+> risks/READY decision) and [RAILWAY_DEPLOYMENT_PLAN.md](RAILWAY_DEPLOYMENT_PLAN.md)
+> for deployment prep. The sections below are updated in place rather than
+> superseded wholesale, since most of the underlying mechanisms are unchanged.
+
 ## API key handling
 
-- Read from `PLATE_RUNNER_API_KEY`. If unset, falls back to `dev-local-key`
-  with a `console.warn` on startup (louder wording under
-  `NODE_ENV=production`) — a deliberately loud default, not a silent one.
+- Read from `PLATE_RUNNER_API_KEY`. In development (`PLATE_RUNNER_ENV`
+  unset or not `production`), an unset key still falls back to
+  `dev-local-key` with a `console.warn` — unchanged, still fine for local
+  dev. **In production (`PLATE_RUNNER_ENV=production`), this is now a hard
+  startup failure, not a warning**: a missing key, a key equal to
+  `dev-local-key`, or a key under 32 characters all abort startup
+  (`process.exit(1)`) before the server ever listens. `NODE_ENV` is no
+  longer consulted for this decision — only `PLATE_RUNNER_ENV`, so the
+  Docker image's unconditional `NODE_ENV=production` (an unrelated Node
+  runtime setting) doesn't accidentally trigger production enforcement
+  during local `docker compose up`.
+- Compared via `crypto.timingSafeEqual` (previously `===`).
 - Checked via `x-api-key` header or `Authorization: Bearer <key>` on every
   `/api/*` route; `/health` is intentionally exempt (needs to be pollable
   without a key for basic liveness checks).
@@ -62,19 +80,24 @@ detail (token hashing, revocation, code expiry) lives in
 
 ## Rate limiting
 
-- General: `@fastify/rate-limit`, 100 requests/minute per IP, applied to
-  the whole `/api/*` scope.
-- **Pairing** (Phase 5): `POST /api/controllers/pair` and `POST
-  /api/displays/:id/pairing-code` are limited to 10 requests/minute per
-  route — tighter than the general limit, since pairing-code guessing is
-  the one place a rate limit is load-bearing for actual security (a 6-digit
-  space is only 1,000,000 possibilities).
-- **Remote commands** (Phase 5): every `/api/remote/displays/:displayId/*`
-  route is limited to 30 requests/minute — stricter than general API
-  traffic since remote command creation is a more consequential action than
-  local status polling.
+- General: `@fastify/rate-limit`, per IP, applied to the whole `/api/*`
+  scope. Default 100/min, configurable via
+  `PLATE_RUNNER_RATE_LIMIT_GENERAL_PER_MIN` (added in the Security
+  Hardening phase — previously hardcoded).
+- **Pairing**: `POST /api/controllers/pair`, `POST
+  /api/displays/:id/pairing-code`, and `POST /api/displays/register` are
+  limited tighter than the general limit — default 10/min, configurable
+  via `PLATE_RUNNER_RATE_LIMIT_PAIRING_PER_MIN` (display registration was
+  added to this tier during the Security Hardening phase; it previously
+  only had the general 100/min limit).
+- **Remote commands**: every `/api/remote/displays/:displayId/*` route —
+  default 30/min, configurable via
+  `PLATE_RUNNER_RATE_LIMIT_REMOTE_PER_MIN`.
 - Still per-IP, still basic — SECURITY_SPEC.md §4.4's per-API-key/per-
   pairing tiers are a further-future refinement, not implemented.
+- Also new this phase: a max of 5 concurrent `approval_pending` requests
+  per display (`too_many_pending_requests`, 409) — stops a leaked/shared
+  pairing code from generating unbounded pending approvals.
 - **Failed-attempt guard (Phase 5.1)**: on top of the 10/min route limit,
   an in-memory sliding-window tracker
   (`security/failedPairingAttempts.ts`) blocks an IP with `429
@@ -98,25 +121,44 @@ harmless since it still needs a valid API key regardless.
 
 ## Payload limits
 
-**Resolved in Phase 5** — Fastify's `bodyLimit` is set to 1MB globally
-(`Fastify({ bodyLimit: 1_000_000 })`), rejecting oversized request bodies
-with `413` before they reach any route handler. SECURITY_SPEC.md §4.3's
-more granular per-endpoint-type limits (4KB for a single plate run, 64KB
-for a list upload) are still not separately enforced — the flat 1MB cap is
-coarser but closes the "unbounded body" gap that existed before.
+**Resolved in Phase 5, made configurable in the Security Hardening
+phase** — Fastify's `bodyLimit` defaults to 1MB globally
+(`PLATE_RUNNER_BODY_LIMIT_BYTES`, was hardcoded), rejecting oversized
+request bodies with `413` before they reach any route handler.
+SECURITY_SPEC.md §4.3's more granular per-endpoint-type limits (4KB for a
+single plate run, 64KB for a list upload) are still not separately
+enforced — the flat cap is coarser but closes the "unbounded body" gap
+that existed before.
+
+## HTTP security headers
+
+**Added in the Security Hardening phase** — `@fastify/helmet` on the
+backend (mostly-default protections; a JSON API has no meaningful CSP
+need, so CSP is left at helmet's default no-op) and a new
+`apps/web/nginx.conf` on the frontend container (`X-Content-Type-Options`,
+`Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options`, and a
+pragmatic CSP with `connect-src *` — the API Base URL is user-configurable
+at runtime, so a locked-down `connect-src` would break that by design).
+No nginx config existed before this phase; the web container shipped
+nginx's stock defaults with zero custom headers.
 
 ## What's still explicitly out of scope
 
 - Multi-tenant/cloud auth, user accounts — no Remote Mode phase touches
   this; pairing remains device-to-device, not user-to-user.
-- HTTPS/TLS termination — assumed to be handled by a reverse proxy in any
-  deployment that needs it; not configured here.
+- HTTPS/TLS termination — assumed to be handled by the platform (Railway
+  terminates TLS automatically for its generated/custom domains) or a
+  reverse proxy in any other deployment; not configured in this app.
 - API key hashing/rotation tooling (the key itself, not display/controller
-  credentials — those are already hashed, see above).
+  credentials — those are already hashed, see above). Production now at
+  least *requires* a strong key (see API key handling above); rotating it
+  is still "restart with a new env var," unchanged.
 - Per-endpoint-type payload size tiers (SECURITY_SPEC.md §4.3) — only a
-  flat global cap exists.
-- Pairing brute-force protection beyond the rate limit + failed-attempt
-  counter — no lockout/backoff scheme, and the counter is in-memory only.
+  flat, now-configurable global cap exists.
+- Display secret revocation/expiry — controller tokens gained an optional
+  TTL this phase (`PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS`); display secrets
+  did not get an equivalent. Flagged as a Medium risk in
+  SECURITY_AUDIT_RAILWAY_READINESS.md.
 - A controller cannot self-cancel a pairing request it created, or
   self-inspect/self-revoke its own pairing — those actions are
   display-secret-authenticated only. See PAIRING_SPEC.md's Known

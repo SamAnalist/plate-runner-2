@@ -2698,3 +2698,156 @@ consolidated list.
 
 - Render/scene calibration, or new functionality — see
   `docs/RELEASE_NOTES.md`'s Recommended Next Work.
+
+---
+
+## Phase — Security Hardening + Railway Readiness Review
+
+**Date:** 2026-08-06
+
+### Goal
+
+Full security audit and hardening pass ahead of a future (not yet
+scheduled) Railway deployment — treating Railway as a potentially-public
+environment rather than the trusted LAN this project has run on so far.
+No deploy, no Railway connection, no cloud accounts, no new product
+features except where security required them. Preceded by 3 parallel
+Explore passes covering backend auth/CORS/rate-limits/logging, pairing/
+token schema and lifecycle, and Docker/env/frontend-validation — findings
+captured in `docs/SECURITY_AUDIT_RAILWAY_READINESS.md`.
+
+### Implemented
+
+- **Production environment enforcement** — new `PLATE_RUNNER_ENV`
+  (independent of `NODE_ENV`, deliberately — the Docker image already
+  sets `NODE_ENV=production` unconditionally for unrelated reasons, and
+  OR-ing it in would have broken local `docker compose up`). When
+  `PLATE_RUNNER_ENV=production`: missing/default/`<32`-char
+  `PLATE_RUNNER_API_KEY` or missing `PLATE_RUNNER_CORS_ORIGINS` now abort
+  startup (`process.exit(1)`) instead of silently falling back to an
+  insecure default. Development behavior is completely unchanged.
+- **Railway `PORT` bug fix** — `readPort()` previously only read
+  `PLATE_RUNNER_SERVER_PORT`; a real Railway deploy would have silently
+  ignored Railway's injected `PORT` and failed its health check. Now
+  reads `PORT` first.
+- **No stack traces in HTTP responses, ever** — a new
+  `fastify.setErrorHandler` strips `error.stack` from every response in
+  every environment, and genericizes 5xx messages in production while
+  still logging the full error server-side.
+- **Constant-time secret comparison** — API key and the one raw
+  `hashToken(secret) === display.secretHash` compare now use
+  `crypto.timingSafeEqual` via a new `timingSafeEqualStrings` helper.
+- **Controller token TTL** — new `device_pairings.expiresAt` column
+  (migrated via the existing `ensureColumn` pattern), computed at
+  finalize time from `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` (unset =
+  never expires, matching prior behavior). `controllerAuth.ts` now 401s
+  with a distinct `token_expired` (vs generic `unauthorized`) once
+  passed, surfaced as a friendlier message in `ControllerModePanel.tsx`.
+- **Max pending pairing requests per display** — a 6th concurrent
+  `approval_pending` request now 409s (`too_many_pending_requests`)
+  rather than piling up unbounded.
+- **Configurable rate/body limits** — `PLATE_RUNNER_RATE_LIMIT_
+  GENERAL_PER_MIN`/`_REMOTE_PER_MIN`/`_PAIRING_PER_MIN` (defaults
+  100/30/10, unchanged from before, now env-tunable) and
+  `PLATE_RUNNER_BODY_LIMIT_BYTES` (default 1MB, was hardcoded). Display
+  registration (`POST /displays/register`) moved onto the pairing tier —
+  previously only covered by the general limit.
+- **HTTP security headers** — `@fastify/helmet` (new dependency) on the
+  backend; a new `apps/web/nginx.conf` (none existed before — the web
+  container shipped nginx's stock, header-less defaults) adding
+  `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`,
+  `X-Frame-Options`, and a pragmatic CSP (`connect-src *`, deliberate —
+  the API Base URL is user-configurable at runtime).
+- **Logging defense-in-depth** — a pino `redact` list added on top of
+  the existing header-excluding request serializer, covering
+  `x-api-key`/`x-display-secret`/`x-controller-token`/`authorization`.
+- **Backup import hardening** — `parseLocalBackup` now caps each array
+  (plateLists/schedules/executionHistory) at 2,000 entries;
+  `BackupPanel.tsx` rejects files over 5MB before reading them.
+- **Frontend secret UX** — API Key fields (`LocalApiPanel.tsx`,
+  `ControllerModePanel.tsx`, `DisplayModePanel.tsx`) switched to
+  `type="password"` (masked), a "Clear API Key" button added to Local
+  API, and a note clarifying the Local API key is session-only (not
+  persisted) while pointing at the existing "Remote Pairing Credentials"
+  reset for the credentials that *are* persisted
+  (`controllerToken`/`displaySecret`). API Base URL fields get a light
+  `http(s)://` format check (red border, non-blocking). Controller/
+  Display name inputs gained client-side `maxLength={80}` (server
+  already enforced it — this closed the client-side gap).
+
+### Files Modified
+
+Backend: `config.ts` (rewritten), `index.ts` (rewritten), `security/
+{apiKeyAuth,timingSafeCompare(new),controllerAuth,rateLimit}.ts`,
+`services/{displayService,pairingService}.ts`, `storage/{db,remoteRepo}.ts`,
+`routes/{displays,controllers,remote}.ts`, `logging/requestLogger.ts`,
+`package.json` (+`@fastify/helmet`).
+Frontend: `components/controls/{LocalApiPanel,ControllerModePanel,
+DisplayModePanel}.tsx`, `features/backup/localBackup.ts`,
+`components/controls/BackupPanel.tsx`.
+Docker: `apps/web/Dockerfile`, new `apps/web/nginx.conf`.
+Env: `.env.example` (updated), new `.env.production.example`,
+`.env.railway.example`.
+Docs: new `docs/SECURITY_AUDIT_RAILWAY_READINESS.md`,
+`docs/RAILWAY_DEPLOYMENT_PLAN.md`; updated `docs/SECURITY_NOTES.md`,
+`docs/PAIRING_SPEC.md`, `docs/BACKEND_API_SPEC.md`,
+`docs/DOCKER_SETUP.md`, `docs/OPERATIONS_GUIDE.md`, `README.md`.
+
+### Decisions
+
+- `PLATE_RUNNER_ENV` (not `NODE_ENV`) is the sole gate for production
+  hardening — found during implementation that the Dockerfile already
+  sets `NODE_ENV=production` unconditionally, which would have broken
+  local `docker compose up` the moment production validation was wired
+  to `NODE_ENV`. `docker-compose.yml` deliberately does not set
+  `PLATE_RUNNER_ENV`, so local Docker stays lenient exactly as before.
+- Display secret revocation/expiry, DB-level `UNIQUE`/FK constraints,
+  and an explicit pairing-code-cancel endpoint were all considered and
+  deliberately **not** implemented this phase — real but lower-priority
+  gaps, documented as "Optional fixes after Railway" in the audit rather
+  than expanding an already-large phase further.
+- CORS's "no Origin header → allowed" behavior was kept as-is (not
+  tightened) — it's the correct design (API key is the real gate for
+  non-browser clients; CORS is a browser-only enforcement mechanism),
+  confirmed via the audit rather than assumed.
+
+### Manual Testing
+
+20 scenarios covering the full threat model, run against a live server in
+both development and `PLATE_RUNNER_ENV=production` modes (via direct curl/
+env-var manipulation, not just code review) plus a Playwright pass for the
+frontend-visible checks: production startup correctly aborts on a missing/
+default/short API key and on missing CORS origins (3 separate live
+attempts); `/api/status` 401/401/200 across no-key/wrong-key/right-key;
+CORS preflight confirmed present only for the allowed origin, absent for
+an unknown one; a 2MB payload got `413`; 6 rapid bad pairing attempts
+tripped the `429` lockout; a remote command with no token got `401`; a
+full register→code→pair→approve→finalize flow worked end-to-end in
+production mode; the resulting token worked, then `401`'d after revoke,
+then a *different* fresh token correctly `403`'d against the wrong
+display; a token minted with a ~9-second TTL cleanly `401`'d with
+`token_expired` after waiting past it; Export Backup's JSON and the
+Settings page body were both scanned for secret field names/values
+(none found); server logs were scanned for a probe secret and a
+submitted pairing code after triggering both an auth failure and a
+pairing attempt (neither appeared); a 2,500-entry backup import was
+rejected with a clear "too many entries" error before any localStorage
+write; `docker compose up --build` still boots cleanly in dev mode and
+serves the new nginx security headers; all three env example files were
+grepped for real-looking secrets (none found, only placeholders).
+`pnpm typecheck`, `pnpm --filter web build`, `pnpm build`, and
+`docker compose up --build` all clean.
+
+### Known Limitations / Remaining Risks
+
+See `docs/SECURITY_AUDIT_RAILWAY_READINESS.md`'s Known Risks section for
+the full classified (High/Medium/Low) list. Headline Medium risks
+carried forward: no display-secret revocation/expiry, no automated test
+suite, no automated SQLite backups, no WAF beyond in-app rate limiting.
+
+### Next Steps
+
+- Follow `docs/RAILWAY_DEPLOYMENT_PLAN.md`'s pre-deploy checklist when
+  actually deploying (still not done this phase).
+- Consider display-secret revocation as a follow-up, mirroring what
+  controller tokens got this phase.

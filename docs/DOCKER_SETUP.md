@@ -20,9 +20,10 @@ pinning" below).
 
 ## Environment variables
 
-Same four as running locally (see [BACKEND_API_SPEC.md](BACKEND_API_SPEC.md)),
+Same variables as running locally (see [BACKEND_API_SPEC.md](BACKEND_API_SPEC.md)),
 passed through `docker-compose.yml` to `plate-runner-server`. See also
-`.env.example` at the repo root.
+`.env.example` at the repo root, and `.env.production.example` /
+`.env.railway.example` for a hardened, non-local deployment.
 
 | Variable | Compose default |
 |---|---|
@@ -30,6 +31,21 @@ passed through `docker-compose.yml` to `plate-runner-server`. See also
 | `PLATE_RUNNER_SERVER_PORT` | `8787` (fixed in compose) |
 | `PLATE_RUNNER_STORAGE_PATH` | `/data` (fixed in compose, backed by the named volume below) |
 | `PLATE_RUNNER_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8080` (Phase 5 — matches the compose web/dev ports by default) |
+
+**`PLATE_RUNNER_ENV` is deliberately not set anywhere in
+`docker-compose.yml`**, so local Docker always runs in the lenient
+development mode (the `dev-local-key`/localhost-CORS defaults above keep
+working exactly as before) — even though the image's `Dockerfile` sets
+`NODE_ENV=production` unconditionally (an unrelated Node-runtime setting,
+not this app's own hardening gate; see
+[SECURITY_AUDIT_RAILWAY_READINESS.md](SECURITY_AUDIT_RAILWAY_READINESS.md)).
+Production/Railway deployments set `PLATE_RUNNER_ENV=production`
+explicitly, which is what actually enforces a real API key and CORS
+allowlist.
+
+The web container also now ships a small `apps/web/nginx.conf` with
+baseline HTTP security headers (previously the stock nginx defaults, no
+custom headers at all).
 
 ## Persistence
 

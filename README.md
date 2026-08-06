@@ -70,4 +70,6 @@ All project documentation lives in [docs/](docs/). Key entry points:
 - [docs/BACKEND_API_SPEC.md](docs/BACKEND_API_SPEC.md) — the local backend's REST API.
 - [docs/REMOTE_MODE_SPEC.md](docs/REMOTE_MODE_SPEC.md) / [docs/PAIRING_SPEC.md](docs/PAIRING_SPEC.md) — Display/Controller remote control and pairing.
 - [docs/SECURITY_NOTES.md](docs/SECURITY_NOTES.md) — what's protected, what's explicitly deferred.
+- [docs/SECURITY_AUDIT_RAILWAY_READINESS.md](docs/SECURITY_AUDIT_RAILWAY_READINESS.md) — current security audit and Railway readiness decision.
+- [docs/RAILWAY_DEPLOYMENT_PLAN.md](docs/RAILWAY_DEPLOYMENT_PLAN.md) — Railway deployment prep (not yet deployed).
 - [docs/DOCKER_SETUP.md](docs/DOCKER_SETUP.md) — running the full stack in containers.
