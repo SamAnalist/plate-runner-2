@@ -26,6 +26,8 @@ import { useLocalScheduler } from './features/scheduler/useLocalScheduler';
 import { useApiCommandListener } from './features/api/useApiCommandListener';
 import { useDisplayCommandListener } from './features/display/useDisplayCommandListener';
 import { useRemoteController } from './features/controller/useRemoteController';
+import { useScreenSaver } from './features/screensaver/useScreenSaver';
+import { ScreenSaverOverlay } from './components/screensaver/ScreenSaverOverlay';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
@@ -34,9 +36,7 @@ export default function App() {
   const [appMode, setAppMode]         = useState<AppMode>('normal');
   const { screen, setScreen }         = usePersistentAppScreen();
   const [showDebug, setShowDebug]     = useState(false);
-  // Default ON for Phase 1.2 camera-aware asset calibration session.
-  // Set back to false once all plate anchors are visually verified.
-  const [showAnchorOverlay, setShowAnchorOverlay]         = useState(true);
+  const [showAnchorOverlay, setShowAnchorOverlay]         = useState(false);
   const [showMotionPathOverlay, setShowMotionPathOverlay] = useState(false);
 
   const simulation = useSimulation(config);
@@ -74,6 +74,27 @@ export default function App() {
   const displayCommandListener = useDisplayCommandListener({ simulation, plateQueue, plateLists, onSetConfig: applyPartialConfig });
   const remoteController = useRemoteController();
 
+  const queueActive = QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
+
+  // ── Screen Saver — active whenever nothing "busy" has happened for a while ──
+  const isAtGateOrWaiting = ['stopped_at_gate', 'waiting_for_signal', 'gate_opening'].includes(simulation.state.phase);
+  const screenSaverBusy = simulation.state.isRunning || isAtGateOrWaiting || queueActive || displayCommandListener.pairingRequests.length > 0;
+  const screenSaver = useScreenSaver({ busy: screenSaverBusy });
+
+  // Non-DOM activity sources (remote/API commands, queue/sim starting, pairing requests,
+  // screen navigation) all flow through this one effect instead of being hand-wired individually.
+  useEffect(() => {
+    screenSaver.notifyActivity();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    displayCommandListener.lastCommandAt,
+    apiCommandListener.pendingCount,
+    plateQueue.queueStatus,
+    simulation.state.phase,
+    displayCommandListener.pairingRequests.length,
+    screen,
+  ]);
+
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -88,7 +109,6 @@ export default function App() {
   const isExpanded  = appMode === 'fullscreen' || appMode === 'camera';
   const isCameraMode = appMode === 'camera';
 
-  const queueActive = QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
   const navigateToLocal = () => setScreen('local');
 
   // ─── Normal layout ───────────────────────────────────────────────────────
@@ -192,7 +212,21 @@ export default function App() {
       screenContent = <ExecutionHistoryScreen history={executionHistory} />;
       break;
     case 'settings':
-      screenContent = <SettingsScreen apiCommandListener={apiCommandListener} />;
+      screenContent = (
+        <SettingsScreen
+          apiCommandListener={apiCommandListener}
+          displayCommandListener={displayCommandListener}
+          remoteController={remoteController}
+          plateLists={plateLists}
+          scheduler={scheduler}
+          executionHistory={executionHistory}
+          queueStatus={plateQueue.queueStatus}
+          vehicleColor={config.vehicleColor}
+          screen={screen}
+          onNavigateHome={() => setScreen('home')}
+          screenSaver={screenSaver}
+        />
+      );
       break;
     case 'home':
     default:
@@ -265,5 +299,10 @@ export default function App() {
     </div>
   );
 
-  return isExpanded ? expandedLayout : normalLayout;
+  return (
+    <>
+      {isExpanded ? expandedLayout : normalLayout}
+      {screenSaver.isActive && <ScreenSaverOverlay style={screenSaver.settings.style} />}
+    </>
+  );
 }
