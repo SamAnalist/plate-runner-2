@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { PairingRequestSummary } from '@plate-runner/shared';
 import type { DisplayCommandListenerControls } from '../../features/display/useDisplayCommandListener';
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -55,6 +56,31 @@ function useCountdown(expiresAt: string | undefined) {
   return Math.max(0, remainingMs);
 }
 
+function PairingRequestCard({
+  request, onApprove, onReject,
+}: {
+  request: PairingRequestSummary;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const remainingMs = useCountdown(request.expiresAt);
+  const remainingLabel = remainingMs > 0
+    ? `${Math.floor(remainingMs / 60000)}:${String(Math.floor((remainingMs % 60000) / 1000)).padStart(2, '0')}`
+    : 'expired';
+  return (
+    <div className="px-2.5 py-2 rounded bg-white/5 border border-cyan-500/25">
+      <p className="text-[11px] font-mono text-white/80">{request.controllerName}</p>
+      <p className="text-[9px] font-mono text-white/30">
+        Requested {new Date(request.createdAt).toLocaleTimeString()} · expires in {remainingLabel}
+      </p>
+      <div className="mt-1.5 flex gap-2">
+        <SmallButton tone="primary" onClick={onApprove}>Approve</SmallButton>
+        <SmallButton tone="danger" onClick={onReject}>Reject</SmallButton>
+      </div>
+    </div>
+  );
+}
+
 export function DisplayModePanel({ listener }: { listener: DisplayCommandListenerControls }) {
   const {
     apiBaseUrl, setApiBaseUrl, apiKey, setApiKey,
@@ -62,6 +88,7 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
     enabled, setEnabled, connectionStatus, pendingCount, lastError, lastCommandAt,
     pairingCode, generatePairingCode, pairingCodeError,
     pairings, refreshPairings, revokePairing,
+    pairingRequests, approveRequest, rejectRequest,
   } = listener;
 
   const [nameInput, setNameInput] = useState('');
@@ -121,6 +148,24 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
         <div className="mt-1.5">
           <SmallButton tone="danger" onClick={forgetRegistration}>Forget Registration</SmallButton>
         </div>
+      </div>
+
+      <div>
+        <Label>Pairing Requests ({pairingRequests.length})</Label>
+        {pairingRequests.length === 0 ? (
+          <p className="text-[10px] font-mono text-white/25">No pending pairing requests.</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {pairingRequests.map(r => (
+              <PairingRequestCard
+                key={r.pairingRequestId}
+                request={r}
+                onApprove={() => approveRequest(r.pairingRequestId)}
+                onReject={() => rejectRequest(r.pairingRequestId)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div>

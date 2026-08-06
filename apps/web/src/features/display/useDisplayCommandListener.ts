@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DevicePairingSummary, SetConfigPayload, SimulationCommand } from '@plate-runner/shared';
+import type { DevicePairingSummary, PairingRequestSummary, SetConfigPayload, SimulationCommand } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 import type { PlateListsControls } from '../lists/usePlateLists';
@@ -51,12 +51,18 @@ export interface DisplayCommandListenerControls {
   pairings: DevicePairingSummary[];
   refreshPairings: () => void;
   revokePairing: (pairingId: string) => void;
+
+  pairingRequests: PairingRequestSummary[];
+  refreshPairingRequests: () => void;
+  approveRequest: (pairingRequestId: string) => void;
+  rejectRequest: (pairingRequestId: string) => void;
 }
 
 const DEFAULT_BASE_URL = 'http://localhost:8787';
 const DEFAULT_API_KEY = 'dev-local-key';
 const POLL_MS = 1500;
 const HEARTBEAT_MS = 20_000;
+const PAIRING_REQUESTS_POLL_MS = 2000;
 const STORAGE_KEY = 'platerunner_display_registration';
 
 function loadRegistration(): DisplayRegistration | null {
@@ -114,6 +120,7 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
   const [pairingCode, setPairingCode] = useState<PairingCodeState | null>(null);
   const [pairingCodeError, setPairingCodeError] = useState<string | null>(null);
   const [pairings, setPairings] = useState<DevicePairingSummary[]>([]);
+  const [pairingRequests, setPairingRequests] = useState<PairingRequestSummary[]>([]);
 
   const simulationRef = useRef(simulation); simulationRef.current = simulation;
   const plateQueueRef = useRef(plateQueue); plateQueueRef.current = plateQueue;
@@ -155,6 +162,7 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
     setEnabled(false);
     setPairingCode(null);
     setPairings([]);
+    setPairingRequests([]);
   }, []);
 
   const refreshPairings = useCallback(() => {
@@ -179,6 +187,48 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
       refreshPairings();
     })();
   }, [authedFetch, refreshPairings]);
+
+  const refreshPairingRequests = useCallback(() => {
+    const reg = registrationRef.current;
+    if (!reg) return;
+    void (async () => {
+      try {
+        const res = await authedFetch(`/api/displays/${reg.displayId}/pairing-requests`);
+        const data = await res.json().catch(() => null);
+        if (res.ok && data?.ok) setPairingRequests(data.requests);
+      } catch {
+        // best-effort — surfaced via connectionStatus from the command poll loop instead
+      }
+    })();
+  }, [authedFetch]);
+
+  const approveRequest = useCallback((pairingRequestId: string) => {
+    const reg = registrationRef.current;
+    if (!reg) return;
+    void (async () => {
+      await authedFetch(`/api/displays/${reg.displayId}/pairing-requests/${pairingRequestId}/approve`, { method: 'POST' }).catch(() => {});
+      refreshPairingRequests();
+      refreshPairings();
+    })();
+  }, [authedFetch, refreshPairingRequests, refreshPairings]);
+
+  const rejectRequest = useCallback((pairingRequestId: string) => {
+    const reg = registrationRef.current;
+    if (!reg) return;
+    void (async () => {
+      await authedFetch(`/api/displays/${reg.displayId}/pairing-requests/${pairingRequestId}/reject`, { method: 'POST' }).catch(() => {});
+      refreshPairingRequests();
+    })();
+  }, [authedFetch, refreshPairingRequests]);
+
+  // Independent of the "Listen for Remote Commands" toggle — approving a controller
+  // shouldn't require the command execution listener to be enabled.
+  useEffect(() => {
+    if (!registration) return;
+    refreshPairingRequests();
+    const interval = setInterval(refreshPairingRequests, PAIRING_REQUESTS_POLL_MS);
+    return () => clearInterval(interval);
+  }, [registration, refreshPairingRequests]);
 
   const generatePairingCode = useCallback(() => {
     const reg = registrationRef.current;
@@ -294,5 +344,6 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
     connectionStatus, pendingCount, lastError, lastCommandAt,
     pairingCode, generatePairingCode, pairingCodeError,
     pairings, refreshPairings, revokePairing,
+    pairingRequests, refreshPairingRequests, approveRequest, rejectRequest,
   };
 }

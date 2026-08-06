@@ -62,6 +62,26 @@ export async function registerDisplaysRoutes(
       return reply.send({ ok: true });
     });
 
+    // ── Manual pairing approval (Macro Phase 5.1) ──────────────────────
+    scope.get('/displays/:displayId/pairing-requests', async (request) => {
+      const { displayId } = request.params as { displayId: string };
+      return { ok: true, requests: pairingService.listPendingRequestsForDisplay(displayId) };
+    });
+
+    scope.post('/displays/:displayId/pairing-requests/:id/approve', async (request, reply) => {
+      const { displayId, id } = request.params as { displayId: string; id: string };
+      const result = pairingService.approveRequest(displayId, id);
+      if (!result.ok) return reply.code(result.status).send({ ok: false, error: result.error });
+      return reply.send({ ok: true, status: result.status });
+    });
+
+    scope.post('/displays/:displayId/pairing-requests/:id/reject', async (request, reply) => {
+      const { displayId, id } = request.params as { displayId: string; id: string };
+      const result = pairingService.rejectRequest(displayId, id);
+      if (!result.ok) return reply.code(result.status).send({ ok: false, error: result.error });
+      return reply.send({ ok: true, status: result.status });
+    });
+
     // ── Display's own command listener — scoped to this displayId only ──
     scope.get('/displays/:displayId/commands/pending', async (request) => {
       const { displayId } = request.params as { displayId: string };
