@@ -49,7 +49,7 @@ async function main() {
   const fastify = Fastify({ logger: loggerOptions, bodyLimit: config.bodyLimitBytes });
   const commandService = createCommandService(commandsRepo, fastify.log);
   const listService = createListService(listsRepo);
-  const displayService = createDisplayService(remoteRepo, fastify.log);
+  const displayService = createDisplayService(remoteRepo, fastify.log, config.displaySecretTtlDays);
   const pairingService = createPairingService(remoteRepo, fastify.log, config.pairingTokenTtlDays);
   const failedAttempts = createFailedAttemptsTracker();
 

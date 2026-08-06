@@ -33,10 +33,37 @@ export async function registerDisplaysRoutes(
   await fastify.register(async (scope) => {
     scope.addHook('preHandler', createDisplayAuth(displayService));
 
+    scope.get('/displays/:displayId', async (request, reply) => {
+      const { displayId } = request.params as { displayId: string };
+      const display = displayService.getById(displayId);
+      if (!display) return reply.code(404).send({ ok: false, error: 'not_found' });
+      return { ok: true, display };
+    });
+
     scope.post('/displays/:displayId/heartbeat', async (request) => {
       const { displayId } = request.params as { displayId: string };
       displayService.heartbeat(displayId);
       return { ok: true };
+    });
+
+    // ── Display Secret Lifecycle Hardening ──────────────────────────────
+    scope.post('/displays/:displayId/rotate-secret', async (request, reply) => {
+      const { displayId } = request.params as { displayId: string };
+      const result = displayService.rotateSecret(displayId);
+      if (!result.ok) return reply.code(404).send({ ok: false, error: result.error });
+      return reply.send({
+        ok: true,
+        displayId,
+        displaySecret: result.displaySecret,
+        secretExpiresAt: result.secretExpiresAt,
+      });
+    });
+
+    scope.post('/displays/:displayId/revoke', async (request, reply) => {
+      const { displayId } = request.params as { displayId: string };
+      const result = displayService.revokeDisplay(displayId);
+      if (!result.ok) return reply.code(404).send({ ok: false, error: result.error });
+      return reply.send({ ok: true });
     });
 
     scope.post('/displays/:displayId/pairing-code', {
