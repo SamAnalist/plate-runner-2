@@ -72,4 +72,6 @@ All project documentation lives in [docs/](docs/). Key entry points:
 - [docs/SECURITY_NOTES.md](docs/SECURITY_NOTES.md) — what's protected, what's explicitly deferred.
 - [docs/SECURITY_AUDIT_RAILWAY_READINESS.md](docs/SECURITY_AUDIT_RAILWAY_READINESS.md) — current security audit and Railway readiness decision.
 - [docs/RAILWAY_DEPLOYMENT_PLAN.md](docs/RAILWAY_DEPLOYMENT_PLAN.md) — Railway deployment prep (not yet deployed).
+- [docs/RAILWAY_STAGING_SMOKE_TEST.md](docs/RAILWAY_STAGING_SMOKE_TEST.md) — step-by-step script to validate a real Railway Staging deploy.
+- [docs/RAILWAY_SECURITY_CHECKLIST.md](docs/RAILWAY_SECURITY_CHECKLIST.md) — exhaustive pre-deploy security checklist.
 - [docs/DOCKER_SETUP.md](docs/DOCKER_SETUP.md) — running the full stack in containers.

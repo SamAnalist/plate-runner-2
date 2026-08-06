@@ -22,6 +22,19 @@ Railway builds from the repo root context for both (same as
 `docker-compose.yml` does locally — `context: .`), so no changes to
 either Dockerfile's `COPY` paths are needed.
 
+**Decision (final, Railway Staging Deployment Preparation phase):**
+Dockerfile-based services (the table above), configured entirely from
+Railway's UI — no `railway.json` is added. Both Dockerfiles are already
+validated locally (`docker compose up --build`) and give more control
+than Nixpacks/build-command autodetection for this monorepo's
+`pnpm --filter` workspace layout. A `railway.json` would need to
+correctly express two services with different root directories from one
+repo, and there's no way to verify that config is right without a real
+Railway project to test it against — the risk of a subtly wrong
+committed config outweighs the convenience, so per-service UI
+configuration (root directory + Dockerfile path, set once when each
+service is created) is preferred instead.
+
 ## Environment variables
 
 ### `plate-runner-server`
@@ -64,6 +77,35 @@ the backend URL by hand on first load, that would mean adding a
 `VITE_DEFAULT_API_BASE_URL` build-time variable and wiring it into
 `useApiCommandListener`'s initial state — not done in this phase (a
 product change, not a security one), noted here as a future option.
+
+## API key generation and rotation
+
+Generate a strong key locally — never commit it, never paste it into
+this repo's docs:
+
+```bash
+openssl rand -base64 48
+# or, without openssl:
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+Paste the output directly into Railway's Variables tab for
+`plate-runner-server`'s `PLATE_RUNNER_API_KEY` — nowhere else. It must
+be at least 32 characters and not equal to the dev default
+(`dev-local-key`); `apps/server/src/config.ts` enforces both when
+`PLATE_RUNNER_ENV=production`.
+
+**To rotate:** generate a new key the same way, update
+`PLATE_RUNNER_API_KEY` in Railway's Variables tab, and redeploy
+`plate-runner-server` (env var changes require a redeploy, same as
+CORS). The old key stops working the moment the new deploy is live —
+there is no overlap window. Every client that talks to the API
+(Display Mode, Controller Mode, any external integration, and anyone's
+local `Settings / API` configuration) must be updated with the new key
+before its next request, or it will start getting `401`s. Rotate on a
+real security event (suspected leak) or on a routine schedule if this
+deployment's policy calls for one — there's currently no automated
+reminder for this, it's a manual operational task.
 
 ## Build & start commands
 
@@ -135,6 +177,24 @@ Before the first real Railway deploy:
 - [ ] Re-read `SECURITY_AUDIT_RAILWAY_READINESS.md`'s Known Risks —
       confirm none of the Medium risks are unacceptable for this
       deployment's actual use case.
+
+## Staging deployment execution
+
+Once the checklist above is satisfied, execute the actual staging
+deploy using:
+
+1. [RAILWAY_SECURITY_CHECKLIST.md](RAILWAY_SECURITY_CHECKLIST.md) — the
+   full pre-deploy checklist (superset of the one above, includes
+   secrets-hygiene and domain-documentation checks not repeated here).
+2. [RAILWAY_STAGING_SMOKE_TEST.md](RAILWAY_STAGING_SMOKE_TEST.md) — a
+   25-step numbered script to run against the live staging deployment,
+   covering both services, the Volume, CORS, the full Display/Controller
+   pairing and remote-control flow, Display Secret rotation/revocation,
+   a service restart (Volume persistence check), and a log/backup scan
+   for leaked secrets.
+
+Neither document requires or contains real Railway URLs, keys, or
+secrets — they're scripts to run, not records of a specific deployment.
 
 ## Rollback plan
 

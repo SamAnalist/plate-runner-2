@@ -2971,3 +2971,89 @@ TTL) onto `displaySecret`.
 - Revisit `RAILWAY_DEPLOYMENT_PLAN.md`'s pre-deploy checklist in practice
   once an actual Railway deployment happens, to confirm the new TTL var
   behaves as documented under real conditions.
+
+## Phase — Railway Staging Deployment Preparation
+
+### Goal
+
+Prepare the repo and documentation to execute a real Railway Staging
+deployment with confidence — no code architecture changes, no deploy,
+no Railway account connection. Close the gap between
+`RAILWAY_DEPLOYMENT_PLAN.md` (the strategy) and an operator actually
+running the deploy.
+
+### Implemented
+
+- Reviewed the deploy strategy against the current repo structure and
+  confirmed the Dockerfile-based two-service approach
+  (`plate-runner-server`, `plate-runner-web`) is correct and final — no
+  `railway.json` added, no Nixpacks path taken.
+- Confirmed no code blockers exist: `PORT` handling, `0.0.0.0` binding,
+  `/health` route, production API-key/CORS enforcement, storage-path
+  auto-creation, and nginx SPA fallback were all already correct.
+- Confirmed the frontend has no build-time `VITE_*` env vars anywhere
+  in the codebase — API Base URL stays fully runtime-configurable via
+  the UI, matching the existing documented design. No new env var
+  added.
+- Added an "API key generation and rotation" section to
+  `RAILWAY_DEPLOYMENT_PLAN.md`.
+- Finalized and documented the Dockerfiles-over-`railway.json` decision
+  in `RAILWAY_DEPLOYMENT_PLAN.md`.
+- Added a "Staging deployment execution" section to
+  `RAILWAY_DEPLOYMENT_PLAN.md` linking the two new docs below.
+
+### Files Changed
+
+- `docs/RAILWAY_STAGING_SMOKE_TEST.md` — new; 25-step numbered script to
+  validate a live Railway Staging deployment end-to-end.
+- `docs/RAILWAY_SECURITY_CHECKLIST.md` — new; standalone pre-deploy
+  security checklist (env config, secrets hygiene, network/domains,
+  sign-off).
+- `docs/RAILWAY_DEPLOYMENT_PLAN.md` — added API key generation/rotation
+  guidance, finalized the Dockerfiles decision, linked the two new docs.
+- `README.md`, `docs/OPERATIONS_GUIDE.md`, `docs/DOCKER_SETUP.md` — added
+  pointers to the two new docs.
+- `docs/PROGRESS.md` — this entry.
+
+### Decisions
+
+- Dockerfiles over Nixpacks/`railway.json`: already validated locally,
+  more control, and a monorepo `railway.json` can't be verified correct
+  without a real Railway project to test it against.
+- No `VITE_PLATE_RUNNER_DEFAULT_API_URL` build-time default: no existing
+  pattern for it in this codebase, and adding one is a product change
+  the user explicitly excluded from this phase.
+- The new smoke test and security checklist are separate documents from
+  `RAILWAY_DEPLOYMENT_PLAN.md`'s existing shorter inline checklist —
+  that one stays as a quick pre-deploy summary; the new docs are the
+  exhaustive, runnable versions.
+
+### Manual Testing
+
+- `pnpm typecheck`, `pnpm --filter web build`, `pnpm build`, and
+  `docker compose up --build` all run clean (no code changes this
+  phase, so this reconfirms no regression from prior phases).
+- Production-local simulation: ran the server with
+  `PLATE_RUNNER_ENV=production`, a dummy local-only strong API key
+  (generated inline, never committed), and
+  `PLATE_RUNNER_CORS_ORIGINS=http://localhost:8080` — confirmed
+  `/health` responds unauthenticated, `/api/status` 401s without the
+  key and 200s with it, and the server refuses to start when the CORS
+  origin or a valid API key is missing.
+
+### Known Limitations
+
+- None of this has been run against a real Railway project — the smoke
+  test and checklist are unexecuted scripts until an actual staging
+  deploy happens.
+- CORS-rejection verification (smoke test step 25) can only be done
+  from a real browser context; curl-based checks cannot exercise it
+  since the server intentionally allows no-Origin requests through.
+
+### Next Steps
+
+- Execute an actual Railway Staging deployment using
+  `RAILWAY_SECURITY_CHECKLIST.md` and `RAILWAY_STAGING_SMOKE_TEST.md`.
+- After a successful staging run, revisit
+  `SECURITY_AUDIT_RAILWAY_READINESS.md`'s residual risks to decide
+  whether a production readiness review is warranted.

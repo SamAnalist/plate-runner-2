@@ -141,3 +141,14 @@ verified against this lockfile.
 - No dedicated `.env` file support in `docker-compose.yml` beyond Compose's
   own default `.env` file lookup — copy `.env.example` to `.env` at the repo
   root, or set overrides inline (`PLATE_RUNNER_API_KEY=... docker compose up`).
+
+## Deploying these same images to Railway
+
+Railway uses these exact two Dockerfiles (`apps/server/Dockerfile`,
+`apps/web/Dockerfile`), built from the same repo-root context Compose
+uses locally — no separate Railway-specific Dockerfile or build config
+exists or is needed. See
+[RAILWAY_DEPLOYMENT_PLAN.md](RAILWAY_DEPLOYMENT_PLAN.md) for the service
+setup, env vars, and Volume configuration, then
+[RAILWAY_STAGING_SMOKE_TEST.md](RAILWAY_STAGING_SMOKE_TEST.md) to
+validate a live deployment.

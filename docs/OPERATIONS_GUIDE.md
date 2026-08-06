@@ -66,6 +66,11 @@ vars, volume setup, pre-deploy checklist). In short: set
 point `PLATE_RUNNER_STORAGE_PATH` at a persistent volume — the server
 refuses to start in production without the first three.
 
+Before actually deploying to Railway Staging, work through
+[RAILWAY_SECURITY_CHECKLIST.md](RAILWAY_SECURITY_CHECKLIST.md), then
+validate the live deployment with
+[RAILWAY_STAGING_SMOKE_TEST.md](RAILWAY_STAGING_SMOKE_TEST.md).
+
 ## CORS
 
 A disallowed origin doesn't stop the backend from processing a request —
