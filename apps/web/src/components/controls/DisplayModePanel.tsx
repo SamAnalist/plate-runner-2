@@ -16,6 +16,20 @@ const CONNECTION_TONE: Record<DisplayConnectionStatus, BadgeTone> = {
 
 const URL_SCHEME_PATTERN = /^https?:\/\//i;
 
+type SecretStatus = 'active' | 'expired' | 'revoked' | 'unknown';
+
+const SECRET_STATUS_TONE: Record<SecretStatus, BadgeTone> = {
+  active: 'success',
+  expired: 'warning',
+  revoked: 'danger',
+  unknown: 'neutral',
+};
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  display_revoked: 'This display has been revoked. Please clear local credentials and re-register.',
+  display_secret_expired: 'This display secret has expired. Please clear local credentials and re-register.',
+};
+
 function useCountdown(expiresAt: string | undefined) {
   const [remainingMs, setRemainingMs] = useState(() => (expiresAt ? new Date(expiresAt).getTime() - Date.now() : 0));
   useEffect(() => {
@@ -61,6 +75,8 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
     pairingCode, generatePairingCode, pairingCodeError,
     pairings, refreshPairings, revokePairing,
     pairingRequests, approveRequest, rejectRequest,
+    authErrorReason, displaySecurity, rotateSecret, rotateSecretError,
+    revokeThisDisplay, revokeError,
   } = listener;
 
   const [nameInput, setNameInput] = useState('');
@@ -75,6 +91,14 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
     if (registration) refreshPairings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registration?.displayId]);
+
+  const secretStatus: SecretStatus = !displaySecurity
+    ? 'unknown'
+    : displaySecurity.revokedAt
+      ? 'revoked'
+      : displaySecurity.secretExpiresAt && new Date(displaySecurity.secretExpiresAt).getTime() <= Date.now()
+        ? 'expired'
+        : 'active';
 
   if (!registration) {
     return (
@@ -119,12 +143,55 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <Label>This Display</Label>
+        <Label>Display Security</Label>
         <p className="text-xs font-mono text-white/70">{registration.displayName}</p>
         <p className="text-[9px] font-mono text-white/25 truncate">{registration.displayId}</p>
-        <div className="mt-1.5">
-          <Button tone="danger" onClick={forgetRegistration}>Forget Registration</Button>
+
+        <div className="mt-1.5 flex items-center gap-2">
+          <Badge tone={SECRET_STATUS_TONE[secretStatus]}>secret: {secretStatus}</Badge>
         </div>
+        <p className="mt-1 text-[9px] font-mono text-white/25">
+          Expiration: {displaySecurity?.secretExpiresAt
+            ? new Date(displaySecurity.secretExpiresAt).toLocaleString()
+            : 'No expiration configured'}
+        </p>
+        {displaySecurity?.secretLastUsedAt && (
+          <p className="text-[9px] font-mono text-white/25">
+            Last used: {new Date(displaySecurity.secretLastUsedAt).toLocaleString()}
+          </p>
+        )}
+
+        {authErrorReason && AUTH_ERROR_MESSAGES[authErrorReason] && (
+          <div className="mt-1.5"><FieldError>{AUTH_ERROR_MESSAGES[authErrorReason]}</FieldError></div>
+        )}
+
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button
+            tone="neutral"
+            onClick={() => {
+              if (window.confirm('Rotate this display\'s secret? The old secret will stop working immediately.')) {
+                rotateSecret();
+              }
+            }}
+          >
+            Rotate Secret
+          </Button>
+          <Button
+            tone="danger"
+            onClick={() => {
+              if (window.confirm(
+                `Unregister "${registration.displayName}"? This revokes its secret and all paired controllers. This cannot be undone.`,
+              )) {
+                revokeThisDisplay();
+              }
+            }}
+          >
+            Unregister Display
+          </Button>
+          <Button tone="danger" variant="ghost" onClick={forgetRegistration}>Forget Registration</Button>
+        </div>
+        {rotateSecretError && <div className="mt-1.5"><FieldError>{rotateSecretError}</FieldError></div>}
+        {revokeError && <div className="mt-1.5"><FieldError>{revokeError}</FieldError></div>}
       </div>
 
       <div>

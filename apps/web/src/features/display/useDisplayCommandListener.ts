@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DevicePairingSummary, PairingRequestSummary, SetConfigPayload, SimulationCommand } from '@plate-runner/shared';
+import type { DevicePairingSummary, DisplayDevice, PairingRequestSummary, SetConfigPayload, SimulationCommand } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 import type { PlateListsControls } from '../lists/usePlateLists';
@@ -43,6 +43,16 @@ export interface DisplayCommandListenerControls {
   pendingCount: number;
   lastError: string | null;
   lastCommandAt: string | null;
+  /** Set when the command poll gets a 401 with a specific reason — 'display_revoked' or
+   * 'display_secret_expired' — so the UI can show that instead of a generic error. */
+  authErrorReason: string | null;
+
+  displaySecurity: DisplayDevice | null;
+  refreshDisplaySecurity: () => void;
+  rotateSecret: () => void;
+  rotateSecretError: string | null;
+  revokeThisDisplay: () => void;
+  revokeError: string | null;
 
   pairingCode: PairingCodeState | null;
   generatePairingCode: () => void;
@@ -121,6 +131,10 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
   const [pairingCodeError, setPairingCodeError] = useState<string | null>(null);
   const [pairings, setPairings] = useState<DevicePairingSummary[]>([]);
   const [pairingRequests, setPairingRequests] = useState<PairingRequestSummary[]>([]);
+  const [authErrorReason, setAuthErrorReason] = useState<string | null>(null);
+  const [displaySecurity, setDisplaySecurity] = useState<DisplayDevice | null>(null);
+  const [rotateSecretError, setRotateSecretError] = useState<string | null>(null);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
 
   const simulationRef = useRef(simulation); simulationRef.current = simulation;
   const plateQueueRef = useRef(plateQueue); plateQueueRef.current = plateQueue;
@@ -163,6 +177,10 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
     setPairingCode(null);
     setPairings([]);
     setPairingRequests([]);
+    setAuthErrorReason(null);
+    setDisplaySecurity(null);
+    setRotateSecretError(null);
+    setRevokeError(null);
   }, []);
 
   const refreshPairings = useCallback(() => {
@@ -187,6 +205,62 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
       refreshPairings();
     })();
   }, [authedFetch, refreshPairings]);
+
+  const refreshDisplaySecurity = useCallback(() => {
+    const reg = registrationRef.current;
+    if (!reg) return;
+    void (async () => {
+      try {
+        const res = await authedFetch(`/api/displays/${reg.displayId}`);
+        const data = await res.json().catch(() => null);
+        if (res.ok && data?.ok) setDisplaySecurity(data.display);
+      } catch {
+        // best-effort — surfaced via connectionStatus from the poll loop instead
+      }
+    })();
+  }, [authedFetch]);
+
+  /** Only overwrites the persisted secret on success — a failure leaves the old, still-working secret untouched. */
+  const rotateSecret = useCallback(() => {
+    const reg = registrationRef.current;
+    if (!reg) return;
+    setRotateSecretError(null);
+    void (async () => {
+      try {
+        const res = await authedFetch(`/api/displays/${reg.displayId}/rotate-secret`, { method: 'POST' });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.ok) {
+          setRotateSecretError(data?.error ?? `HTTP ${res.status}`);
+          return;
+        }
+        const updated: DisplayRegistration = { ...reg, displaySecret: data.displaySecret };
+        saveRegistration(updated);
+        setRegistration(updated);
+        refreshDisplaySecurity();
+      } catch (err) {
+        setRotateSecretError(err instanceof Error ? err.message : 'Could not reach server');
+      }
+    })();
+  }, [authedFetch, refreshDisplaySecurity]);
+
+  const revokeThisDisplay = useCallback(() => {
+    const reg = registrationRef.current;
+    if (!reg) return;
+    setRevokeError(null);
+    void (async () => {
+      try {
+        const res = await authedFetch(`/api/displays/${reg.displayId}/revoke`, { method: 'POST' });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.ok) {
+          setRevokeError(data?.error ?? `HTTP ${res.status}`);
+          return;
+        }
+        forgetRegistration();
+      } catch (err) {
+        setRevokeError(err instanceof Error ? err.message : 'Could not reach server');
+      }
+    })();
+  }, [authedFetch, forgetRegistration]);
 
   const refreshPairingRequests = useCallback(() => {
     const reg = registrationRef.current;
@@ -229,6 +303,12 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
     const interval = setInterval(refreshPairingRequests, PAIRING_REQUESTS_POLL_MS);
     return () => clearInterval(interval);
   }, [registration, refreshPairingRequests]);
+
+  useEffect(() => {
+    if (!registration) return;
+    refreshDisplaySecurity();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registration?.displayId]);
 
   const generatePairingCode = useCallback(() => {
     const reg = registrationRef.current;
@@ -297,7 +377,9 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
     try {
       const res = await authedFetch(`/api/displays/${reg.displayId}/commands/pending`);
       if (res.status === 401) {
+        const data = await res.json().catch(() => null);
         setConnectionStatus('unauthorized');
+        setAuthErrorReason(data?.error ?? null);
         return;
       }
       if (!res.ok) {
@@ -308,6 +390,7 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
       const data = (await res.json()) as { commands: SimulationCommand[] };
       setConnectionStatus('connected');
       setLastError(null);
+      setAuthErrorReason(null);
       setPendingCount(data.commands.length);
       if (data.commands.length > 0) {
         await executeCommand(data.commands[0]);
@@ -341,9 +424,12 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
     apiKey, setApiKey,
     registration, registerDisplay, forgetRegistration, registerError,
     enabled, setEnabled,
-    connectionStatus, pendingCount, lastError, lastCommandAt,
+    connectionStatus, pendingCount, lastError, lastCommandAt, authErrorReason,
     pairingCode, generatePairingCode, pairingCodeError,
     pairings, refreshPairings, revokePairing,
     pairingRequests, refreshPairingRequests, approveRequest, rejectRequest,
+    displaySecurity, refreshDisplaySecurity,
+    rotateSecret, rotateSecretError,
+    revokeThisDisplay, revokeError,
   };
 }
