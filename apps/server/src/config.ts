@@ -3,11 +3,14 @@ import { resolve } from 'node:path';
 
 const DEV_DEFAULT_API_KEY = 'dev-local-key';
 
+const DEV_DEFAULT_CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:8080'];
+
 export interface ServerConfig {
   apiKey: string;
   port: number;
   storagePath: string;
   isProduction: boolean;
+  corsOrigins: string[];
 }
 
 function readApiKey(): string {
@@ -38,11 +41,27 @@ function readStoragePath(): string {
   return absolute;
 }
 
+function readCorsOrigins(): string[] {
+  const raw = process.env.PLATE_RUNNER_CORS_ORIGINS;
+  if (raw && raw.trim()) {
+    return raw.split(',').map(o => o.trim()).filter(Boolean);
+  }
+  const isProduction = process.env.NODE_ENV === 'production';
+  const banner = isProduction
+    ? '⚠️  PLATE_RUNNER_CORS_ORIGINS is not set in a production-like environment (NODE_ENV=production). ' +
+      `Falling back to ${DEV_DEFAULT_CORS_ORIGINS.join(', ')} — set PLATE_RUNNER_CORS_ORIGINS explicitly for any non-localhost origin.`
+    : `⚠️  PLATE_RUNNER_CORS_ORIGINS is not set — allowing ${DEV_DEFAULT_CORS_ORIGINS.join(', ')} by default. ` +
+      'Fine for local development, set PLATE_RUNNER_CORS_ORIGINS for anything else.';
+  console.warn(banner);
+  return DEV_DEFAULT_CORS_ORIGINS;
+}
+
 export function loadConfig(): ServerConfig {
   return {
     apiKey: readApiKey(),
     port: readPort(),
     storagePath: readStoragePath(),
     isProduction: process.env.NODE_ENV === 'production',
+    corsOrigins: readCorsOrigins(),
   };
 }

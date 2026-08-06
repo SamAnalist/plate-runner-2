@@ -33,13 +33,21 @@ async function main() {
   const remoteRepo = createRemoteRepo(storage);
 
   const statusService = createStatusService(commandsRepo, storage);
-  const fastify = Fastify({ logger: loggerOptions });
+  // 1MB — generous for JSON simulation/list payloads, small enough to reject abuse before it reaches route handlers.
+  const fastify = Fastify({ logger: loggerOptions, bodyLimit: 1_000_000 });
   const commandService = createCommandService(commandsRepo, fastify.log);
   const listService = createListService(listsRepo);
   const displayService = createDisplayService(remoteRepo, fastify.log);
   const pairingService = createPairingService(remoteRepo, fastify.log);
 
-  await fastify.register(cors, { origin: true });
+  await fastify.register(cors, {
+    origin: (origin, cb) => {
+      // No Origin header (curl, server-to-server) — allow, there's nothing to check against.
+      // A disallowed origin gets no CORS headers (browsers enforce that client-side) rather
+      // than an error — the request itself isn't blocked server-side, just not marked cross-origin-safe.
+      cb(null, !origin || config.corsOrigins.includes(origin));
+    },
+  });
   registerRequestLogger(fastify);
 
   // External API callers commonly send Content-Type: application/json with no body on
