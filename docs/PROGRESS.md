@@ -2596,3 +2596,105 @@ Execution History/Camera Mode/Fullscreen during this phase's QA pass.
 - If selective backup import (e.g. "only Plate Lists") is ever needed,
   it would build on the same `parseLocalBackup`/`applyLocalBackup`
   primitives.
+
+---
+
+## Phase — Demo Readiness Polish
+
+**Date:** 2026-08-06
+
+### Goal
+
+Final review pass before moving to new features or back to render work:
+copy/consistency across every visible screen, a rewritten narrative demo
+checklist with timings, a Quick Start in the README, a manual smoke
+test, and one small explicitly-requested UI addition — a hover-revealed
+Play/Pause/Skip widget over the Local Mode scene. No backend/API/
+pairing/scheduler-engine/Remote-Mode/render-calibration changes, no
+automated tests, no large layout changes.
+
+### Implemented
+
+- **Copy pass**: reworded `APP_SCREENS` descriptions
+  (`navigation/appScreens.ts`) so Local Simulator reads as the starting
+  point, Display Mode reads as "this screen receives commands", and
+  Execution History/Settings drop stale or overly technical wording
+  (Settings' description predated System Status/Backup/Storage/Screen
+  Saver existing). Matching subtitles updated on `SettingsScreen.tsx`,
+  `PlateListsScreen.tsx`, `SchedulerScreen.tsx`,
+  `ExecutionHistoryScreen.tsx`. `ControllerModeScreen.tsx` — the one
+  full-width screen with room to spare — gained a short page heading it
+  was missing (Local/Display keep their scene+panel layout unchanged,
+  no room to add one without shrinking the scene). Minor copy fixes in
+  `LocalStorageManagementPanel.tsx` (title casing) and
+  `ScreenSaverSettingsPanel.tsx` (dropped the technical "CSS-only"
+  phrasing from user-facing copy).
+- **Scene quick-controls** (explicit user request):
+  `components/simulation/SceneQuickControls.tsx` — a small,
+  semi-transparent, hover-revealed corner widget over the Local Mode
+  scene with Play/Pause (reusing the exact same start/pause/resume
+  conditions as the existing Playback section) and Skip (shown only
+  when a Plate Queue is active, calling the same `skipCurrent` the
+  Plate Queue panel already uses). Purely a UI overlay in
+  `LocalModeScreen.tsx` — `SimulationScene.tsx` itself is untouched.
+- **`docs/DEMO_CHECKLIST.md`** rewritten into 6 named blocks (What is
+  Plate Runner?, Local Simulation, Saved Lists/Scheduling/History,
+  Screen Saver, Remote Mode, Wrap-up) with rough per-block time budgets,
+  matching the user's requested step order.
+- **`README.md`** gained a numbered `## Quick Start` (install → run →
+  open → run a plate → optional Docker → optional LAN/Remote Mode),
+  replacing the old terse "Quickstart", linking to
+  `OPERATIONS_GUIDE.md` and `MANUAL_TESTING_GUIDE.md`.
+- **New `docs/RELEASE_NOTES.md`**: current feature set, how to run,
+  known limitations (rolled up from this and prior phases), and
+  recommended next work (render/scene calibration or new functionality).
+- `docs/MANUAL_TESTING_GUIDE.md` gained one step documenting the new
+  scene quick-controls widget.
+
+### Files Modified
+
+- `apps/web/src/navigation/appScreens.ts`,
+  `screens/{SettingsScreen,ControllerModeScreen,PlateListsScreen,
+  SchedulerScreen,ExecutionHistoryScreen}.tsx`,
+  `components/controls/{LocalStorageManagementPanel,
+  ScreenSaverSettingsPanel}.tsx` — copy only, no logic changes.
+- `components/simulation/SceneQuickControls.tsx` — new.
+- `screens/LocalModeScreen.tsx` — wires the new widget.
+- `docs/{DEMO_CHECKLIST,MANUAL_TESTING_GUIDE}.md`, `README.md` —
+  updated. `docs/RELEASE_NOTES.md` — new.
+- `docs/APP_NAVIGATION_SPEC.md`, `docs/SCREEN_SAVER_SPEC.md`,
+  `docs/OPERATIONS_GUIDE.md` — reviewed, no stale references found, left
+  unchanged.
+
+### Decisions
+
+- Local Mode and Display Mode's side-panel headers stay without
+  subtitles (space-constrained, would require a layout change);
+  Controller Mode's full-width screen was the one safe place to add a
+  short intro without touching layout.
+- Skip in the new scene widget only appears when a Plate Queue is
+  active — a lone single-plate run has nothing meaningful to skip to,
+  so the control simply isn't shown rather than inventing new behavior.
+
+### Manual Testing
+
+Scripted Playwright smoke test (not committed) covering the user's
+19-step list: Home → Local → random plate generator (via Plate Lists,
+where it actually lives) → Start/Pause/Resume/Stop → load+run a 3-plate
+queue → create a Plate List → Run List → create a schedule + Run Now →
+Execution History shows a record → Settings → Export Backup → short
+Screen Saver timeout + overlay appears → Display Mode opens →
+Controller Mode opens → Camera Mode hides the shell. All passed;
+`pnpm typecheck`, `pnpm --filter web build`, and `pnpm build` all clean.
+No Docker rebuild — nothing in this phase touches Docker/backend files.
+
+### Known Limitations
+
+Unchanged from the prior phase — see Operational Readiness's entry
+above and `docs/RELEASE_NOTES.md`'s Known Limitations section for the
+consolidated list.
+
+### Next Steps
+
+- Render/scene calibration, or new functionality — see
+  `docs/RELEASE_NOTES.md`'s Recommended Next Work.

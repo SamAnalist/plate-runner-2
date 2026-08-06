@@ -3,24 +3,35 @@
 A simulated license-plate reading scene for camera/ANPR testing —
 local-first, with an optional local backend for remote control over a LAN.
 
-## Quickstart
+## Quick Start
 
-```bash
-pnpm install
-pnpm dev        # web (http://localhost:5173) + backend (http://localhost:8787)
-```
+1. **Install dependencies:**
+   ```bash
+   pnpm install
+   ```
+2. **Run web + server locally:**
+   ```bash
+   pnpm dev        # web (http://localhost:5173) + backend (http://localhost:8787)
+   ```
+3. **Open the app** at `http://localhost:5173` — you'll land on Home.
+4. **Run a plate:** open Local Simulator, type a plate (e.g. `ABC123`),
+   click Start.
+5. **Optional — Docker:**
+   ```bash
+   docker compose up --build   # web at http://localhost:8080, backend at http://localhost:8787
+   ```
+6. **Optional — LAN / Remote Mode:** pair a Display and a Controller on
+   two devices on the same network — see
+   [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md)'s "Real
+   LAN Testing" section.
 
-Or with Docker:
-
-```bash
-docker compose up --build   # web at http://localhost:8080, backend at http://localhost:8787
-```
-
-New to the project? Start with
-[docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md) — a step-by-step
-walkthrough of every feature, no code knowledge required — or
-[docs/DEMO_CHECKLIST.md](docs/DEMO_CHECKLIST.md) for a quick 10–15 minute
-guided demo.
+For day-to-day operation (env vars, backups, storage resets, Screen
+Saver, troubleshooting), see
+[docs/OPERATIONS_GUIDE.md](docs/OPERATIONS_GUIDE.md). For a full
+feature walkthrough, see
+[docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md), or
+[docs/DEMO_CHECKLIST.md](docs/DEMO_CHECKLIST.md) for a guided 10–15
+minute demo.
 
 ## Project layout
 
@@ -48,6 +59,7 @@ Limitations for the current state of automated testing.
 
 All project documentation lives in [docs/](docs/). Key entry points:
 
+- [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) — current feature set, how to run, known limitations, and what's next.
 - [docs/PROGRESS.md](docs/PROGRESS.md) — the full phase-by-phase build log.
 - [docs/RELEASE_CANDIDATE_QA.md](docs/RELEASE_CANDIDATE_QA.md) — latest QA pass and release readiness status.
 - [docs/OPERATIONS_GUIDE.md](docs/OPERATIONS_GUIDE.md) — running, configuring, backing up, and troubleshooting day-to-day.

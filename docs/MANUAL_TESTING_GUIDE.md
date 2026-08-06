@@ -49,6 +49,9 @@ simulation.
 5. In **Visual Settings → Vehicle Color**, click the red and gray dots —
    notice a small note appears saying there's no dedicated asset yet (the
    car still renders blue). This is expected, not a bug.
+6. Hover the top-right corner of the scene itself — a dim dot expands
+   into a small Play/Pause (and, while a queue is running, Skip)
+   control. It mirrors the same Playback buttons in the side panel.
 
 ## 3. Plate Queue — running many plates in a row
 
