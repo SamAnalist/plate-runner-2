@@ -2345,3 +2345,100 @@ clean.
 - Nothing backend-related is pending from this phase — Remote Mode's
   pairing/command-routing/CORS all remain exactly as validated in the
   prior LAN testing phase.
+
+---
+
+## Phase — App UX Polish
+
+**Date:** 2026-08-06
+
+### Goal
+
+Short visual/UX polish pass on top of App Shell Navigation: unify
+buttons, badges, empty states, and form styling app-wide; polish the
+Home screen, header, and sidebar; do a light responsive/spacing check.
+Pure UI/CSS/component polish — no backend, API, pairing,
+command-routing, scheduler-engine, queue-logic, or render/scene changes.
+
+### Implemented
+
+- New shared UI kit at `apps/web/src/components/ui/`: `Button` (tones
+  neutral/primary/danger/warn; variants pill/solid/ghost), `Badge`
+  (tones neutral/success/info/warning/danger, optional pulse), `Label`,
+  `EmptyState` (message + hint + optional action), `FieldError`.
+- All 7 control panels (`DisplayModePanel`, `ControllerModePanel`,
+  `LocalApiPanel`, `ExecutionHistoryPanel`, `SchedulerPanel`,
+  `PlateListsPanel`, `PlateQueuePanel`) had their locally-duplicated
+  `SmallButton`/`Label` and ad hoc status-color maps replaced with the
+  shared components — no behavior changes, pure rendering swap around
+  the exact same conditions.
+- 5 empty states (Plate Lists, Scheduler, Execution History, Controller
+  paired displays, Display pairing requests/paired controllers) now
+  explain what to do next instead of a bare "No X yet." line.
+- `LocalModeScreen.tsx` and `DisplayModeScreen.tsx`'s bespoke
+  Start/Stop/Pause/Reset/gate-override/view-mode buttons now go through
+  `Button` too.
+- Home screen: Local Simulator card visually promoted as the primary
+  entry point (gradient, `lg:col-span-2`, "Start here" badge), every
+  card gets a two-letter monogram, status pills now use `Badge`.
+- Sidebar: active items get a left accent bar in addition to the
+  background fill, plus dividers between the Modes/Data/Settings groups.
+- Header: status chip dot color now reflects the actual connection/queue
+  status instead of always being static green (see Bugs/Risks).
+
+### Files Changed
+
+- `apps/web/src/components/ui/{Badge,Button,Label,EmptyState,FieldError}.tsx` — new shared UI kit.
+- `apps/web/src/components/controls/{DisplayModePanel,ControllerModePanel,LocalApiPanel,ExecutionHistoryPanel,SchedulerPanel,PlateListsPanel,PlateQueuePanel}.tsx` — badge/button/empty-state/form polish, no logic changes.
+- `apps/web/src/screens/LocalModeScreen.tsx`, `DisplayModeScreen.tsx` — button/badge polish.
+- `apps/web/src/screens/HomeScreen.tsx` — card hierarchy, monograms, Badge status pills.
+- `apps/web/src/components/layout/AppShell.tsx` — header spacing, status-chip tone.
+- `apps/web/src/components/layout/SidebarNav.tsx` — active-item accent bar, group dividers.
+- `apps/web/src/App.tsx` — computes `tone` for each status chip from real connection/queue state.
+- `docs/UI_POLISH_NOTES.md` — new.
+- `docs/APP_NAVIGATION_SPEC.md` — pointer to the new UI kit.
+
+### Decisions
+
+- Kept `Card`/`ToggleGroup` file-local rather than extracting — the
+  Home nav-card and the compact data-item cards serve different jobs;
+  forcing one abstraction would have blurred that distinction.
+- Header status chips stay a distinct compound element, not `<Badge>` —
+  they need more visual weight in that persistent-header role.
+- Sidebar collapse/icon-only mode intentionally not implemented — no
+  icon library in the project and no interactive collapse affordance
+  was requested; documented as a known limitation instead.
+
+### Manual Testing
+
+Scripted Playwright pass (not committed) against `pnpm --filter web
+dev` covering all 14 requested checks: Home renders with the promoted
+Local Simulator card, sidebar active state, navigating every screen,
+last-screen persistence survives a reload, Local Mode Start/Stop still
+works, Display Mode still shows registration/pairing/listener,
+Controller still shows Paired Displays + empty state, Plate Lists and
+Scheduler empty states plus populated states after creating a test
+list/schedule, Execution History renders, Settings/API Test Connection
+visible, Camera Mode and Fullscreen both still hide the shell, and zero
+browser console errors during the whole pass. All 14 passed.
+`pnpm typecheck` and `pnpm --filter web build` both clean.
+
+### Known Limitations
+
+- No collapsed/icon-only sidebar for narrow viewports (see Decisions).
+- Debug toggle in Local Mode now renders with the shared `primary`
+  (blue) tone instead of its previous one-off purple — a deliberate
+  simplification of the tone palette, not a functional change.
+
+### Bugs/Risks
+
+- Fixed one narrow, behavior-adjacent bug: the header's status-chip dot
+  was always static green for any active chip, even when the underlying
+  connection was actually `error`/`unauthorized`. It now reflects the
+  real status color. No new state was introduced — only how existing
+  state is displayed.
+
+### Next Steps
+
+- If the app later needs to run well on narrower screens, revisit the
+  sidebar-collapse decision above (likely needs a small icon set).

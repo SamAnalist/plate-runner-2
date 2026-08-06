@@ -4,6 +4,11 @@ How the frontend shell is structured after the App Shell Navigation phase:
 a header + sidebar + 8 screens, replacing the old three-tab
 (Local/Display/Controller) header with a single mega-panel underneath.
 
+Every button, badge, and empty state described below is rendered through
+a small shared UI kit at `apps/web/src/components/ui/` (`Button`,
+`Badge`, `Label`, `EmptyState`, `FieldError`) — see
+[UI_POLISH_NOTES.md](UI_POLISH_NOTES.md) for the tone/variant system.
+
 ## Screens
 
 ```ts
