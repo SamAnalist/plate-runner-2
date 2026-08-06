@@ -5,6 +5,18 @@ simulation defaults to run them with. No backend — everything lives in the
 browser and is portable only via JSON export/import (see
 `docs/IMPORT_EXPORT_SPEC.md`).
 
+**Update (Macro Phase 4 — Local Backend):** the backend now also persists
+`PlateList` objects (same shape, SQLite-backed) with its own CRUD API —
+`GET/POST /api/lists`, `GET/PUT/DELETE /api/lists/:id`,
+`POST /api/lists/:id/run` — see [BACKEND_API_SPEC.md](BACKEND_API_SPEC.md).
+This is a **parallel, unsynced** store: creating a list via the API does not
+appear in the browser's localStorage-backed list UI, and vice versa. Running
+a list via the API (`POST /api/lists/:id/run`) embeds a full snapshot of the
+list into the resulting `run_list` command payload specifically so the
+frontend listener doesn't need to look anything up by id — see
+[API_COMMANDS_SPEC.md](API_COMMANDS_SPEC.md). Syncing the two stores is not
+in scope for this phase.
+
 ## Type — `packages/shared/src/types/plateList.ts`
 
 ```ts

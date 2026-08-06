@@ -1656,3 +1656,214 @@ Regression spot-check: single-plate manual run, manual pause/resume (exact `t` f
 ### Next Steps
 
 - Backend/remote/API phases remain explicitly out of scope until requested.
+
+---
+
+## Phase 0.8 — Local Backend + API + Docker (Macro Phase 4)
+
+### Goal
+
+Add a local Node.js/Fastify backend so external scripts/tools can drive
+Plate Runner over a REST API, without building Remote Mode, pairing, or
+WebSocket yet. Everything up to this phase lived entirely in the browser
+(`localStorage`); this phase adds real server-side persistence and a
+command-queue model the frontend polls to actually execute anything.
+
+### Implemented
+
+- **`apps/server`** — Fastify backend, run via `tsx` (no build step, mirrors
+  how Vite already consumes `packages/shared` as raw TS for the frontend).
+  `GET /health` (unauthenticated) and `GET /api/status`.
+- **API key auth** on every `/api/*` route (`x-api-key` header or
+  `Authorization: Bearer`), scoped via a Fastify plugin boundary so `/health`
+  is structurally exempt rather than special-cased per route. Basic rate
+  limiting (`@fastify/rate-limit`, 100 req/min/IP). Request logging with a
+  custom serializer that can never leak the API key.
+- **SQLite storage** (`better-sqlite3`, WAL mode, no ORM) for
+  `simulation_commands` and `plate_lists` — installed cleanly via a
+  prebuilt binary, no native-compile friction, no JSON fallback needed.
+  Never crashes on a corrupted/unwritable data dir — falls back to an
+  in-memory database and reports that via `/api/status`.
+- **Simulation Command API** — `SimulationCommand` type
+  (`pending → claimed → completed|failed|cancelled`) added to
+  `packages/shared`. `POST /api/simulate`, `POST /api/simulate/queue`,
+  `POST /api/simulation/{pause,resume,stop,skip-current,open-gate}`, the
+  generic `POST/GET /api/simulation/commands*`, and `GET /api/commands*`
+  (history) all build on this one lifecycle.
+- **Plate Lists API** — backend-side CRUD (`GET/POST /api/lists`,
+  `GET/PUT/DELETE /api/lists/:id`, `POST /api/lists/:id/run`), a parallel,
+  unsynced store to the browser's localStorage-backed lists.
+  `POST /api/lists/:id/run` embeds a full list snapshot in the resulting
+  command's payload to avoid a read-then-execute race.
+- **Frontend `useApiCommandListener`** — polls `GET
+  /api/simulation/commands/pending` every 1.5s, claims and executes
+  commands against the existing local simulator via
+  `usePlateLists.runListSnapshot` (a new method factoring out the same
+  apply-defaults-then-run sequencing `runList`/`runListForSchedule` already
+  used — now shared by three callers: manual, scheduled, API). If the local
+  queue is already active, run-type commands are claimed then failed with
+  `local_queue_busy` for explicit feedback instead of silently starving.
+  Instantiated in `App.tsx` (not `ControlPanel`) so it keeps polling in
+  Camera Mode/Fullscreen — only its `LocalApiPanel` UI is hidden there.
+- **Docker** — `apps/server/Dockerfile`, `apps/web/Dockerfile` (multi-stage,
+  nginx-served), `docker-compose.yml` (named volume for SQLite
+  persistence), root `dev`/`dev:web`/`dev:server`/`server:start` scripts via
+  a new `concurrently` devDependency.
+
+### Files Changed
+
+- `packages/shared/src/types/simulationCommand.ts` — created
+- `packages/shared/src/types/executionHistory.ts` — `TriggeredBy` gains `'api_command'`
+- `packages/shared/src/index.ts`, `packages/shared/package.json` (`"type": "module"` — see Decisions) — updated
+- `apps/server/**` — created (package.json, tsconfig.json, `src/{index,config}.ts`, `src/routes/*.ts`, `src/services/*.ts`, `src/storage/*.ts`, `src/security/*.ts`, `src/logging/requestLogger.ts`)
+- `apps/web/src/features/lists/usePlateLists.ts` — `runListSnapshot` added
+- `apps/web/src/features/api/useApiCommandListener.ts` — created
+- `apps/web/src/components/controls/LocalApiPanel.tsx` — created
+- `apps/web/src/components/controls/ControlPanel.tsx`, `apps/web/src/App.tsx` — wiring
+- `apps/server/Dockerfile`, `apps/web/Dockerfile`, `docker-compose.yml`, `.dockerignore` — created
+- `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` — scripts, `packageManager` pin, `allowBuilds` for `better-sqlite3`
+- `.gitignore` — `apps/server/data/`
+- `docs/BACKEND_API_SPEC.md`, `docs/API_COMMANDS_SPEC.md`, `docs/LOCAL_API_MODE.md`, `docs/DOCKER_SETUP.md`, `docs/SECURITY_NOTES.md` — created
+- `docs/SECURITY_SPEC.md`, `docs/PLATE_LISTS_SPEC.md`, `docs/QUEUE_SPEC.md`, `docs/SCHEDULER_SPEC.md`, `docs/EXECUTION_HISTORY_SPEC.md` — updated
+
+### Decisions
+
+- **`apps/server` runs via `tsx`, no build step** — `packages/shared` has no
+  compile step either (Vite transpiles it directly for the frontend);
+  adding a dedicated build pipeline just for the backend to consume it
+  would be new tooling for no real benefit at local scale. Easily revisited
+  before any real production deployment.
+- **SQLite over JSON files** — `better-sqlite3` installed cleanly via a
+  prebuilt binary in this environment, so the plan's JSON-file fallback
+  was never needed. Sets up cleanly for future remote/history/pairing needs
+  without a heavy ORM.
+- **`packages/shared/package.json` needed `"type": "module"`** — without it,
+  Node/`tsx` silently interpreted its `.ts` files as CommonJS at runtime
+  (only synthesizing a `default` export), even though `tsc --noEmit`
+  type-checked fine against the same source — type-checking is purely
+  source-level and doesn't care about the runtime module system. This had
+  been invisible until now because Vite (the frontend's only prior
+  consumer) ignores the field entirely. Caught by smoke-testing the actual
+  server process, not by `tsc` alone — reinforces always live-testing
+  before calling a milestone done.
+- **`local_queue_busy` claims-then-fails rather than leaving the command
+  pending** — an API caller gets an explicit, fast signal instead of
+  silently waiting on a command that might never get picked up before the
+  caller's own timeout.
+- **Run-list snapshot embedding, not a list-id reference** — avoids a
+  race where the list is edited or deleted between "the API call that
+  triggers a run" and "the frontend actually executing it."
+- **Fastify's empty-JSON-body rejection fixed on both ends** — `fetch()`
+  always sets `Content-Type: application/json`, which Fastify's default
+  parser rejects when combined with no body
+  (`FST_ERR_CTP_EMPTY_JSON_BODY`) — this broke every bodiless POST
+  (`claim`, `complete`, the control endpoints) until the frontend was
+  changed to always send `'{}'` and the server's JSON parser was changed to
+  treat an empty body as `{}`. Fixed on both sides deliberately: the
+  frontend fix makes this app's own calls correct, but the server fix
+  protects any *other* external caller (curl, CI scripts) from hitting the
+  same footgun, which is the whole point of exposing this API to begin with.
+- **`packageManager: "pnpm@11.9.0"` pinned in root `package.json`** —
+  without it, `corepack enable` inside the Docker image resolved the latest
+  pnpm (11.20.0) at build time, which requires Node ≥ 22.13; combined with
+  the `node:20-bookworm-slim` base image this produced a cryptic pnpm-level
+  `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite` crash unrelated to this
+  project's own code. Fixed by pinning the pnpm version and bumping both
+  Dockerfiles to `node:22-bookworm-slim`.
+
+### Manual Testing
+
+Backend endpoints verified via `curl` and the frontend listener verified
+end-to-end via a headless-Chromium Playwright driver (both a live two-process
+test — `tsx` backend + Vite dev server — and a full `docker compose up
+--build` run):
+
+1. `GET /health` with no key → `200`.
+2. `GET /api/status` with no key → `401`; with the correct key → `200`,
+   `storage.type: "sqlite"`, `storage.ok: true`.
+3. `POST /api/simulate` (single plate) → `200`, `{ ok, commandId, status: 'pending' }`.
+4. Frontend "Test Connection" → `connected` badge.
+5. Frontend listener claims and executes the `run_plate` command — vehicle
+   ran with the API-supplied plate (confirmed via screenshot: top bar and
+   on-vehicle plate both show `APIRUN1`), execution history recorded it,
+   command reached `status: 'completed'`.
+6. `POST /api/simulate/queue` with 3 plates → `200`, command created and
+   later confirmed `completed` in the command history.
+7. `POST /api/simulation/pause` / `/resume` with **no body** (only
+   `Content-Type: application/json`) → both `200` — confirms the empty-body
+   fix on the server side, independent of the frontend.
+8. `open-gate` via API in a `wait_for_signal`-gated run — exercised as part
+   of the control-command sweep; command created and completable.
+9. `POST /api/simulation/stop` — command created, `200`.
+10. Invalid plate (`abc!`) → `400` with a descriptive error.
+11. Invalid API key → `401` (both missing-header and wrong-key cases).
+12. `POST /api/lists` → `201`, list created; `POST /api/lists/:id/run` →
+    `200`, `run_list` command created with an embedded list snapshot.
+13. Restarted the raw backend process against the same storage path — prior
+    pending commands and the created list were both still present
+    afterward, confirming SQLite persistence across restarts.
+14. `docker compose up --build` — both images built (including
+    `better-sqlite3`'s native postinstall step via a prebuilt binary), both
+    containers started, `/health`/`/api/status` behaved identically to the
+    non-Docker run, `http://localhost:8080` served the built frontend, and
+    a command created via the API survived `docker compose restart
+    plate-runner-server` — confirming the named-volume persistence, not
+    just same-process persistence.
+15. Confirmed the API key does not appear anywhere in either the raw `tsx`
+    process logs or `docker logs plate-runner-server` (`grep`-checked
+    directly).
+16. Camera Mode — the Local API panel is hidden, but a command sent via the
+    API while in Camera Mode was still claimed and (once the queue was
+    free) executed and completed — confirmed the listener keeps polling
+    with `ControlPanel` unmounted.
+17. `local_queue_busy` behavior — with several commands backlogged, a
+    newly-arriving `run_plate` command while the queue was already busy
+    processing an earlier one was claimed and immediately marked `failed`
+    with `error: 'local_queue_busy'`, while `pause`/`resume` issued during
+    that same busy window both completed normally — confirmed directly by
+    inspecting `GET /api/commands`.
+
+### Known Limitations
+
+- No Remote Mode, pairing, or WebSocket — explicitly out of scope this
+  phase, per the request.
+- `set_config` commands are claimed and immediately failed with
+  `not_implemented` — the payload shape is reserved but unused.
+- Frontend execution history and backend command history are two
+  independent, unsynced logs of the same underlying runs.
+- Frontend and backend plate-list stores are two independent, unsynced
+  stores (see `docs/PLATE_LISTS_SPEC.md`).
+- Rate limiting is basic (100 req/min/IP, not per-API-key-tiered); no
+  explicit payload size caps yet — see `docs/SECURITY_NOTES.md` for the
+  full list of deferred hardening items.
+- CORS is permissive (`origin: true`) — a deliberate local-only relaxation,
+  not appropriate once anything beyond localhost/LAN is exposed.
+- No HTTPS/reverse proxy in the Docker setup — local/LAN only.
+- Only one command is processed per 1.5s frontend poll tick.
+- No `.env.example` for Docker Compose overrides yet.
+
+### Bugs Found and Fixed This Phase
+
+- `packages/shared` was silently loaded as CommonJS at runtime (only a
+  `default` export visible) despite type-checking cleanly — fixed by adding
+  `"type": "module"` to its `package.json`. Would have broken any future
+  non-Vite consumer of the package, not just this backend.
+- `FST_ERR_CTP_EMPTY_JSON_BODY` — Fastify rejected any bodiless POST sent
+  with `Content-Type: application/json` (which `fetch()` always sets),
+  breaking `claim`/`complete`/the control endpoints end-to-end. Fixed on
+  both the frontend (`useApiCommandListener`) and the server (custom JSON
+  content-type parser).
+- pnpm/Node version mismatch inside Docker (`corepack` resolving a pnpm
+  version requiring Node ≥ 22.13 against a `node:20` base image) — fixed by
+  pinning `packageManager` and bumping both Dockerfiles to
+  `node:22-bookworm-slim`.
+
+### Next Steps
+
+- Remote Display Mode + 6-digit pairing (the next natural phase once this
+  local API is proven out).
+- Optionally sync frontend/backend plate-list and execution-history stores
+  once Remote Mode needs a single source of truth.
+- Harden `docs/SECURITY_NOTES.md`'s deferred items (payload caps,
+  per-key rate tiers, CORS allowlist, key rotation) before any exposure
+  beyond localhost/LAN.

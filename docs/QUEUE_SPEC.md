@@ -57,6 +57,16 @@ interface PlateQueueConfig { gapBetweenVehiclesMs: number; mode: PlateQueueMode;
 Only entries that pass validation become `PlateQueueItem`s — invalid tokens
 never enter the queue; they're only surfaced in the input preview panel.
 
+**Update (Macro Phase 4 — Local Backend):** a queue run can now also be
+triggered by an external API call (`POST /api/simulate`, `/api/simulate/queue`,
+or `/api/lists/:id/run`), consumed by `useApiCommandListener` and routed
+through the exact same `usePlateLists.runListSnapshot(...)` →
+`loadAndRunQueue` path as a manual "Run List" click or a scheduler firing —
+see [API_COMMANDS_SPEC.md](API_COMMANDS_SPEC.md). If the queue is already
+active when an API-triggered run arrives, it is rejected with
+`local_queue_busy` rather than interrupting or silently queuing behind the
+current run — see [LOCAL_API_MODE.md](LOCAL_API_MODE.md).
+
 ## Queue hook — `apps/web/src/features/queue/usePlateQueue.ts`
 
 The hook **orchestrates** the existing `useSimulation` instance; it does not

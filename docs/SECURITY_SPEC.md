@@ -133,18 +133,22 @@ Logs must not contain:
 
 ---
 
-## 5. Current Status (Phase 0.2)
+## 5. Current Status (Phase 0.4 — Local Backend)
 
 | Security concern | Status |
 |---|---|
-| Plate charset validation | Enforced |
+| Plate charset validation | Enforced (frontend + backend, same shared validator) |
 | HTML injection prevention | Enforced |
 | `dangerouslySetInnerHTML` | Not present in codebase |
-| API key auth | Not applicable — no backend |
-| Pairing token | Not applicable — no remote |
-| Payload limits | Not applicable — no backend |
-| Rate limiting | Not applicable — no backend |
-| Connection logging | Not applicable — no backend |
+| API key auth | Enforced on all `/api/*` routes — see [SECURITY_NOTES.md](SECURITY_NOTES.md) |
+| Pairing token | Not applicable — no remote mode yet |
+| Payload limits | Not enforced — see SECURITY_NOTES.md gap note |
+| Rate limiting | Basic — 100 req/min per IP on `/api/*`, not per-key-tiered |
+| Connection logging | Enforced — timestamp/method/path/status/ip/userAgent/requestId, never the API key |
+
+Implementation details for the local backend introduced in this phase live
+in [SECURITY_NOTES.md](SECURITY_NOTES.md) — this section only tracks status
+against the checklist below.
 
 ---
 

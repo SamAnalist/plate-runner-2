@@ -2,6 +2,13 @@
 
 Local, in-browser automation layer on top of Persistent Plate Lists — schedules that trigger a saved list's playback on a timer, without any backend or remote trigger.
 
+**Update (Macro Phase 4 — Local Backend):** unchanged and untouched by the
+local backend — this remains a purely frontend, browser-timer-driven
+feature. It uses the exact same underlying execution path
+(`usePlateLists.runListSnapshot`) that API-triggered runs now also use (see
+[API_COMMANDS_SPEC.md](API_COMMANDS_SPEC.md)), but scheduling itself is not
+exposed via the API this phase.
+
 ## Type — `packages/shared/src/types/scheduler.ts`
 
 ```ts

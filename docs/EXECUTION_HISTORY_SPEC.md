@@ -2,11 +2,18 @@
 
 A local log of every plate-list run (manual or scheduled), stored in `localStorage`.
 
+**Update (Macro Phase 4 — Local Backend):** `TriggeredBy` gained an
+`'api_command'` value for runs started by `useApiCommandListener`. This
+frontend history remains **unsynced** with the backend's own command
+history (`GET /api/commands`, see [API_COMMANDS_SPEC.md](API_COMMANDS_SPEC.md))
+— they are two independent logs of the same underlying runs, not a single
+source of truth.
+
 ## Record schema — `packages/shared/src/types/executionHistory.ts`
 
 ```ts
 type ExecutionStatus = 'started' | 'completed' | 'stopped' | 'failed' | 'skipped';
-type TriggeredBy = 'manual_list_run' | 'schedule' | 'import_test' | 'unknown';
+type TriggeredBy = 'manual_list_run' | 'schedule' | 'import_test' | 'api_command' | 'unknown';
 
 interface ScheduledExecutionRecord {
   id: string;
