@@ -18,6 +18,9 @@ export interface ServerConfig {
   bodyLimitBytes: number;
   /** null = tokens never expire (default, matches today's behavior). */
   pairingTokenTtlDays: number | null;
+  /** null = display secrets never expire (default). Only applied to NEW/rotated
+   * secrets, never retroactively — see docs/PAIRING_SPEC.md. */
+  displaySecretTtlDays: number | null;
   rateLimits: {
     generalPerMinute: number;
     remotePerMinute: number;
@@ -129,6 +132,13 @@ function readPairingTokenTtlDays(): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function readDisplaySecretTtlDays(): number | null {
+  const raw = process.env.PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS;
+  if (!raw || !raw.trim()) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function readRatePerMinute(envVar: string, fallback: number): number {
   const raw = process.env[envVar];
   const parsed = raw ? Number(raw) : NaN;
@@ -145,6 +155,7 @@ export function loadConfig(): ServerConfig {
     corsOrigins: readCorsOrigins(isProduction),
     bodyLimitBytes: readBodyLimitBytes(),
     pairingTokenTtlDays: readPairingTokenTtlDays(),
+    displaySecretTtlDays: readDisplaySecretTtlDays(),
     rateLimits: {
       generalPerMinute: readRatePerMinute('PLATE_RUNNER_RATE_LIMIT_GENERAL_PER_MIN', DEFAULT_RATE_LIMIT_GENERAL_PER_MIN),
       remotePerMinute: readRatePerMinute('PLATE_RUNNER_RATE_LIMIT_REMOTE_PER_MIN', DEFAULT_RATE_LIMIT_REMOTE_PER_MIN),

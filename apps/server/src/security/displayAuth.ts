@@ -7,6 +7,14 @@ import type { DisplayService } from '../services/displayService';
  * global API key hook already applied to the whole /api scope — the API
  * key proves "allowed to talk to this backend at all," this proves "is
  * specifically that display." Never logs the secret.
+ *
+ * Returns a distinct 401 error code per failure reason (Display Secret
+ * Lifecycle Hardening) so the frontend can tell a bad secret apart from a
+ * revoked display or an expired secret: invalid_display_secret,
+ * display_revoked, display_secret_expired. On success, bumps
+ * secretLastUsedAt — every route behind this hook (heartbeat, pairing-code,
+ * pairing-requests, commands claim/complete/fail, rotate-secret, revoke)
+ * gets that for free.
  */
 export function createDisplayAuth(displayService: DisplayService) {
   return async function displayAuth(request: FastifyRequest, reply: FastifyReply) {
@@ -20,8 +28,11 @@ export function createDisplayAuth(displayService: DisplayService) {
       : undefined;
     const providedSecret = (typeof headerSecret === 'string' ? headerSecret : undefined) ?? bearerSecret;
 
-    if (!displayService.verifySecret(displayId, providedSecret)) {
-      return reply.code(401).send({ ok: false, error: 'unauthorized' });
+    const result = displayService.verifySecret(displayId, providedSecret);
+    if (!result.ok) {
+      return reply.code(401).send({ ok: false, error: result.error });
     }
+
+    displayService.touchSecretLastUsed(displayId);
   };
 }

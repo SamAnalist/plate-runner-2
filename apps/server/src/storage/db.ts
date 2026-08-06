@@ -40,7 +40,10 @@ const SCHEMA = `
     status      TEXT NOT NULL,
     createdAt   TEXT NOT NULL,
     updatedAt   TEXT NOT NULL,
-    lastSeenAt  TEXT
+    lastSeenAt  TEXT,
+    secretLastUsedAt TEXT,
+    secretExpiresAt  TEXT,
+    revokedAt   TEXT
   );
 
   CREATE TABLE IF NOT EXISTS controller_devices (
@@ -103,6 +106,12 @@ function applyMigrations(db: Database.Database): void {
   // Security hardening — optional controller-token TTL (PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS).
   // Null means "never expires", matching the original no-TTL behavior.
   ensureColumn(db, 'device_pairings', 'expiresAt', 'expiresAt TEXT');
+  // Display Secret Lifecycle Hardening — same optional-TTL/revoke pattern as
+  // controller tokens above. Existing displays get NULL for all three (never
+  // touched, never expires, never revoked) — fully backward compatible.
+  ensureColumn(db, 'display_devices', 'secretLastUsedAt', 'secretLastUsedAt TEXT');
+  ensureColumn(db, 'display_devices', 'secretExpiresAt', 'secretExpiresAt TEXT');
+  ensureColumn(db, 'display_devices', 'revokedAt', 'revokedAt TEXT');
 }
 
 /**

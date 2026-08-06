@@ -32,6 +32,12 @@ export interface DisplayDevice {
   createdAt: string;
   updatedAt: string;
   lastSeenAt?: string;
+  /** When this display's secret was last used to authenticate a request. Never the secret itself. */
+  secretLastUsedAt?: string;
+  /** Optional TTL from PLATE_RUNNER_DISPLAY_SECRET_TTL_DAYS, set at register/rotate time — undefined means the secret never expires. */
+  secretExpiresAt?: string;
+  /** Set when this display has been revoked/unregistered — its secret no longer authenticates. */
+  revokedAt?: string;
 }
 
 export interface PairingSession {

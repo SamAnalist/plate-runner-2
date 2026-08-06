@@ -9,6 +9,9 @@ interface DisplayRow {
   createdAt: string;
   updatedAt: string;
   lastSeenAt: string | null;
+  secretLastUsedAt: string | null;
+  secretExpiresAt: string | null;
+  revokedAt: string | null;
 }
 
 interface PairingSessionRow {
@@ -64,6 +67,9 @@ function rowToDisplay(row: DisplayRow): DisplayDeviceRecord {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     lastSeenAt: row.lastSeenAt ?? undefined,
+    secretLastUsedAt: row.secretLastUsedAt ?? undefined,
+    secretExpiresAt: row.secretExpiresAt ?? undefined,
+    revokedAt: row.revokedAt ?? undefined,
   };
 }
 
@@ -111,14 +117,27 @@ function rowToPairingSummary(row: DevicePairingRow): DevicePairingSummary {
 export function createRemoteRepo({ db }: StorageHandle) {
   // ── Displays ──────────────────────────────────────────────────────────
   const insertDisplayStmt = db.prepare(`
-    INSERT INTO display_devices (id, name, secretHash, status, createdAt, updatedAt, lastSeenAt)
-    VALUES (@id, @name, @secretHash, @status, @createdAt, @updatedAt, @lastSeenAt)
+    INSERT INTO display_devices (id, name, secretHash, status, createdAt, updatedAt, lastSeenAt, secretLastUsedAt, secretExpiresAt, revokedAt)
+    VALUES (@id, @name, @secretHash, @status, @createdAt, @updatedAt, @lastSeenAt, @secretLastUsedAt, @secretExpiresAt, @revokedAt)
   `);
   const getDisplayStmt = db.prepare(`SELECT * FROM display_devices WHERE id = ?`);
   const touchDisplayHeartbeatStmt = db.prepare(`
     UPDATE display_devices SET status = 'online', lastSeenAt = @lastSeenAt, updatedAt = @lastSeenAt WHERE id = @id
   `);
   const listDisplaysStmt = db.prepare(`SELECT * FROM display_devices ORDER BY createdAt DESC`);
+  const rotateDisplaySecretStmt = db.prepare(`
+    UPDATE display_devices SET secretHash = @secretHash, updatedAt = @updatedAt, secretExpiresAt = @secretExpiresAt WHERE id = @id
+  `);
+  const touchDisplaySecretLastUsedStmt = db.prepare(`
+    UPDATE display_devices SET secretLastUsedAt = @secretLastUsedAt WHERE id = @id
+  `);
+  const revokeDisplayStmt = db.prepare(`UPDATE display_devices SET revokedAt = @revokedAt WHERE id = @id`);
+  const revokeAllPairingsForDisplayStmt = db.prepare(`
+    UPDATE device_pairings SET revokedAt = @revokedAt WHERE displayId = @displayId AND revokedAt IS NULL
+  `);
+  const cancelActivePairingSessionsForDisplayStmt = db.prepare(`
+    UPDATE pairing_sessions SET status = 'cancelled' WHERE displayId = ? AND status IN ('pending', 'approval_pending', 'approved')
+  `);
 
   // ── Controllers ───────────────────────────────────────────────────────
   const insertControllerStmt = db.prepare(`
@@ -170,7 +189,13 @@ export function createRemoteRepo({ db }: StorageHandle) {
 
   return {
     insertDisplay(display: DisplayDeviceRecord): void {
-      insertDisplayStmt.run({ ...display, lastSeenAt: display.lastSeenAt ?? null });
+      insertDisplayStmt.run({
+        ...display,
+        lastSeenAt: display.lastSeenAt ?? null,
+        secretLastUsedAt: display.secretLastUsedAt ?? null,
+        secretExpiresAt: display.secretExpiresAt ?? null,
+        revokedAt: display.revokedAt ?? null,
+      });
     },
     getDisplayById(id: string): DisplayDeviceRecord | null {
       const row = getDisplayStmt.get(id) as DisplayRow | undefined;
@@ -181,6 +206,21 @@ export function createRemoteRepo({ db }: StorageHandle) {
     },
     listDisplays(): DisplayDeviceRecord[] {
       return (listDisplaysStmt.all() as DisplayRow[]).map(rowToDisplay);
+    },
+    rotateDisplaySecret(id: string, params: { secretHash: string; updatedAt: string; secretExpiresAt: string | null }): void {
+      rotateDisplaySecretStmt.run({ id, ...params });
+    },
+    touchDisplaySecretLastUsed(id: string, secretLastUsedAt: string): void {
+      touchDisplaySecretLastUsedStmt.run({ id, secretLastUsedAt });
+    },
+    revokeDisplay(id: string, revokedAt: string): void {
+      revokeDisplayStmt.run({ id, revokedAt });
+    },
+    revokeAllPairingsForDisplay(displayId: string, revokedAt: string): void {
+      revokeAllPairingsForDisplayStmt.run({ displayId, revokedAt });
+    },
+    cancelActivePairingSessionsForDisplay(displayId: string): void {
+      cancelActivePairingSessionsForDisplayStmt.run(displayId);
     },
 
     insertController(controller: { id: string; name: string; createdAt: string; updatedAt: string; lastSeenAt?: string }): void {
