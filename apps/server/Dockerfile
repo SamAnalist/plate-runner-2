@@ -26,6 +26,5 @@ ENV PLATE_RUNNER_SERVER_PORT=8787
 ENV PLATE_RUNNER_STORAGE_PATH=/data
 
 EXPOSE 8787
-VOLUME ["/data"]
 
 CMD ["pnpm", "--filter", "server", "start"]
