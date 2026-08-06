@@ -15,7 +15,9 @@ unchanged Local Mode behavior.
 1. Start the backend: `pnpm dev:server` (or `pnpm dev` to run both web +
    server together). Default: `http://localhost:8787`, API key
    `dev-local-key` unless `PLATE_RUNNER_API_KEY` is set.
-2. In the app, open the **Local API** panel in the control sidebar.
+2. In the app, open the **Settings / API** screen from the sidebar — it
+   hosts the Local API controls (moved there during the App Shell
+   Navigation phase; see [APP_NAVIGATION_SPEC.md](APP_NAVIGATION_SPEC.md)).
 3. Set **API Base URL** (default `http://localhost:8787`) and **API Key**
    (default `dev-local-key`) if you changed either from the default.
 4. Click **Test Connection** — the badge shows `connected` / `unauthorized` /

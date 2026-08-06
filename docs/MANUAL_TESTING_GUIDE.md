@@ -20,14 +20,18 @@ Wait until you see two "ready" messages — one for the web app
 (`http://localhost:5173`) and one for the backend server
 (`http://localhost:8787`). Open `http://localhost:5173` in your browser.
 
-You should see the Plate Runner interface: a dark screen with a road/gate
-scene on the left and a control panel on the right, with three tabs at the
-top: **Local**, **Display**, **Controller**.
+You should see the Plate Runner interface: a **Home** screen with cards for
+every module, and a sidebar on the left listing them all — **Local**,
+**Display**, **Controller**, **Plate Lists**, **Scheduler**, **Execution
+History**, **Settings / API**. Click a card or a sidebar item to open that
+screen; the app remembers the last screen you had open and returns to it
+on reload.
 
 ## 2. Local Mode — the basics
 
-Local Mode (the default tab) is one computer showing and controlling its
-own simulation.
+Local Mode (open it from the sidebar or the Home screen's "Local
+Simulator" card) is one computer showing and controlling its own
+simulation.
 
 1. In the **License Plate** box, type `ABC123` and click **Start**. A blue
    car should drive in, stop at the gate, the gate arm should rise, and the
@@ -48,7 +52,7 @@ own simulation.
 
 ## 3. Plate Queue — running many plates in a row
 
-1. Open the **Plate Queue** section in the sidebar.
+1. On the Local screen, open the **Plate Queue** section in the right-hand panel.
 2. In the text box, paste:
    ```
    ABC123
@@ -68,7 +72,7 @@ own simulation.
 
 ## 4. Plate Lists — saving reusable sets of plates
 
-1. Open **Plate Lists**, click **+ New List**.
+1. Open the **Plate Lists** screen from the sidebar, click **+ New List**.
 2. Give it a name, paste a few plates, pick a direction/color/gate, click
    **Save List**.
 3. On the saved list card, try **Run List** (starts playing immediately),
@@ -81,7 +85,7 @@ own simulation.
 ## 5. Scheduler — automatic timed runs
 
 1. Create a Plate List first (see above) if you haven't.
-2. Open **Scheduler**, click **+ New Schedule**.
+2. Open the **Scheduler** screen from the sidebar, click **+ New Schedule**.
 3. Pick a Plate List, set **Run Mode** to **Repeat interval**, set it to
    `10` seconds, and enable **Max Runs** at `2`.
 4. Save it and watch — it should fire automatically after ~10 seconds, then
@@ -89,15 +93,15 @@ own simulation.
    after reaching Max Runs).
 5. Try **Run Now** on any schedule — it runs immediately, but does NOT
    count against that schedule's run counter (this is intentional).
-6. Check **Execution History** — you should see a record for each run.
+6. Open the **Execution History** screen from the sidebar — you should see a record for each run.
 
 ## 6. Local API — controlling the app from a script
 
 This lets an external script drive the simulation via the local backend
 (same computer, different process).
 
-1. Open **Local API**, click **Test Connection** — it should say
-   `connected`.
+1. Open the **Settings / API** screen from the sidebar, click **Test Connection** —
+   it should say `connected`.
 2. Click **Listen for API Commands**.
 3. In a terminal, run:
    ```bash
@@ -113,9 +117,9 @@ This lets an external script drive the simulation via the local backend
 This needs two browser tabs (or two computers on the same network). We'll
 use two tabs for this guide.
 
-### On the "Display" tab
+### On the Display screen
 
-1. Open a new tab to `http://localhost:5173`, click the **Display** tab.
+1. Open a new tab to `http://localhost:5173`, open the **Display** screen from the sidebar.
 2. Under **Register This Display**, type a name (e.g. "Front Gate") and
    click **Register Display**.
 3. Click **Generate Pairing Code** — a large 6-digit code appears with a
@@ -123,42 +127,43 @@ use two tabs for this guide.
 4. Click **Listen for Remote Commands**.
 5. Keep this tab open and visible.
 
-### On the "Controller" tab
+### On the Controller screen
 
-1. Go back to your first tab, click the **Controller** tab.
+1. Go back to your first tab, open the **Controller** screen from the sidebar.
 2. Type a controller name (e.g. "My Laptop") and the 6-digit code from the
-   Display tab, click **Pair**.
+   Display screen, click **Pair**.
 3. You'll see "Waiting for display approval…".
 
-### Back on the Display tab
+### Back on the Display screen
 
 4. A "Pairing Requests" card should now show your controller's name with
    **Approve** / **Reject** buttons. Click **Approve**.
 
-### Back on the Controller tab
+### Back on the Controller screen
 
 5. Within a couple seconds it should say "Paired successfully" — click
    **Done**.
 6. Click the paired display's name to select it as the target.
 7. Type a plate under "Send Single Plate" and click **Send Plate**.
-8. Switch back to the Display tab — the car should be running with that
-   plate, driven entirely from the Controller tab.
+8. Switch back to the Display screen — the car should be running with that
+   plate, driven entirely from the Controller screen.
 9. Try the **Pause** / **Resume** / **Stop** / **Skip** / **Open Gate**
-   buttons on the Controller tab and confirm they affect the Display tab.
+   buttons on the Controller screen and confirm they affect the Display screen.
 
 ### Revoking access
 
-10. On the Display tab, find your controller under "Paired Controllers"
+10. On the Display screen, find your controller under "Paired Controllers"
     and click **Revoke**. Any further commands from that controller should
-    now fail (if you're curious, the Controller tab's next "Send" attempt
+    now fail (if you're curious, the Controller screen's next "Send" attempt
     will show an error).
 
 ## 8. Camera Mode
 
-1. On the Display tab, click **Camera Mode** (bottom of the sidebar). The
-   whole sidebar disappears, showing just the simulation full-screen.
-2. From the Controller tab, send another plate — the car should still run
-   on the Display tab even though its control panel is hidden.
+1. On the Display screen, click **Camera Mode** (bottom of the right-hand panel).
+   The whole app shell (nav sidebar, header, panel) disappears, showing just
+   the simulation full-screen.
+2. From the Controller screen, send another plate — the car should still run
+   on the Display screen even though its control panel is hidden.
 3. Press **Escape** or click the small **EXIT** button (top-right) to leave
    Camera Mode.
 
@@ -257,18 +262,18 @@ pointed at Computer A's backend. For this walkthrough, Display runs on
 Computer A:
 
 1. On Computer A, open `http://localhost:5173` (or `:8080` local, since
-   it's the same machine as the backend) → **Display** tab.
+   it's the same machine as the backend) → open the **Display** screen.
 2. Register the display, generate a pairing code, click **Listen for
    Remote Commands**.
 
 ### 4. Controller flow (the other computer)
 
-1. On Computer B, go to the **Controller** tab (already pointed at
+1. On Computer B, open the **Controller** screen from the sidebar (already pointed at
    Computer A's backend from step 2 above).
 2. Enter the controller name and the 6-digit code shown on Computer A.
 3. Wait for "Waiting for display approval…".
-4. On Computer A's Display tab, **Approve** the incoming request.
-5. Computer B's Controller tab should show "Paired successfully" within a
+4. On Computer A's Display screen, **Approve** the incoming request.
+5. Computer B's Controller screen should show "Paired successfully" within a
    couple seconds.
 6. From Computer B, test each action against Computer A's Display:
    - Send a single plate → confirm the car runs on Computer A's screen.
@@ -294,10 +299,10 @@ machines — this is the scenario Remote Mode is actually built for.
 
 1. Stop and restart the backend on Computer A (`Ctrl+C` then `pnpm
    dev:server` again, or `docker compose restart plate-runner-server`).
-2. On Computer A's Display tab, confirm the registered display and its
+2. On Computer A's Display screen, confirm the registered display and its
    paired controller are still listed (may need a page refresh + clicking
    "↻ refresh" under Paired Controllers).
-3. From Computer B's Controller tab — **without re-pairing** — send another
+3. From Computer B's Controller screen — **without re-pairing** — send another
    command (e.g. Pause). It should still work: the `controllerToken` is
    stored in Computer B's browser `localStorage` from the original pairing,
    and the backend's SQLite data (including that pairing) survived the

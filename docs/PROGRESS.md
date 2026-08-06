@@ -2224,3 +2224,124 @@ phone personal hotspot, where the phone itself is the access point and
 isolation between "itself and a connected client" doesn't apply. Worth
 keeping in mind for anyone else running this same test on a network they
 don't control.
+
+---
+
+## Phase — App Shell Navigation
+
+**Date:** 2026-08-06
+
+### Goal
+
+Replace the three-tab (Local/Display/Controller) header + single mega
+control panel with a real app shell: a top header, a left sidebar with 8
+modules, a Home screen with entry cards, and persistence of the last
+screen visited. Pure frontend navigation/shell work — no backend, API,
+pairing, command routing, or render/scene changes.
+
+### Implemented
+
+- New `AppScreen` type (`home | local | display | controller | lists |
+  scheduler | history | settings`) replacing the old `UsageMode`.
+- `usePersistentAppScreen` hook persisting the active screen to
+  `localStorage["plate-runner:last-screen:v1"]`, falling back to `home` on
+  a missing/corrupted/unknown value — `appMode` (Camera/Fullscreen) is
+  deliberately never persisted, so a reload never comes back into
+  Camera Mode/Fullscreen.
+- `AppShell` (header + status chips + sidebar + content) and `SidebarNav`
+  (Modes / Data / Settings grouped nav) as pure layout components.
+- Eight screen components under `apps/web/src/screens/`, each a thin
+  wrapper around an existing, unmodified panel component.
+  `LocalModeScreen.tsx` absorbs the old `ControlPanel.tsx` minus the four
+  sections (Plate Lists, Scheduler, Execution History, Local API) that
+  became their own screens; `ControlPanel.tsx` was deleted.
+  `PlateListsScreen`/`SchedulerScreen` wrap `runList`/`runNow` to also
+  navigate to the Local screen so the running car stays visible.
+- Header status chips (Local API, Display, Queue) surface background
+  listener/queue activity regardless of which screen is active.
+- `App.tsx` rewritten to own all 8 singleton hooks exactly as before (same
+  instantiation order, no duplication) and hand the relevant subset to
+  whichever screen is active; the Camera Mode/Fullscreen `expandedLayout`
+  is untouched and still bypasses the entire shell.
+
+### Files Changed
+
+- `apps/web/src/navigation/appScreens.ts` — new: `AppScreen` type,
+  `APP_SCREENS` metadata, `isAppScreen` guard.
+- `apps/web/src/hooks/usePersistentAppScreen.ts` — new: last-screen
+  persistence hook.
+- `apps/web/src/components/layout/AppShell.tsx` — new: header + sidebar +
+  content shell.
+- `apps/web/src/components/layout/SidebarNav.tsx` — new: grouped nav.
+- `apps/web/src/screens/HomeScreen.tsx` — new: module cards with live
+  status.
+- `apps/web/src/screens/LocalModeScreen.tsx` — new: absorbs
+  `ControlPanel.tsx`'s simulator/plate/gate/vehicle/playback/queue
+  controls.
+- `apps/web/src/screens/DisplayModeScreen.tsx` — new: scene + display
+  panel, moved verbatim out of `App.tsx`.
+- `apps/web/src/screens/ControllerModeScreen.tsx` — new: thin
+  `ControllerModePanel` wrapper.
+- `apps/web/src/screens/PlateListsScreen.tsx` — new: thin
+  `PlateListsPanel` wrapper with navigate-on-run.
+- `apps/web/src/screens/SchedulerScreen.tsx` — new: thin `SchedulerPanel`
+  wrapper with navigate-on-run.
+- `apps/web/src/screens/ExecutionHistoryScreen.tsx` — new: thin
+  `ExecutionHistoryPanel` wrapper.
+- `apps/web/src/screens/SettingsScreen.tsx` — new: thin `LocalApiPanel`
+  wrapper + version footer.
+- `apps/web/src/App.tsx` — rewritten: drops `UsageMode`/inline tab
+  switcher, wires `AppShell` + `usePersistentAppScreen`, keeps every hook
+  instantiation and the Camera Mode/Fullscreen layout unchanged.
+- `apps/web/src/components/controls/ControlPanel.tsx` — deleted (content
+  absorbed by `LocalModeScreen.tsx` and the 4 extracted screens).
+- `docs/APP_NAVIGATION_SPEC.md` — new.
+- `docs/MANUAL_TESTING_GUIDE.md` — updated: sidebar navigation replaces
+  tab-switching language throughout.
+- `docs/LOCAL_API_MODE.md` — updated: Local API controls now live on the
+  Settings / API screen.
+
+### Decisions
+
+- `AppScreen` stays a frontend-only concern in `apps/web/src/navigation/`
+  — not added to `packages/shared`, since it has no backend counterpart.
+- No Context/Provider introduced — one level of prop-drilling from
+  `App.tsx` to the active screen was enough at this size; every singleton
+  hook is still instantiated exactly once, in the same place, in the same
+  order as before this phase.
+- `appMode` intentionally excluded from persistence so a reload can never
+  land the user in Camera Mode/Fullscreen with no visible way back in.
+- "Run List"/"Run Now" auto-navigate to the Local screen — the underlying
+  hooks aren't touched, only the screen-level wrapper passed to the panel,
+  so this is presentation-only and doesn't change what actually runs.
+
+### Manual Testing
+
+Ran a scripted Playwright pass (not committed — matches this session's
+established ad hoc QA pattern) against `pnpm --filter web dev`, covering:
+cold load → Home; navigating to Local/Display/Controller and confirming
+each survives a reload; a corrupted `localStorage` value falling back to
+Home; the plate input, Plate Queue section, Plate Lists/Scheduler/
+Execution History screens, and Settings screen (Test Connection + Local
+API listener controls) all loading; the Display screen's registration/
+listener controls; Camera Mode hiding the header; Fullscreen showing the
+fullscreen overlay; and Home cards navigating to their screens. All
+scenarios passed. `pnpm typecheck` and `pnpm --filter web build` both
+clean.
+
+### Known Limitations
+
+- No dedicated mobile breakpoints for the sidebar — this phase targets
+  desktop/laptop, matching the request; narrow viewports won't collapse
+  the sidebar gracefully.
+- The Settings screen doesn't duplicate the per-screen "Reset Storage"
+  buttons already present on Lists/Scheduler/History — intentional, to
+  avoid duplicated state/actions, per the phase's constraints.
+
+### Next Steps
+
+- Consider a collapsed/icon-only sidebar mode if the app is ever used on
+  narrower viewports.
+- Nothing backend-related is pending from this phase — Remote Mode's
+  pairing/command-routing/CORS all remain exactly as validated in the
+  prior LAN testing phase.
