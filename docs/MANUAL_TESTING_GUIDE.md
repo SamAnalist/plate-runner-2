@@ -223,6 +223,19 @@ pick to host it — "Computer A" below.
    (Not `localhost` — use the actual LAN IP, to prove it's reachable the
    same way Computer B will reach it.)
 
+5. If you're running the frontend via `pnpm dev`/`pnpm dev:web` (not Docker),
+   check its own startup output too — Vite should print a `Network:` line:
+   ```
+   ➜  Local:   http://localhost:5173/
+   ➜  Network: http://192.168.1.50:5173/
+   ```
+   If you only see the `Local:` line and a hint saying `use --host to
+   expose`, the frontend dev server itself isn't reachable from Computer B
+   yet — this is a distinct issue from the backend being LAN-reachable, and
+   would block Computer B from even loading the page. (Already fixed in
+   `apps/web/vite.config.ts` for this repo — this note is here so it's
+   obvious what a regression of that fix would look like.)
+
 ### 2. On Computer B — connect to Computer A
 
 1. Open a browser to Computer A's frontend: `http://192.168.1.50:5173`
@@ -295,6 +308,7 @@ machines — this is the scenario Remote Mode is actually built for.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| Computer B can't even load the page (not a Test Connection issue — the page itself never appears) | Frontend dev server (Vite) isn't bound to the LAN — only relevant if running `pnpm dev`/`pnpm dev:web` directly, not Docker (nginx in the Docker image already listens on all interfaces) | Check Computer A's Vite output for a `Network:` line; if it's missing, confirm `apps/web/vite.config.ts` still has `server: { host: true }` |
 | Test Connection fails / times out | Wrong IP, or Computer A's firewall is blocking the port | Re-check the IP with `ipconfig`/`ip addr`; on macOS, System Settings → Network → Firewall may need to allow incoming connections for `node`; on Windows, allow the port through Windows Defender Firewall |
 | Test Connection gets a response but pairing/data never updates, or the browser console shows a CORS error | Computer B's browser origin isn't in `PLATE_RUNNER_CORS_ORIGINS` | Restart the backend with Computer B's actual origin added (see step 1.2) — CORS errors are silent in the UI but visible in the browser DevTools Console/Network tab |
 | `401 unauthorized` on every request | API key mismatch, or you forgot to pass `x-api-key` somewhere custom | Confirm both machines are using the same `PLATE_RUNNER_API_KEY` value (defaults to `dev-local-key` if unset — fine for LAN testing, just make sure it's the *same* default on both ends, i.e. don't set it on one machine and not the other) |
