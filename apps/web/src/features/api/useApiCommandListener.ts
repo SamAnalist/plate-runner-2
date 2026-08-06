@@ -1,20 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type {
-  PlateList,
-  PlateQueueStatus,
-  RunListPayload,
-  RunPlatePayload,
-  RunQueuePayload,
-  SimulationCommand,
-} from '@plate-runner/shared';
+import type { SetConfigPayload, SimulationCommand } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 import type { PlateListsControls } from '../lists/usePlateLists';
+import { runLocalAction } from './commandExecutor';
 
 interface UseApiCommandListenerArgs {
   simulation: SimulationControls;
   plateQueue: PlateQueueControls;
   plateLists: PlateListsControls;
+  /** Applies a partial SimulationConfig change for 'set_config' commands. Omit to leave set_config unimplemented. */
+  onSetConfig?: (partial: SetConfigPayload) => void;
 }
 
 export type ApiConnectionStatus = 'disconnected' | 'connected' | 'unauthorized' | 'error';
@@ -35,7 +31,6 @@ export interface ApiCommandListenerControls {
 const DEFAULT_BASE_URL = 'http://localhost:8787';
 const DEFAULT_API_KEY = 'dev-local-key';
 const POLL_MS = 1500;
-const QUEUE_ACTIVE_STATUSES: PlateQueueStatus[] = ['running', 'paused', 'waiting_for_signal', 'waiting_for_next'];
 
 function buildFetch(baseUrl: string, apiKey: string) {
   return (path: string, options: RequestInit = {}) =>
@@ -52,52 +47,13 @@ function buildFetch(baseUrl: string, apiKey: string) {
     });
 }
 
-/** Turns a run_plate/run_queue command payload into a single-use PlateList-shaped object so it can flow through the same runListSnapshot path as run_list. */
-function runPlatePayloadToList(payload: RunPlatePayload): PlateList {
-  const now = new Date().toISOString();
-  return {
-    id: `api-plate-${now}`,
-    name: `API: ${payload.plate}`,
-    plates: [payload.plate],
-    simulationDefaults: {
-      direction: payload.direction,
-      detectorPlacement: payload.detectorPlacement,
-      vehicleColor: payload.vehicleColor,
-      gateConfig: payload.gateConfig,
-      queueConfig: payload.queueConfig,
-    },
-    createdAt: now,
-    updatedAt: now,
-    version: 1,
-  };
-}
-
-function runQueuePayloadToList(payload: RunQueuePayload): PlateList {
-  const now = new Date().toISOString();
-  return {
-    id: `api-queue-${now}`,
-    name: `API: ${payload.plates.length} plates`,
-    plates: payload.plates,
-    simulationDefaults: {
-      direction: payload.direction,
-      detectorPlacement: payload.detectorPlacement,
-      vehicleColor: payload.vehicleColor,
-      gateConfig: payload.gateConfig,
-      queueConfig: payload.queueConfig,
-    },
-    createdAt: now,
-    updatedAt: now,
-    version: 1,
-  };
-}
-
 /**
  * Polls the local backend (apps/server) for pending SimulationCommands and
  * executes them against the local simulator/queue. Instantiated in App.tsx
  * (not inside ControlPanel) so polling keeps running in Camera Mode/Fullscreen
  * — only its UI panel is conditionally hidden there, same as every other panel.
  */
-export function useApiCommandListener({ simulation, plateQueue, plateLists }: UseApiCommandListenerArgs): ApiCommandListenerControls {
+export function useApiCommandListener({ simulation, plateQueue, plateLists, onSetConfig }: UseApiCommandListenerArgs): ApiCommandListenerControls {
   const [enabled, setEnabled] = useState(false);
   const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_BASE_URL);
   const [apiKey, setApiKey] = useState(DEFAULT_API_KEY);
@@ -115,6 +71,8 @@ export function useApiCommandListener({ simulation, plateQueue, plateLists }: Us
   apiBaseUrlRef.current = apiBaseUrl;
   const apiKeyRef = useRef(apiKey);
   apiKeyRef.current = apiKey;
+  const onSetConfigRef = useRef(onSetConfig);
+  onSetConfigRef.current = onSetConfig;
 
   const claim = useCallback(async (id: string): Promise<boolean> => {
     try {
@@ -137,46 +95,18 @@ export function useApiCommandListener({ simulation, plateQueue, plateLists }: Us
   }, []);
 
   const executeCommand = useCallback(async (command: SimulationCommand) => {
-    const isRunCommand = command.type === 'run_plate' || command.type === 'run_queue' || command.type === 'run_list';
-
-    if (isRunCommand) {
-      const claimed = await claim(command.id);
-      if (!claimed) return;
-
-      const busy = QUEUE_ACTIVE_STATUSES.includes(plateQueueRef.current.queueStatus);
-      if (busy) {
-        await fail(command.id, 'local_queue_busy');
-        return;
-      }
-
-      let list: PlateList;
-      if (command.type === 'run_plate') list = runPlatePayloadToList(command.payload as RunPlatePayload);
-      else if (command.type === 'run_queue') list = runQueuePayloadToList(command.payload as RunQueuePayload);
-      else list = (command.payload as RunListPayload).list;
-
-      plateListsRef.current.runListSnapshot(list, 'api_command');
-      await complete(command.id);
-      return;
-    }
-
-    if (command.type === 'set_config') {
-      const claimed = await claim(command.id);
-      if (!claimed) return;
-      await fail(command.id, 'not_implemented');
-      return;
-    }
-
-    // pause / resume / stop / skip_current / open_gate — idempotent/no-op-safe locally, best-effort complete.
     const claimed = await claim(command.id);
     if (!claimed) return;
-    switch (command.type) {
-      case 'pause': plateQueueRef.current.pauseQueue(); break;
-      case 'resume': plateQueueRef.current.resumeQueue(); break;
-      case 'stop': plateQueueRef.current.stopQueue(); break;
-      case 'skip_current': plateQueueRef.current.skipCurrent(); break;
-      case 'open_gate': simulationRef.current.openGate(); break;
-    }
-    await complete(command.id);
+
+    const outcome = await runLocalAction(command, {
+      simulation: simulationRef.current,
+      plateQueue: plateQueueRef.current,
+      plateLists: plateListsRef.current,
+      onSetConfig: onSetConfigRef.current,
+    });
+
+    if (outcome.status === 'completed') await complete(command.id);
+    else await fail(command.id, outcome.error);
   }, [claim, complete, fail]);
 
   const poll = useCallback(async () => {
