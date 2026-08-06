@@ -1,3 +1,4 @@
+import { networkInterfaces } from 'node:os';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 
@@ -89,10 +90,24 @@ async function main() {
   try {
     await fastify.listen({ port: config.port, host: '0.0.0.0' });
     console.log(`plate-runner-server listening on http://localhost:${config.port} (storage: ${storage.persistent ? 'sqlite' : 'in-memory fallback'})`);
+    for (const address of lanAddresses()) {
+      console.log(`  also reachable from other devices on this network at: http://${address}:${config.port}`);
+    }
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
   }
+}
+
+/** Non-internal IPv4 addresses this machine has — printed at startup so whoever starts the backend can immediately give the right URL to another device on the LAN. */
+function lanAddresses(): string[] {
+  const addresses: string[] = [];
+  for (const iface of Object.values(networkInterfaces())) {
+    for (const info of iface ?? []) {
+      if (info.family === 'IPv4' && !info.internal) addresses.push(info.address);
+    }
+  }
+  return addresses;
 }
 
 main();
