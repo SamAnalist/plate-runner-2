@@ -9,6 +9,7 @@ import {
 import { SimulationScene } from './components/simulation/SimulationScene';
 import { ControlPanel } from './components/controls/ControlPanel';
 import { DisplayModePanel } from './components/controls/DisplayModePanel';
+import { ControllerModePanel } from './components/controls/ControllerModePanel';
 import { useSimulation } from './hooks/useSimulation';
 import { usePlateQueue } from './features/queue/usePlateQueue';
 import { usePlateLists } from './features/lists/usePlateLists';
@@ -16,9 +17,10 @@ import { useExecutionHistory } from './features/history/useExecutionHistory';
 import { useLocalScheduler } from './features/scheduler/useLocalScheduler';
 import { useApiCommandListener } from './features/api/useApiCommandListener';
 import { useDisplayCommandListener } from './features/display/useDisplayCommandListener';
+import { useRemoteController } from './features/controller/useRemoteController';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
-type UsageMode = 'local' | 'display';
+type UsageMode = 'local' | 'display' | 'controller';
 
 export default function App() {
   const [config, setConfig]           = useState<SimulationConfig>(DEFAULT_CONFIG);
@@ -63,6 +65,7 @@ export default function App() {
   const scheduler = useLocalScheduler({ plateLists, plateQueue, executionHistory });
   const apiCommandListener = useApiCommandListener({ simulation, plateQueue, plateLists, onSetConfig: applyPartialConfig });
   const displayCommandListener = useDisplayCommandListener({ simulation, plateQueue, plateLists, onSetConfig: applyPartialConfig });
+  const remoteController = useRemoteController();
 
   // ── Keyboard: Escape exits fullscreen / camera mode ─────────────────────
   useEffect(() => {
@@ -80,8 +83,9 @@ export default function App() {
 
   // ─── Normal layout ───────────────────────────────────────────────────────
   const USAGE_MODES: { value: UsageMode; label: string }[] = [
-    { value: 'local',   label: 'Local' },
-    { value: 'display', label: 'Display' },
+    { value: 'local',      label: 'Local' },
+    { value: 'display',    label: 'Display' },
+    { value: 'controller', label: 'Controller' },
   ];
 
   const normalLayout = (
@@ -127,6 +131,11 @@ export default function App() {
       </header>
 
       {/* Main layout */}
+      {usageMode === 'controller' ? (
+        <div className="flex-1 overflow-y-auto px-6 py-6 bg-[#080910]">
+          <ControllerModePanel controller={remoteController} localLists={plateLists.lists} />
+        </div>
+      ) : (
       <div className="flex flex-1 overflow-hidden min-h-0">
         <main className="flex-1 flex items-center justify-center p-6 min-w-0 bg-[#080910]">
           <SimulationScene
@@ -189,6 +198,7 @@ export default function App() {
           )}
         </aside>
       </div>
+      )}
     </div>
   );
 
