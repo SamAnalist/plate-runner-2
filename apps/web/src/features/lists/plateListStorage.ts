@@ -15,7 +15,7 @@ import {
   type PlateListCollectionExportEnvelope,
 } from '@plate-runner/shared';
 
-const STORAGE_KEY = 'plate-runner:plate-lists:v1';
+export const STORAGE_KEY = 'plate-runner:plate-lists:v1';
 
 export function generateListId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();

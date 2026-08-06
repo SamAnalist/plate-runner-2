@@ -1,6 +1,6 @@
 import { MAX_EXECUTION_HISTORY_RECORDS, type ScheduledExecutionRecord } from '@plate-runner/shared';
 
-const STORAGE_KEY = 'plate-runner:execution-history:v1';
+export const STORAGE_KEY = 'plate-runner:execution-history:v1';
 
 export function generateExecutionId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();

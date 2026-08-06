@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { type AppScreen, isAppScreen } from '../navigation/appScreens';
 
-const STORAGE_KEY = 'plate-runner:last-screen:v1';
+export const STORAGE_KEY = 'plate-runner:last-screen:v1';
+export const LAST_SCREEN_STORAGE_KEY = STORAGE_KEY;
 
 function loadScreen(): AppScreen {
   try {

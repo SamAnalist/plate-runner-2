@@ -1,6 +1,6 @@
 import type { ScheduledPlateListRun } from '@plate-runner/shared';
 
-const STORAGE_KEY = 'plate-runner:schedules:v1';
+export const STORAGE_KEY = 'plate-runner:schedules:v1';
 
 export function generateScheduleId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
