@@ -1867,3 +1867,180 @@ test — `tsx` backend + Vite dev server — and a full `docker compose up
 - Harden `docs/SECURITY_NOTES.md`'s deferred items (payload caps,
   per-key rate tiers, CORS allowlist, key rotation) before any exposure
   beyond localhost/LAN.
+
+---
+
+## Phase 0.9 — Remote Display Mode + Pairing + Remote Control (Macro Phase 5)
+
+### Goal
+
+Let one computer act as a **Display** (shows the simulation, listens for
+remote commands) and another as a **Controller** (sends commands to one or
+more paired displays), using 6-digit pairing codes and long-lived tokens —
+no cloud, no user accounts, local/LAN/self-hosted. Explicitly out of scope:
+cloud deployment, users/email/password, billing, multi-tenant hosting, new
+render scenes, visual calibration, real ANPR/AI.
+
+### Implemented
+
+- **Storage**: four new tables (`display_devices`, `controller_devices`,
+  `pairing_sessions`, `device_pairings`), all `CREATE TABLE IF NOT EXISTS`,
+  plus an idempotent `ALTER TABLE` migration adding `displayId`/`source`/
+  `createdByControllerId` to the existing `simulation_commands` table —
+  verified against a pre-Phase-5 database with existing rows, nothing lost.
+- **Pairing**: `POST /api/displays/register` issues a `displaySecret`;
+  `POST /api/displays/:id/pairing-code` generates a crypto-random 6-digit
+  code with a 5-minute TTL (regenerating cancels the prior pending code);
+  `POST /api/controllers/pair` exchanges a valid code for a
+  `controllerToken`. Both secrets are 256-bit random and stored as SHA-256
+  hashes only — plaintext appears in exactly one API response each, never
+  persisted, never logged.
+- **Remote command routing**: `/api/remote/displays/:displayId/*` (simulate,
+  simulate/queue, pause, resume, stop, skip-current, open-gate, set-config),
+  controller-token-authenticated — the auth check also verifies the token's
+  pairing is for *that specific* displayId, 403ing otherwise. Every
+  `SimulationCommand` now carries `displayId`/`source`/
+  `createdByControllerId`; `commandsRepo.listPending(displayId?)` branches
+  at the SQL level so a display only ever sees its own commands and the
+  local/global listener never sees remote ones.
+- **Display Mode command listener**: `useDisplayCommandListener` — same
+  poll/claim/execute/report shape as the Phase 4 Local API listener, scoped
+  to `/api/displays/:displayId/commands/*`, authenticated with both the
+  global API key and the display's own secret, plus a 20s heartbeat.
+  Registration persists to `localStorage`.
+- **Controller Mode**: `useRemoteController` — pairs with (multiple)
+  displays, persists `{displayId, controllerToken}` pairs to `localStorage`,
+  and fires single-shot commands at the remote routes — no polling, the
+  target display's listener does the work.
+- **`set_config` now genuinely implemented** (was permanently
+  `not_implemented` in Phase 4) — a shared `commandExecutor.ts` extracted
+  from `useApiCommandListener` (now reused by both the local and display
+  listeners) applies partial config changes via an optional `onSetConfig`
+  callback.
+- **Three usage modes** in the frontend header (Local / Display /
+  Controller) — Local Mode's layout and hooks are completely untouched;
+  Display Mode reuses the same `SimulationScene` plus a new
+  `DisplayModePanel`; Controller Mode has no large scene view, just a
+  full-width `ControllerModePanel`.
+- **Hardening**: global 1MB Fastify `bodyLimit`; `PLATE_RUNNER_CORS_ORIGINS`
+  allowlist replacing `origin: true` (defaults to localhost with a
+  `console.warn` if unset); pairing routes rate-limited to 10/min, remote
+  command routes to 30/min (general API stays 100/min); `.env.example`
+  added at the repo root.
+
+### Files Changed
+
+- `packages/shared/src/types/remote.ts` — created (RemoteRole, PairingSessionStatus, CommandSource, DisplayDevice, PairingSession, DevicePairingSummary)
+- `packages/shared/src/types/simulationCommand.ts` — displayId/source/createdByControllerId, SetConfigPayload
+- `packages/shared/src/index.ts` — new export
+- `apps/server/src/storage/db.ts` — four new tables, idempotent column migration
+- `apps/server/src/storage/remoteRepo.ts` — created
+- `apps/server/src/storage/commandsRepo.ts` — new columns, displayId-scoped listPending
+- `apps/server/src/security/tokens.ts`, `displayAuth.ts`, `controllerAuth.ts` — created
+- `apps/server/src/services/displayService.ts`, `pairingService.ts` — created
+- `apps/server/src/services/validation.ts` — validateName, validateSetConfigPayload
+- `apps/server/src/services/commandService.ts` — options bag for displayId/source/createdByControllerId
+- `apps/server/src/routes/displays.ts`, `controllers.ts`, `remote.ts` — created
+- `apps/server/src/routes/simulate.ts`, `simulationControl.ts`, `simulationCommands.ts`, `lists.ts` — pass `source: 'local_api'`
+- `apps/server/src/config.ts`, `index.ts` — CORS allowlist, bodyLimit, new route registration
+- `apps/web/src/features/api/commandExecutor.ts` — created (shared dispatch core)
+- `apps/web/src/features/api/useApiCommandListener.ts` — uses the shared core, onSetConfig prop
+- `apps/web/src/features/display/useDisplayCommandListener.ts` — created
+- `apps/web/src/features/controller/useRemoteController.ts` — created
+- `apps/web/src/components/controls/DisplayModePanel.tsx`, `ControllerModePanel.tsx` — created
+- `apps/web/src/App.tsx` — usage-mode tabs, Display/Controller layouts, applyPartialConfig
+- `docker-compose.yml` — PLATE_RUNNER_CORS_ORIGINS pass-through
+- `.env.example`, `.gitignore` — created / `!.env.example` exception added
+- `docs/REMOTE_MODE_SPEC.md`, `PAIRING_SPEC.md`, `REMOTE_COMMANDS_SPEC.md` — created
+- `docs/BACKEND_API_SPEC.md`, `API_COMMANDS_SPEC.md`, `LOCAL_API_MODE.md`, `DOCKER_SETUP.md`, `SECURITY_NOTES.md`, `SECURITY_SPEC.md` — updated
+
+### Decisions
+
+- **Server-internal secret/token types never enter `@plate-runner/shared`**
+  — only hash-free, frontend-safe shapes (`DisplayDevice`,
+  `DevicePairingSummary`) are exported; `secretHash`/`tokenHash`-bearing
+  records live only in `apps/server/src/storage/remoteRepo.ts`.
+- **SHA-256, not bcrypt/scrypt, for secret/token hashing** — the inputs are
+  already uniformly-random 256-bit values, not low-entropy passwords, so a
+  slow KDF adds cost without adding real protection.
+- **Idempotent `ALTER TABLE` migration, not a migration framework** —
+  matches the project's existing "no heavy ORM" philosophy; a
+  `PRAGMA table_info` check before each `ADD COLUMN` is enough for this
+  scale and is trivially safe to re-run.
+- **Two-layer auth** (global API key + per-device secret/token) — the API
+  key proves "allowed to talk to this backend at all," the device
+  credential proves "is specifically this display/controller." Documented
+  explicitly rather than left implicit.
+- **`displayId`-scoped pending queues enforced in SQL**
+  (`WHERE displayId IS NULL` vs `WHERE displayId = ?`), not just filtered
+  client-side — a display cannot accidentally see another display's or the
+  local queue's commands even if the frontend had a bug.
+- **Auto-approve pairing, no manual Display-side confirmation this phase**
+  — `PairingSessionStatus` already has room for an `approved` state between
+  `pending` and `used` so a future phase can add manual confirmation
+  without a breaking schema change.
+- **"Send List" on Controller reuses `/api/remote/displays/:id/simulate/queue`**
+  rather than a new endpoint — the spec's endpoint list has no dedicated
+  remote list-run route, and a `PlateList`'s shape already maps 1:1 onto
+  `simulate/queue`'s body.
+- **`set_config` implemented via a shared `commandExecutor.ts` extraction**
+  — rather than duplicating the dispatch switch a second time for Display
+  Mode, the existing Local Mode listener's switch was factored out first,
+  and both hooks now call the same function.
+
+### Manual Testing (30/30 scenarios)
+
+1. Local Mode regression-checked — unchanged, still fully functional.
+2. `GET /health` — `200`, no auth.
+3. `GET /api/status` with API key — `200`.
+4. Display registers via `POST /api/displays/register` — confirmed via curl and the UI's Register form.
+5. Display generates a 6-digit pairing code — confirmed format and `expiresAt`.
+6. Code expiry — manually expired a session's `expiresAt` in SQLite and confirmed `POST /api/controllers/pair` returns `410`; the UI shows a live countdown from `expiresAt`.
+7. Controller enters a valid code — paired successfully via both curl and the two-tab Playwright UI test.
+8. Controller receives a `controllerToken` — confirmed in the pair response.
+9. Token never appears in logs — grepped server logs after multiple pairing/remote-command flows, zero matches, in both raw-process and Docker runs.
+10. Controller sends a single plate — confirmed via curl and the two-tab UI test (display actually ran the plate, screenshot confirms).
+11. Display listener claims only its own displayId's commands — confirmed the global `/api/simulation/commands/pending` does NOT see a remote-targeted command, and a display's own `pending` endpoint does.
+12. Display runs the vehicle from a remote command — confirmed visually (screenshot) in both the single-display and two-tab tests.
+13. Command reaches `completed` — confirmed via `GET /api/commands/:id` (the same table backs both local and remote commands).
+14. Controller sends a remote queue (`run_queue`) — command created and visible in the display's pending list.
+15. Display runs the remote queue — same dispatch path as `run_plate`, confirmed via the shared `commandExecutor`.
+16. Controller sends pause/resume — both confirmed via curl and the two-tab UI test (Pause button, "Sent" badge shown).
+17. Controller sends open-gate — confirmed via curl; command created and completable.
+18. Controller sends stop — confirmed via curl.
+19. Controller tries to control an unpaired display — `403` confirmed via curl ("this controller is not paired with that display").
+20. Invalid pairing code — `400` (malformed) and `404` (well-formed but unknown) both confirmed via curl.
+21. Expired pairing code — `410` confirmed (see #6).
+22. Revoke a pairing — `POST /api/displays/:id/pairings/:pairingId/revoke` confirmed via curl.
+23. Revoked token no longer works — confirmed: a remote command with the same token immediately after revocation returns `401`.
+24. Camera Mode hides the Display panel but keeps the listener running — confirmed via Playwright: panel hidden, a remote command sent while in Camera Mode still reached `completed`.
+25. `docker compose restart plate-runner-server` preserves display/pairing data — confirmed: registered a display and paired a controller, restarted the container, `GET .../pairings` still showed the pairing.
+26. CORS allowlist works for localhost — confirmed an allowed origin gets `Access-Control-Allow-Origin`, a disallowed one does not.
+27. Oversized payload fails — a 2MB body returns `413 FST_ERR_CTP_BODY_TOO_LARGE`.
+28. Invalid API key fails — `401` confirmed on both `/api/status` and pairing routes.
+29. Local API Mode (Phase 4) still works — the two-tab and single-display Playwright tests all ran alongside it with zero regressions; typecheck/build clean throughout.
+30. No console errors — every Playwright run (single-display, two-tab Display+Controller, Camera Mode) reported zero console errors.
+
+### Known Limitations
+
+- No manual Display-side pairing confirmation this phase (auto-approve
+  only) — see Recommended Next Phase.
+- Pairing brute-force protection is a flat rate limit, not a
+  lockout/backoff scheme.
+- No pairing/token expiry beyond explicit revocation.
+- Frontend/backend plate-list and execution-history stores remain
+  independent and unsynced (unchanged from Phase 4) — Controller Mode's
+  "Send List" reads the controller's own local browser lists, not
+  anything display-side.
+- `GET /api/displays/:id/pairings` requires the display's own secret — a
+  controller can't self-inspect or self-revoke its own pairing.
+- Payload limits are a single flat 1MB cap, not per-endpoint-type tiers.
+- No WebSocket/push — Display Mode's 1.5s poll interval is the same
+  latency ceiling Local Mode has always had.
+
+### Next Steps
+
+- Manual Display-side pairing confirmation (the `PairingSessionStatus`
+  state machine already supports inserting an `approved` step).
+- Cloud deployment, user accounts, and multi-tenant hosting remain
+  explicitly out of scope until a future phase requests them.

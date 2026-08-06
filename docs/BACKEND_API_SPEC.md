@@ -2,9 +2,15 @@
 
 Local Node.js/Fastify backend (`apps/server`) exposing a REST API for external
 scripts/tools (GitHub Actions, test harnesses, curl) to drive Plate Runner.
-This is **not** Remote Mode — no pairing, no multi-device, no WebSocket. It's
-a local command-queue API the frontend polls (see
+It's a local command-queue API the frontend polls (see
 [LOCAL_API_MODE.md](LOCAL_API_MODE.md)) to actually execute anything.
+
+**Macro Phase 5 (Remote Display Mode + Pairing)** added display/controller
+device registration, pairing, and `displayId`-scoped remote command routes
+on top of this same backend — see [REMOTE_MODE_SPEC.md](REMOTE_MODE_SPEC.md),
+[PAIRING_SPEC.md](PAIRING_SPEC.md), and
+[REMOTE_COMMANDS_SPEC.md](REMOTE_COMMANDS_SPEC.md). Everything below this
+point describes the original local-only surface, which is unchanged.
 
 ## Runtime
 
@@ -23,6 +29,7 @@ before any real production deployment.
 | `PLATE_RUNNER_API_KEY` | `dev-local-key` | Logs a loud `console.warn` on startup if unset — louder wording when `NODE_ENV=production`. |
 | `PLATE_RUNNER_SERVER_PORT` | `8787` | |
 | `PLATE_RUNNER_STORAGE_PATH` | `./data` | Created if missing. SQLite file lives at `<path>/plate-runner.sqlite3`. |
+| `PLATE_RUNNER_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8080` | Comma-separated allowlist. Unset falls back to the default with a `console.warn` (Phase 5). |
 
 ## API security
 
@@ -136,6 +143,15 @@ Each creates the correspondingly-typed command (`pause`, `resume`, `stop`,
 - `POST /api/lists/:id/run` — creates a `run_list` command whose payload
   embeds the **full list snapshot** at the time of the call (not just the id),
   so a concurrent edit/delete of the list can't race the eventual execution.
+
+### Display, pairing, and remote routes (Phase 5)
+
+`POST /api/displays/register`, display-secret-authenticated
+`/api/displays/:displayId/*` (heartbeat, pairing-code, pairings, revoke,
+commands), `POST /api/controllers/pair`, and controller-token-authenticated
+`/api/remote/displays/:displayId/*` — see
+[PAIRING_SPEC.md](PAIRING_SPEC.md) and
+[REMOTE_COMMANDS_SPEC.md](REMOTE_COMMANDS_SPEC.md) for the full reference.
 
 ## Files
 

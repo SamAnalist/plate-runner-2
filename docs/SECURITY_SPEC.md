@@ -133,7 +133,7 @@ Logs must not contain:
 
 ---
 
-## 5. Current Status (Phase 0.4 — Local Backend)
+## 5. Current Status (Phase 0.9 — Remote Display Mode + Pairing)
 
 | Security concern | Status |
 |---|---|
@@ -141,10 +141,10 @@ Logs must not contain:
 | HTML injection prevention | Enforced |
 | `dangerouslySetInnerHTML` | Not present in codebase |
 | API key auth | Enforced on all `/api/*` routes — see [SECURITY_NOTES.md](SECURITY_NOTES.md) |
-| Pairing token | Not applicable — no remote mode yet |
-| Payload limits | Not enforced — see SECURITY_NOTES.md gap note |
-| Rate limiting | Basic — 100 req/min per IP on `/api/*`, not per-key-tiered |
-| Connection logging | Enforced — timestamp/method/path/status/ip/userAgent/requestId, never the API key |
+| Pairing token | Enforced — 256-bit random, SHA-256 hashed at rest, revocable, displayId-scoped. See [PAIRING_SPEC.md](PAIRING_SPEC.md) |
+| Payload limits | Global 1MB body cap enforced; per-endpoint-type tiers still not implemented |
+| Rate limiting | 100 req/min general; 10/min on pairing routes; 30/min on remote command routes |
+| Connection logging | Enforced — timestamp/method/path/status/ip/userAgent/requestId, never the API key/secret/token |
 
 Implementation details for the local backend introduced in this phase live
 in [SECURITY_NOTES.md](SECURITY_NOTES.md) — this section only tracks status

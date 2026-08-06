@@ -7,6 +7,12 @@ external action goes through a **command queue**: the API creates a
 polls, claims, executes, and reports back. This is what lets an external
 script "control" the simulation without any push transport.
 
+**Macro Phase 5** extended this same command queue with a `displayId` scope
+for Remote Mode — see [REMOTE_COMMANDS_SPEC.md](REMOTE_COMMANDS_SPEC.md).
+The shape below reflects the current, extended fields; everything else on
+this page (lifecycle, endpoints, the poll/claim/execute/report loop) is
+unchanged from Phase 4 and applies identically to local and remote commands.
+
 ## `SimulationCommand` shape
 
 ```ts
@@ -15,6 +21,8 @@ type SimulationCommandType =
   | 'pause' | 'resume' | 'stop' | 'skip_current' | 'open_gate' | 'set_config';
 
 type SimulationCommandStatus = 'pending' | 'claimed' | 'completed' | 'failed' | 'cancelled';
+
+type CommandSource = 'local_api' | 'remote_controller' | 'scheduler' | 'unknown';
 
 interface SimulationCommand {
   id: string;
@@ -26,6 +34,9 @@ interface SimulationCommand {
   claimedAt?: string;
   completedAt?: string;
   error?: string;
+  displayId?: string;             // Phase 5 — set for remote-controller-created commands
+  source: CommandSource;          // Phase 5 — defaults to 'local_api' for local routes
+  createdByControllerId?: string; // Phase 5
 }
 ```
 
@@ -86,9 +97,12 @@ Implemented in `apps/web/src/features/api/useApiCommandListener.ts`:
      matching local control function unconditionally (these are already
      idempotent/no-op-safe locally — pausing an already-paused queue is not
      an error), then report `completed`.
-   - `set_config`: not implemented this phase. Claimed, then immediately
-     failed with `error: 'not_implemented'` — the payload shape is reserved
-     but unspecified.
+   - `set_config`: **implemented as of Phase 5** — applies the partial
+     payload (`direction`/`detectorPlacement`/`vehicleColor`/`gateConfig`/
+     `queueConfig`, all optional) via an `onSetConfig` callback. If a given
+     listener instance doesn't wire one up, it's still claimed then failed
+     with `error: 'not_implemented'` rather than left pending. See
+     [REMOTE_COMMANDS_SPEC.md](REMOTE_COMMANDS_SPEC.md).
 4. Regardless of outcome, `pendingCount` and `connectionStatus` are updated
    from the poll response so the UI reflects the queue depth and auth state
    live.

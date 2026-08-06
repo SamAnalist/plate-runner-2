@@ -3,6 +3,13 @@
 How to enable the frontend's Local API listener so an external script can
 drive the running simulation through `apps/server`.
 
+This is the **Local** usage mode specifically — one computer both running
+and controlling the simulation. Macro Phase 5 added two more modes,
+**Display** and **Controller**, for controlling a *different* computer's
+simulation over the same backend. See
+[REMOTE_MODE_SPEC.md](REMOTE_MODE_SPEC.md) for those; everything below is
+unchanged Local Mode behavior.
+
 ## Enabling it
 
 1. Start the backend: `pnpm dev:server` (or `pnpm dev` to run both web +

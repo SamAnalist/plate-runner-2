@@ -17,21 +17,27 @@ pinning" below).
 
 ## Environment variables
 
-Same three as running locally (see [BACKEND_API_SPEC.md](BACKEND_API_SPEC.md)),
-passed through `docker-compose.yml` to `plate-runner-server`:
+Same four as running locally (see [BACKEND_API_SPEC.md](BACKEND_API_SPEC.md)),
+passed through `docker-compose.yml` to `plate-runner-server`. See also
+`.env.example` at the repo root.
 
 | Variable | Compose default |
 |---|---|
 | `PLATE_RUNNER_API_KEY` | `dev-local-key` (override via a `.env` file or `PLATE_RUNNER_API_KEY=... docker compose up`) |
 | `PLATE_RUNNER_SERVER_PORT` | `8787` (fixed in compose) |
 | `PLATE_RUNNER_STORAGE_PATH` | `/data` (fixed in compose, backed by the named volume below) |
+| `PLATE_RUNNER_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8080` (Phase 5 — matches the compose web/dev ports by default) |
 
 ## Persistence
 
 `plate-runner-server`'s `/data` is a named Docker volume
 (`plate-runner-data`), so SQLite data survives `docker compose down` /
 `docker compose up` and container restarts — only `docker compose down -v`
-discards it.
+discards it. This covers every table, including the Phase 5 ones
+(`display_devices`, `pairing_sessions`, `device_pairings`) — verified by
+registering a display and pairing a controller, then `docker compose
+restart plate-runner-server` and confirming the pairing was still listed
+afterward.
 
 ## Running it
 
