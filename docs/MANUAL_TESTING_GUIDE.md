@@ -73,14 +73,19 @@ simulation.
 ## 4. Plate Lists — saving reusable sets of plates
 
 1. Open the **Plate Lists** screen from the sidebar, click **+ New List**.
-2. Give it a name, paste a few plates, pick a direction/color/gate, click
-   **Save List**.
-3. On the saved list card, try **Run List** (starts playing immediately),
+2. Try the **Random Plate Generator** inside the form: set a count, a
+   digit count, and an optional prefix (e.g. `GE`), click **Generate** —
+   the Plates box fills with that many unique plates matching
+   `PREFIX+digits` (no hyphens — plates are A–Z0–9 only).
+3. Give it a name, pick a direction/color/gate, click **Save List**.
+4. On the saved list card, try **Run List** (starts playing immediately),
    **Load Into Queue** (fills the queue but doesn't start it), **Edit**,
    **Duplicate**, and **Delete**.
-4. Click **Export All**, then **Import JSON** and pick the file you just
+5. Click **ⓘ Format** next to Import JSON — it should show the expected
+   JSON shape (single list vs. collection export).
+6. Click **Export All**, then **Import JSON** and pick the file you just
    downloaded — it should re-import without duplicating incorrectly.
-5. Reload the page — your saved lists should still be there.
+7. Reload the page — your saved lists should still be there.
 
 ## 5. Scheduler — automatic timed runs
 
@@ -337,9 +342,51 @@ Stop and report an issue if you see any of:
 - Any API key, token, or pairing code appearing in the terminal output
   where the server is running.
 
-## 12. Where to look for more detail
+## 12. System Status, Storage Management, and Backup
+
+1. Open **Settings / API**, scroll to **System Status** — confirm it
+   shows app name, frontend mode, API base URL/status, display
+   registered, pairings/lists/schedules/history counts, queue status,
+   vehicle color, last screen, browser storage available, and Screen
+   Saver enabled/timeout. Confirm the API key is **not** shown anywhere.
+2. Click **Check Backend Status** (backend must be running) — shows
+   backend health, storage type/ok, pending commands, server time.
+3. Click **Export Backup** — downloads a JSON file. Open it and confirm
+   it has `schemaVersion`, `type: "plate_runner_local_backup"`, and a
+   `data` object with `plateLists`/`schedules`/`executionHistory`/
+   `preferences`/`screenSaver` — and confirms it does **not** contain
+   `apiKey`, `controllerToken`, or `displaySecret` anywhere.
+4. Under **Local Storage**, try each **Reset** button — each should show
+   a confirm dialog first. Cancel a couple to confirm nothing happens if
+   you decline. Confirm "Reset App Preferences" returns you to Home, and
+   "Reset Screen Saver Settings" restores the 10-minute default.
+5. Try **Import Backup** with the file you exported in step 3 — confirm
+   it warns about overwriting, then reloads with the same data restored.
+
+## 13. Screen Saver
+
+1. Go to **Settings / API → Screen Saver**, set the timeout to the
+   lowest custom value (1 minute), pick a style.
+2. Reload the page — confirm the timeout/style you picked are still
+   selected.
+3. Go to Local Mode and don't touch anything for about a minute — the
+   full-screen overlay should appear, no sidebar/header visible.
+4. Move the mouse (or press a key, or touch on a touchscreen) — it
+   should close immediately.
+5. Start the vehicle with **Wait Signal** gate mode and let it sit at
+   `waiting_for_signal` — confirm the Screen Saver does **not** appear
+   even after the timeout elapses while it's waiting.
+6. With the Local API listener enabled (see section 6) and the Screen
+   Saver active, send a plate via `curl -X POST /api/simulate` — the
+   overlay should close automatically and the plate should update
+   correctly.
+
+## 14. Where to look for more detail
 
 - [RELEASE_CANDIDATE_QA.md](RELEASE_CANDIDATE_QA.md) — full QA results and known limitations.
 - [BACKEND_API_SPEC.md](BACKEND_API_SPEC.md) / [API_COMMANDS_SPEC.md](API_COMMANDS_SPEC.md) — every backend endpoint.
 - [PAIRING_SPEC.md](PAIRING_SPEC.md) / [REMOTE_MODE_SPEC.md](REMOTE_MODE_SPEC.md) — how Remote Mode pairing works under the hood.
 - [SECURITY_NOTES.md](SECURITY_NOTES.md) — what's protected and what's explicitly deferred.
+- [OPERATIONS_GUIDE.md](OPERATIONS_GUIDE.md) — running, configuring, and maintaining the app day-to-day.
+- [SCREEN_SAVER_SPEC.md](SCREEN_SAVER_SPEC.md) — full Screen Saver behavior spec.
+- [DEMO_CHECKLIST.md](DEMO_CHECKLIST.md) — a 10–15 minute guided demo script.

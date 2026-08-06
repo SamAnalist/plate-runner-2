@@ -30,7 +30,7 @@ both the sidebar and the Home screen's cards.
 | `lists` | `screens/PlateListsScreen.tsx` | `PlateListsPanel` (create/edit/import/export/run) |
 | `scheduler` | `screens/SchedulerScreen.tsx` | `SchedulerPanel` (create/edit/enable/disable/run now) |
 | `history` | `screens/ExecutionHistoryScreen.tsx` | `ExecutionHistoryPanel` |
-| `settings` | `screens/SettingsScreen.tsx` | `LocalApiPanel` (API base URL, key, Test Connection, listener) |
+| `settings` | `screens/SettingsScreen.tsx` | `LocalApiPanel`, `SystemStatusPanel`, `ScreenSaverSettingsPanel`, `BackupPanel`, `LocalStorageManagementPanel` — see [OPERATIONS_GUIDE.md](OPERATIONS_GUIDE.md) |
 
 Every screen is a thin wrapper around an existing, unmodified panel
 component — none of `PlateInput`, `PlateQueuePanel`, `PlateListsPanel`,
@@ -98,3 +98,11 @@ which screen you navigate to.
 separate screens from Local, this keeps the existing "you see the car run
 after you click Run" experience. `loadListIntoQueue` is untouched (no
 navigation) since it doesn't start playback.
+
+## Screen Saver overlay
+
+`ScreenSaverOverlay` (in `components/screensaver/`) renders as a sibling
+at the very top of `App.tsx`'s return, outside both `normalLayout` and
+`expandedLayout` — so it covers Camera Mode/Fullscreen exactly the same
+way it covers the normal shell, with no changes to either layout. See
+[SCREEN_SAVER_SPEC.md](SCREEN_SAVER_SPEC.md) for the full behavior.

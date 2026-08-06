@@ -18,7 +18,9 @@ docker compose up --build   # web at http://localhost:8080, backend at http://lo
 
 New to the project? Start with
 [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md) — a step-by-step
-walkthrough of every feature, no code knowledge required.
+walkthrough of every feature, no code knowledge required — or
+[docs/DEMO_CHECKLIST.md](docs/DEMO_CHECKLIST.md) for a quick 10–15 minute
+guided demo.
 
 ## Project layout
 
@@ -48,7 +50,10 @@ All project documentation lives in [docs/](docs/). Key entry points:
 
 - [docs/PROGRESS.md](docs/PROGRESS.md) — the full phase-by-phase build log.
 - [docs/RELEASE_CANDIDATE_QA.md](docs/RELEASE_CANDIDATE_QA.md) — latest QA pass and release readiness status.
+- [docs/OPERATIONS_GUIDE.md](docs/OPERATIONS_GUIDE.md) — running, configuring, backing up, and troubleshooting day-to-day.
 - [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md) — step-by-step manual testing.
+- [docs/DEMO_CHECKLIST.md](docs/DEMO_CHECKLIST.md) — a guided 10–15 minute demo script.
+- [docs/SCREEN_SAVER_SPEC.md](docs/SCREEN_SAVER_SPEC.md) — the configurable idle Screen Saver.
 - [docs/SIMULATION_SPEC.md](docs/SIMULATION_SPEC.md) — how the simulation itself works.
 - [docs/BACKEND_API_SPEC.md](docs/BACKEND_API_SPEC.md) — the local backend's REST API.
 - [docs/REMOTE_MODE_SPEC.md](docs/REMOTE_MODE_SPEC.md) / [docs/PAIRING_SPEC.md](docs/PAIRING_SPEC.md) — Display/Controller remote control and pairing.

@@ -2442,3 +2442,157 @@ browser console errors during the whole pass. All 14 passed.
 
 - If the app later needs to run well on narrower screens, revisit the
   sidebar-collapse decision above (likely needs a small icon set).
+
+---
+
+## Phase — Operational Readiness
+
+**Date:** 2026-08-06
+
+### Goal
+
+Closing "operational readiness" phase: System Status, per-domain local
+storage reset, a local backup export/import, and a configurable idle
+Screen Saver — plus a few small UX fixes that came up mid-phase. No
+backend/API/pairing changes, no automated tests, no WebSocket/cloud, no
+render/scene calibration.
+
+### Implemented
+
+- **System Status** (`SystemStatusPanel.tsx`, on Settings / API): app
+  name, frontend mode (`import.meta.env.MODE`), API base URL/connection
+  status, display registered, controller pairings/lists/schedules/
+  history counts, queue status, vehicle color, last persisted screen,
+  browser-storage-available check, Screen Saver enabled/timeout. A
+  "Check Backend Status" button does a one-off `GET /api/status` call
+  (reusing the existing Local API base URL/key — no new polling). Never
+  renders the API key, tokens, secrets, or pairing codes.
+- **Local Storage Management** (`LocalStorageManagementPanel.tsx`):
+  confirm-gated resets for Plate Lists, Scheduler, Execution History,
+  Remote Pairings local credentials (clears both the controller's
+  paired displays and the display's own registration), App Preferences/
+  Last Screen, Screen Saver Settings, and a stronger-worded "All Local
+  Browser Data" (`localStorage.clear()` + reload). Every action reuses
+  an existing reset function from its owning hook — no new hook-level
+  reset APIs were added except where noted below.
+- **Local Backup** (`features/backup/localBackup.ts` +
+  `BackupPanel.tsx`): exports Plate Lists, Scheduler, Execution History,
+  and non-secret preferences (last screen, Screen Saver settings) as one
+  JSON file (`schemaVersion: 1`, `type:
+  "plate_runner_local_backup"`). Import validates the schema, confirms
+  before overwriting, writes the same localStorage keys the app already
+  reads on mount, and reloads. Never reads or writes the API key,
+  controller tokens, display secrets, or pairing codes.
+- **Configurable Screen Saver** (`features/screensaver/useScreenSaver.ts` +
+  `ScreenSaverOverlay.tsx` + `ScreenSaverSettingsPanel.tsx`): full-screen,
+  CSS-only idle animation (`floating_plate` / `moving_logo` /
+  `subtle_gradient`), default `{ enabled: true, timeoutMinutes: 10,
+  style: 'floating_plate' }`, persisted to
+  `plate-runner:screensaver:v1`. Activity detection covers both DOM
+  events (mouse/keyboard/touch/wheel) and app-level signals (remote/API
+  commands, queue/simulation starts, pairing requests, screen
+  navigation) through one small `useEffect` in `App.tsx`. Suppressed
+  while the app is "busy" (simulation running, at-gate/waiting-for-
+  signal/gate-opening, queue active, or a pairing request is visible),
+  and force-dismisses immediately if the app becomes busy while it's
+  showing. Renders as a sibling above both the normal and expanded
+  (Fullscreen/Camera Mode) layouts, so it works identically in Display
+  Mode/Camera Mode. Full spec in `docs/SCREEN_SAVER_SPEC.md`.
+- **Small UX fixes requested mid-phase**:
+  - Anchor Bounds overlay in Local Mode's Visual QA now defaults to
+    **off** (previously left on from an earlier calibration session).
+  - Plate Lists' list form gained a **Random Plate Generator** (count,
+    digit count, optional prefix) that fills the Plates box with that
+    many unique, valid plates — prefixes are sanitized to A–Z0–9 (no
+    hyphens, since the app's own plate validation forbids them; the
+    example `GE-2323` from the request isn't a valid plate, so the
+    generator produces `GE2323`-style plates instead).
+  - Plate Lists gained an **ⓘ Format** button next to Import JSON that
+    shows the two accepted JSON shapes (single-list vs. collection
+    export) inline.
+- Minor dedup: the `downloadJSON` helper, previously copy-pasted in
+  `ExecutionHistoryPanel.tsx` and `PlateListsPanel.tsx`, moved to
+  `apps/web/src/lib/downloadJSON.ts`; the plate-lists/schedules/
+  execution-history localStorage key constants were exported from their
+  storage modules instead of being re-declared for the backup feature.
+
+### Files Modified
+
+New: `components/controls/{SystemStatusPanel,LocalStorageManagementPanel,
+BackupPanel,ScreenSaverSettingsPanel}.tsx`,
+`features/screensaver/useScreenSaver.ts`,
+`components/screensaver/ScreenSaverOverlay.tsx`,
+`features/backup/localBackup.ts`, `lib/downloadJSON.ts`,
+`features/lists/randomPlateGenerator.ts`, `vite-env.d.ts`,
+`docs/{SCREEN_SAVER_SPEC,DEMO_CHECKLIST,OPERATIONS_GUIDE}.md`.
+Modified: `screens/SettingsScreen.tsx`, `App.tsx`,
+`components/controls/{ExecutionHistoryPanel,PlateListsPanel}.tsx`,
+`features/lists/plateListStorage.ts`,
+`features/scheduler/schedulerStorage.ts`,
+`features/history/executionHistoryStorage.ts` (exported their
+`STORAGE_KEY` consts), `hooks/usePersistentAppScreen.ts` (exported its
+storage key), `docs/{APP_NAVIGATION_SPEC,MANUAL_TESTING_GUIDE,PROGRESS,
+README,DOCKER_SETUP}.md`.
+
+### Decisions
+
+- Backend status is checked on-demand (a button), not polled — avoids
+  adding a new always-on listener for a "nice to have" status field.
+- Backup import overwrites via direct localStorage writes + page reload
+  rather than adding a bulk-import API to each feature hook — simpler
+  and safer, matches the phase's "no big refactor" constraint.
+- Screen Saver's idle tick runs every 5s (not real-time) — negligible
+  lag against a multi-minute timeout, keeps the implementation simple.
+- Random plate generator sanitizes prefixes to A–Z0–9 rather than
+  accepting the hyphenated example from the request verbatim, since
+  hyphens are already invalid everywhere else in the app (plate
+  validation, queue parsing) — introducing an exception here would have
+  been inconsistent.
+
+### Manual Testing
+
+Scripted Playwright pass (not committed) covering all 23 requested
+scenarios plus the mid-phase additions: Settings opens, System Status
+shows data with no API key visible, Export Backup produces a valid,
+secret-free JSON, every reset button confirms before acting (verified
+by cancelling and by accepting), App Preferences reset returns to Home,
+Screen Saver Settings reset restores defaults, Remote Pairings reset
+doesn't crash, Local/Display/Controller Mode and Camera Mode all still
+work, Screen Saver settings persist across reload, activates after a
+real 1-minute timeout, stays suppressed for a full timeout window while
+the vehicle is `waiting_for_signal`, dismisses on mouse and keyboard,
+and — with the Local API listener enabled and a live backend — a `curl
+POST /api/simulate` command both dismisses an active Screen Saver and
+executes correctly afterward. Overlay content was inspected for
+sensitive strings (none found). The Random Plate Generator and Import
+Format button were also verified. All scenarios passed, zero console
+errors. `pnpm typecheck`, `pnpm --filter web build`, `pnpm build`, and
+`docker compose up --build` (containers started, `/health` responded,
+frontend served) all clean.
+
+### Known Limitations
+
+- System Status's backend section requires a manual "Check Backend
+  Status" click — it does not auto-refresh.
+- Screen Saver's idle-check has up to ~5s of lag against the configured
+  timeout.
+- `subtle_gradient` and `moving_logo` Screen Saver styles are
+  implemented but less visually tuned than the default `floating_plate`.
+- Local Backup import is an all-or-nothing overwrite (Plate Lists +
+  Scheduler + Execution History + preferences + Screen Saver together)
+  — there's no selective/partial import.
+
+### Bugs/Risks
+
+None found beyond the pre-existing status-chip issue already fixed in
+the prior UI Polish phase. No regressions detected in Local/Display/
+Controller/Settings/Pairing/Remote commands/Plate Lists/Scheduler/
+Execution History/Camera Mode/Fullscreen during this phase's QA pass.
+
+### Next Steps
+
+- Consider auto-refreshing System Status's backend section on an
+  interval if it turns out to be useful during real demos.
+- If selective backup import (e.g. "only Plate Lists") is ever needed,
+  it would build on the same `parseLocalBackup`/`applyLocalBackup`
+  primitives.

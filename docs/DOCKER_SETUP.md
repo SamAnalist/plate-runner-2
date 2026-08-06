@@ -1,7 +1,10 @@
 # Docker Setup
 
 Packages `apps/server` and `apps/web` as two containers, wired via
-`docker-compose.yml` at the repo root.
+`docker-compose.yml` at the repo root. See
+[OPERATIONS_GUIDE.md](OPERATIONS_GUIDE.md) for the broader day-to-day
+operations picture (pnpm vs. Docker, backups, storage resets, Screen
+Saver, troubleshooting).
 
 ## Services
 
