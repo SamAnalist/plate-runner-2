@@ -1581,3 +1581,78 @@ script run this phase.
   asset-drop, per the documented extension path — no code changes needed
   beyond populating the registry).
 - Backend/remote/API phases remain explicitly out of scope until requested.
+
+---
+
+## Phase 0.7 — Local Scheduler and Execution History
+
+**Date:** 2026-08-05
+
+### Goal
+
+Add a local scheduler that runs saved Plate Lists automatically (once/interval/daily) and a local execution history log for every run (manual or scheduled). Fourth feature module on the established hook+storage+panel pattern.
+
+### Implemented
+
+- **Scheduler types** (`ScheduledPlateListRun`) and **execution history types** (`ScheduledExecutionRecord`) in `packages/shared`, plus validation-support constants/arrays.
+- **`schedulerStorage.ts`** and **`executionHistoryStorage.ts`** — `localStorage`-backed services mirroring `plateListStorage.ts`'s never-throws-on-corruption pattern exactly. History is capped at 500 records (oldest trimmed on write).
+- **`schedulerLogic.ts`** — pure, framework-free helpers: `computeNextRunAt` (mode-specific next-fire computation), `isWithinRunWindow`/`nextRunAtForWindow`, `shufflePlates` (Fisher–Yates, never mutates input), `summarizeGateConfig`.
+- **`useExecutionHistory`** — tracks the currently-active run by watching `plateQueue.queueStatus`, finalizing the record (with per-status plate counts read from `plateQueue.items`) the moment it reaches `completed`/`stopped`. Also the public display API (`records`, `clearHistory`, `exportHistoryToJSON`).
+- **`usePlateLists` extension** — factored `runList`'s body into a shared `executeList` helper that also starts an execution record; added `runListForSchedule` for the scheduler to call with a pre-ordered (possibly shuffled) plate array.
+- **`useLocalScheduler`** — a 1s tick loop that fires due, enabled schedules: skips silently if the referenced list is missing, logs a `skipped`/`queue_busy` record (throttled to at most one per interval, not per tick) if the queue is already active, respects an optional run window for `repeat_interval`, and otherwise fires via `runListForSchedule` and updates `runCount`/`lastRunAt`/`nextRunAt` (auto-disabling on `once_at_time` completion or `maxRuns`).
+- **`SchedulerPanel`** and **`ExecutionHistoryPanel`** UI — new collapsible sections in `ControlPanel`, following the exact `PlateListsPanel` local-primitives pattern.
+
+### Files Changed
+
+- `packages/shared/src/types/scheduler.ts`, `packages/shared/src/types/executionHistory.ts` — created
+- `packages/shared/src/index.ts` — new exports
+- `apps/web/src/features/scheduler/schedulerStorage.ts`, `schedulerLogic.ts`, `useLocalScheduler.ts` — created
+- `apps/web/src/features/history/executionHistoryStorage.ts`, `useExecutionHistory.ts` — created
+- `apps/web/src/features/lists/usePlateLists.ts` — `executeList`/`runListForSchedule`, `executionHistory` dependency
+- `apps/web/src/components/controls/SchedulerPanel.tsx`, `ExecutionHistoryPanel.tsx` — created
+- `apps/web/src/components/controls/ControlPanel.tsx`, `apps/web/src/App.tsx` — wiring
+- `docs/SCHEDULER_SPEC.md`, `docs/EXECUTION_HISTORY_SPEC.md` — created
+- `docs/PLATE_LISTS_SPEC.md`, `docs/QUEUE_SPEC.md`, `docs/SIMULATION_SPEC.md` — updated
+
+### Decisions
+
+- **"Only one execution at a time"** falls out of a single check (`plateQueue.queueStatus` before firing) rather than a dedicated lock — simpler, and it's the same state the rest of the app already treats as the source of truth for "is something running."
+- **`runNow` never touches `runCount`/`lastRunAt`/`nextRunAt`** — an out-of-band manual trigger shouldn't perturb the automatic cadence math.
+- **Missing-list schedules silently no-op every tick** rather than auto-disabling — a deliberate choice to avoid destroying the user's schedule configuration; the UI's "⚠ Missing list" badge is the intended signal to act on.
+- **Busy-skip records are throttled**, not one-per-tick — for `repeat_interval`/`daily_at_time` this falls out naturally from advancing `nextRunAt` on every skip (same as a real fire); for `once_at_time` (which has no natural next slot) an in-memory per-schedule flag prevents repeat logging until the queue frees up.
+- **`failed` execution status has no automatic trigger** — same known limitation as item-level `failed` in the Plate Queue since Phase 0.4 (no failure path exists locally yet).
+
+### Manual Testing (20/20 scenarios, via headless-Chromium Playwright driver)
+
+1–2. `once_at_time` ~12s in the future — created, `nextRunAt` shown correctly.
+3. Fired automatically and auto-disabled (`runs: 1`, `disabled`) — confirmed.
+4. (folded into 1–3.)
+5–6. `repeat_interval` every 10s with `maxRuns=2` — confirmed firing exactly twice then auto-disabling, in an isolated run; also incidentally exercised the busy-skip path when run alongside a slower concurrent schedule, confirming it degrades gracefully (extra `skipped` record, correct final `runs: 2/2`).
+3(daily). `daily_at_time` creation — `nextRunAt` correctly computed as the next day at the given time when today's slot had already passed.
+8. Run Now — executed immediately, recorded with `triggeredBy: 'schedule'`, confirmed `runCount` unaffected.
+9. Shuffle — schedule created with `plateOrder: 'shuffle'`, confirmed persisted/displayed.
+10. Schedule with a deleted list — "⚠ Missing list" badge shown, zero console errors across further ticks (no crash, no spam).
+11–12. Schedule firing while the queue is busy (dedicated test with a manual "Run List" in progress) — confirmed a `skipped`/`queue_busy` record was created and the active manual run was completely undisturbed.
+13. (covered by 11/12 and the history record's fields.)
+14. History `stopped` status — confirmed after manually hitting Stop Queue mid-run.
+9(completed). History `completed` status — confirmed after a run finished normally.
+15. Clear History — confirmed, empty state shown.
+16. Export History — downloaded JSON has the expected `{ exportedAt, records }` shape with the correct record count.
+17. Persistence across reload — both schedules and (pre-clear) history confirmed to survive a hard reload.
+18. Corrupted `localStorage` (both scheduler and history keys) — recoverable error shown, Reset Storage recovers cleanly, zero crashes.
+19. Camera Mode — neither "Scheduler" nor "Execution History" render.
+20. Plate Lists' own "Run List" — exercised repeatedly throughout (Blocker List, Doomed List, Daily List) and confirmed still fully functional.
+
+Regression spot-check: single-plate manual run, manual pause/resume (exact `t` freeze), and gate `hidden` mode all still work. Zero console errors across every QA script run this phase.
+
+### Known Limitations
+
+- Local browser time only — no timezone handling.
+- Run window doesn't support spanning midnight.
+- No queue of pending schedules — a second due schedule during an active run is skipped (with a record), never queued to run immediately after.
+- `failed` execution status has no automatic trigger yet.
+- Execution history export is one-way (no re-import).
+
+### Next Steps
+
+- Backend/remote/API phases remain explicitly out of scope until requested.

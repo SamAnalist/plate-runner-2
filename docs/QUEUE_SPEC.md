@@ -181,3 +181,12 @@ A run started from a Plate List behaves exactly like a manually-loaded
 queue in every other respect (pause/resume, skip, stop, gate interaction,
 `manual_next`, loop) — the queue has no awareness that its plates/settings
 came from a saved list rather than the textarea.
+
+## Scheduler integration (Phase 0.7)
+
+The queue is also completely unaware of the scheduler (`docs/SCHEDULER_SPEC.md`)
+— `useLocalScheduler` never touches `usePlateQueue` directly, it only calls
+`usePlateLists.runListForSchedule`, which goes through the exact same
+`loadAndRunQueue` path a manual list run does. The scheduler's "only one
+execution at a time" rule is enforced by checking `plateQueue.queueStatus`
+before firing a due schedule, not by anything inside the queue itself.

@@ -136,3 +136,12 @@ Rendered inside `ControlPanel`'s "Plate Lists" collapsible section (same
   — the same rules that already govern `runQueue`/`loadQueue` re-entrancy
   apply (a list "run" resets `currentIndex` and item statuses just like
   `loadAndRunQueue`/`loadQueue` always have).
+
+## Scheduling and execution tracking (Phase 0.7)
+
+`usePlateLists.runList(id)`/`runListForSchedule(id, opts)` both create an
+execution history record and are the only two entry points that start a
+list's plates playing — see `docs/SCHEDULER_SPEC.md` (automated scheduling
+on top of these lists) and `docs/EXECUTION_HISTORY_SPEC.md` (the record
+each run produces). `loadListIntoQueue` does not create a record, since it
+doesn't start playback.

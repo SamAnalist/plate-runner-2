@@ -407,3 +407,11 @@ a reusable shape — used by `PlateList.simulationDefaults.gateConfig` (see
 configuration independent of the rest of `SimulationConfig`. `SimulationConfig`
 itself stays flat (unchanged) — `GateConfig` is purely an extraction/reuse
 shape, not a structural change to the simulator.
+
+---
+
+## 18. Scheduler and Execution History (Phase 0.7)
+
+Neither the scheduler nor execution history touch `useSimulation` at all —
+both are built entirely on top of the existing `usePlateQueue`/`usePlateLists`
+layers. See `docs/SCHEDULER_SPEC.md` and `docs/EXECUTION_HISTORY_SPEC.md`.
