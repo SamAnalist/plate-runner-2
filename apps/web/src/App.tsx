@@ -7,10 +7,17 @@ import {
   isPlacementAllowedForDirection,
 } from '@plate-runner/shared';
 import { SimulationScene } from './components/simulation/SimulationScene';
-import { ControlPanel } from './components/controls/ControlPanel';
-import { DisplayModePanel } from './components/controls/DisplayModePanel';
-import { ControllerModePanel } from './components/controls/ControllerModePanel';
+import { AppShell, type StatusChip } from './components/layout/AppShell';
+import { HomeScreen } from './screens/HomeScreen';
+import { LocalModeScreen, QUEUE_ACTIVE_STATUSES } from './screens/LocalModeScreen';
+import { DisplayModeScreen } from './screens/DisplayModeScreen';
+import { ControllerModeScreen } from './screens/ControllerModeScreen';
+import { PlateListsScreen } from './screens/PlateListsScreen';
+import { SchedulerScreen } from './screens/SchedulerScreen';
+import { ExecutionHistoryScreen } from './screens/ExecutionHistoryScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 import { useSimulation } from './hooks/useSimulation';
+import { usePersistentAppScreen } from './hooks/usePersistentAppScreen';
 import { usePlateQueue } from './features/queue/usePlateQueue';
 import { usePlateLists } from './features/lists/usePlateLists';
 import { useExecutionHistory } from './features/history/useExecutionHistory';
@@ -20,12 +27,11 @@ import { useDisplayCommandListener } from './features/display/useDisplayCommandL
 import { useRemoteController } from './features/controller/useRemoteController';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
-type UsageMode = 'local' | 'display' | 'controller';
 
 export default function App() {
   const [config, setConfig]           = useState<SimulationConfig>(DEFAULT_CONFIG);
   const [appMode, setAppMode]         = useState<AppMode>('normal');
-  const [usageMode, setUsageMode]     = useState<UsageMode>('local');
+  const { screen, setScreen }         = usePersistentAppScreen();
   const [showDebug, setShowDebug]     = useState(false);
   // Default ON for Phase 1.2 camera-aware asset calibration session.
   // Set back to false once all plate anchors are visually verified.
@@ -81,125 +87,108 @@ export default function App() {
   const isExpanded  = appMode === 'fullscreen' || appMode === 'camera';
   const isCameraMode = appMode === 'camera';
 
+  const queueActive = QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
+  const navigateToLocal = () => setScreen('local');
+
   // ─── Normal layout ───────────────────────────────────────────────────────
-  const USAGE_MODES: { value: UsageMode; label: string }[] = [
-    { value: 'local',      label: 'Local' },
-    { value: 'display',    label: 'Display' },
-    { value: 'controller', label: 'Controller' },
+
+  const statusChips: StatusChip[] = [
+    {
+      label: 'Local API',
+      active: apiCommandListener.enabled,
+      detail: apiCommandListener.connectionStatus,
+    },
+    {
+      label: 'Display',
+      active: displayCommandListener.enabled,
+      detail: displayCommandListener.connectionStatus,
+    },
+    {
+      label: 'Queue',
+      active: queueActive,
+      detail: plateQueue.queueStatus,
+    },
   ];
 
+  const homeStatus = {
+    local: undefined,
+    display: displayCommandListener.registration
+      ? `Registered as ${displayCommandListener.registration.displayName}`
+      : 'Not registered',
+    controller: `${remoteController.pairedDisplays.length} display${remoteController.pairedDisplays.length === 1 ? '' : 's'} paired`,
+    lists: `${plateLists.lists.length} saved list${plateLists.lists.length === 1 ? '' : 's'}`,
+    scheduler: `${scheduler.schedules.length} schedule${scheduler.schedules.length === 1 ? '' : 's'}`,
+    history: `${executionHistory.records.length} record${executionHistory.records.length === 1 ? '' : 's'}`,
+    settings: apiCommandListener.enabled ? `API: ${apiCommandListener.connectionStatus}` : 'API not connected',
+  };
+
+  let screenContent;
+  switch (screen) {
+    case 'local':
+      screenContent = (
+        <LocalModeScreen
+          config={config}
+          simulation={simulation}
+          plateQueue={plateQueue}
+          onConfigChange={handleConfigChange}
+          showDebug={showDebug}
+          onShowDebugChange={setShowDebug}
+          onEnterFullscreen={() => setAppMode('fullscreen')}
+          onEnterCamera={() => setAppMode('camera')}
+          showAnchorOverlay={showAnchorOverlay}
+          onShowAnchorOverlayChange={setShowAnchorOverlay}
+          showMotionPathOverlay={showMotionPathOverlay}
+          onShowMotionPathOverlayChange={setShowMotionPathOverlay}
+        />
+      );
+      break;
+    case 'display':
+      screenContent = (
+        <DisplayModeScreen
+          config={config}
+          simulation={simulation}
+          displayCommandListener={displayCommandListener}
+          onEnterFullscreen={() => setAppMode('fullscreen')}
+          onEnterCamera={() => setAppMode('camera')}
+        />
+      );
+      break;
+    case 'controller':
+      screenContent = (
+        <ControllerModeScreen controller={remoteController} localLists={plateLists.lists} />
+      );
+      break;
+    case 'lists':
+      screenContent = (
+        <PlateListsScreen plateLists={plateLists} onNavigateToLocal={navigateToLocal} />
+      );
+      break;
+    case 'scheduler':
+      screenContent = (
+        <SchedulerScreen
+          scheduler={scheduler}
+          lists={plateLists.lists}
+          queueActive={queueActive}
+          onNavigateToLocal={navigateToLocal}
+        />
+      );
+      break;
+    case 'history':
+      screenContent = <ExecutionHistoryScreen history={executionHistory} />;
+      break;
+    case 'settings':
+      screenContent = <SettingsScreen apiCommandListener={apiCommandListener} />;
+      break;
+    case 'home':
+    default:
+      screenContent = <HomeScreen onNavigate={setScreen} statusById={homeStatus} />;
+      break;
+  }
+
   const normalLayout = (
-    <div className="flex flex-col h-screen bg-[#0a0b0f] overflow-hidden">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-5 py-2.5 border-b border-white/8 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-sm font-mono font-bold text-white tracking-[0.12em] uppercase">
-            Plate Runner
-          </span>
-          <span className="text-[10px] text-white/25 font-mono bg-white/5 px-1.5 py-0.5 rounded">
-            v0.9
-          </span>
-          <div className="flex items-center gap-0.5 ml-2 bg-white/5 rounded p-0.5">
-            {USAGE_MODES.map(m => (
-              <button
-                key={m.value}
-                onClick={() => setUsageMode(m.value)}
-                className={`px-2 py-1 rounded text-[10px] font-mono font-semibold transition-all ${
-                  usageMode === m.value ? 'bg-blue-600/80 text-white' : 'text-white/40 hover:text-white/70'}`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 text-[11px] font-mono text-white/30">
-          <span>
-            <span className="text-white/50">plate:</span>{' '}
-            <span className="text-blue-400 font-bold tracking-wider">{config.plate}</span>
-          </span>
-          <span>
-            <span className="text-white/50">dir:</span>{' '}
-            <span className="text-white/60">{config.direction}</span>
-          </span>
-          <span>
-            <span className="text-white/50">detector:</span>{' '}
-            <span className="text-white/60">{config.detectorPlacement}</span>
-          </span>
-        </div>
-      </header>
-
-      {/* Main layout */}
-      {usageMode === 'controller' ? (
-        <div className="flex-1 overflow-y-auto px-6 py-6 bg-[#080910]">
-          <ControllerModePanel controller={remoteController} localLists={plateLists.lists} />
-        </div>
-      ) : (
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        <main className="flex-1 flex items-center justify-center p-6 min-w-0 bg-[#080910]">
-          <SimulationScene
-            config={config}
-            simulation={simulation}
-            showDebug={showDebug}
-            showAnchorOverlay={showAnchorOverlay}
-            showMotionPathOverlay={showMotionPathOverlay}
-          />
-        </main>
-        <aside className="w-72 shrink-0 border-l border-white/8 overflow-y-auto">
-          {usageMode === 'local' ? (
-            <ControlPanel
-              config={config}
-              simulation={simulation}
-              plateQueue={plateQueue}
-              plateLists={plateLists}
-              scheduler={scheduler}
-              executionHistory={executionHistory}
-              apiCommandListener={apiCommandListener}
-              onConfigChange={handleConfigChange}
-              showDebug={showDebug}
-              onShowDebugChange={setShowDebug}
-              onEnterFullscreen={() => setAppMode('fullscreen')}
-              onEnterCamera={() => setAppMode('camera')}
-              showAnchorOverlay={showAnchorOverlay}
-              onShowAnchorOverlayChange={setShowAnchorOverlay}
-              showMotionPathOverlay={showMotionPathOverlay}
-              onShowMotionPathOverlayChange={setShowMotionPathOverlay}
-            />
-          ) : (
-            <div className="flex flex-col h-full bg-[#0f1117]">
-              <div className="px-4 py-3 border-b border-white/8 shrink-0">
-                <p className="text-xs font-mono font-bold text-white/60 uppercase tracking-widest">
-                  Display Mode
-                </p>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                <DisplayModePanel listener={displayCommandListener} />
-              </div>
-              <div className="px-4 py-3 border-t border-white/8 shrink-0 flex flex-col gap-1.5">
-                <button
-                  onClick={() => setAppMode('camera')}
-                  className="py-1.5 rounded text-xs font-mono font-semibold
-                    bg-white/5 border border-white/12 text-white/50
-                    hover:text-white/80 hover:border-white/25 transition-all"
-                >
-                  ◉  Camera Mode
-                </button>
-                <button
-                  onClick={() => setAppMode('fullscreen')}
-                  className="py-1.5 rounded text-xs font-mono font-semibold
-                    bg-white/5 border border-white/12 text-white/50
-                    hover:text-white/80 hover:border-white/25 transition-all"
-                >
-                  ⛶  Fullscreen Scene
-                </button>
-              </div>
-            </div>
-          )}
-        </aside>
-      </div>
-      )}
-    </div>
+    <AppShell screen={screen} onNavigate={setScreen} statusChips={statusChips}>
+      {screenContent}
+    </AppShell>
   );
 
   // ─── Expanded layout (Fullscreen / Camera Mode) ──────────────────────────
