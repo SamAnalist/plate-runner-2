@@ -8,6 +8,7 @@ import {
 } from '@plate-runner/shared';
 import { SimulationScene } from './components/simulation/SimulationScene';
 import { AppShell, type StatusChip } from './components/layout/AppShell';
+import type { BadgeTone } from './components/ui/Badge';
 import { HomeScreen } from './screens/HomeScreen';
 import { LocalModeScreen, QUEUE_ACTIVE_STATUSES } from './screens/LocalModeScreen';
 import { DisplayModeScreen } from './screens/DisplayModeScreen';
@@ -92,21 +93,35 @@ export default function App() {
 
   // ─── Normal layout ───────────────────────────────────────────────────────
 
+  const connectionTone = (status: string): BadgeTone =>
+    status === 'connected' ? 'success' :
+    status === 'unauthorized' || status === 'error' ? 'danger' :
+    'neutral';
+
+  const queueTone = (status: string): BadgeTone =>
+    status === 'running' ? 'success' :
+    status === 'waiting_for_signal' || status === 'paused' ? 'warning' :
+    status === 'completed' ? 'info' :
+    'neutral';
+
   const statusChips: StatusChip[] = [
     {
       label: 'Local API',
       active: apiCommandListener.enabled,
       detail: apiCommandListener.connectionStatus,
+      tone: connectionTone(apiCommandListener.connectionStatus),
     },
     {
       label: 'Display',
       active: displayCommandListener.enabled,
       detail: displayCommandListener.connectionStatus,
+      tone: connectionTone(displayCommandListener.connectionStatus),
     },
     {
       label: 'Queue',
       active: queueActive,
       detail: plateQueue.queueStatus,
+      tone: queueTone(plateQueue.queueStatus),
     },
   ];
 
