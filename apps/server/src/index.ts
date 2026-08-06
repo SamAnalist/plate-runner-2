@@ -5,9 +5,12 @@ import { loadConfig } from './config';
 import { initStorage } from './storage/db';
 import { createCommandsRepo } from './storage/commandsRepo';
 import { createListsRepo } from './storage/listsRepo';
+import { createRemoteRepo } from './storage/remoteRepo';
 import { createStatusService } from './services/statusService';
 import { createCommandService } from './services/commandService';
 import { createListService } from './services/listService';
+import { createDisplayService } from './services/displayService';
+import { createPairingService } from './services/pairingService';
 import { createApiKeyAuth } from './security/apiKeyAuth';
 import { registerRateLimit } from './security/rateLimit';
 import { loggerOptions, registerRequestLogger } from './logging/requestLogger';
@@ -18,17 +21,22 @@ import { registerSimulationControlRoutes } from './routes/simulationControl';
 import { registerSimulationCommandsRoutes } from './routes/simulationCommands';
 import { registerCommandsRoutes } from './routes/commands';
 import { registerListsRoutes } from './routes/lists';
+import { registerDisplaysRoutes } from './routes/displays';
+import { registerControllersRoutes } from './routes/controllers';
 
 async function main() {
   const config = loadConfig();
   const storage = initStorage(config.storagePath);
   const commandsRepo = createCommandsRepo(storage);
   const listsRepo = createListsRepo(storage);
+  const remoteRepo = createRemoteRepo(storage);
 
   const statusService = createStatusService(commandsRepo, storage);
   const fastify = Fastify({ logger: loggerOptions });
   const commandService = createCommandService(commandsRepo, fastify.log);
   const listService = createListService(listsRepo);
+  const displayService = createDisplayService(remoteRepo, fastify.log);
+  const pairingService = createPairingService(remoteRepo, fastify.log);
 
   await fastify.register(cors, { origin: true });
   registerRequestLogger(fastify);
@@ -62,6 +70,8 @@ async function main() {
     await registerSimulationCommandsRoutes(apiScope, commandService);
     await registerCommandsRoutes(apiScope, commandService);
     await registerListsRoutes(apiScope, listService, commandService);
+    await registerDisplaysRoutes(apiScope, displayService, pairingService, commandService);
+    await registerControllersRoutes(apiScope, pairingService);
   }, { prefix: '/api' });
 
   try {
