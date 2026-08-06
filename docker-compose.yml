@@ -1,0 +1,29 @@
+services:
+  plate-runner-server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: plate-runner-server
+    ports:
+      - "8787:8787"
+    environment:
+      PLATE_RUNNER_API_KEY: ${PLATE_RUNNER_API_KEY:-dev-local-key}
+      PLATE_RUNNER_SERVER_PORT: 8787
+      PLATE_RUNNER_STORAGE_PATH: /data
+    volumes:
+      - plate-runner-data:/data
+    restart: unless-stopped
+
+  plate-runner-web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: plate-runner-web
+    ports:
+      - "8080:80"
+    depends_on:
+      - plate-runner-server
+    restart: unless-stopped
+
+volumes:
+  plate-runner-data:

@@ -2,13 +2,18 @@
   "name": "plate-runner",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "dev": "pnpm --filter web dev",
+    "dev": "concurrently -n web,server -c blue,green \"pnpm dev:web\" \"pnpm dev:server\"",
+    "dev:web": "pnpm --filter web dev",
+    "dev:server": "pnpm --filter server dev",
     "build": "pnpm --filter web build",
     "preview": "pnpm --filter web preview",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "server:start": "pnpm --filter server start"
   },
   "devDependencies": {
+    "concurrently": "^10.0.4",
     "typescript": "^5.5.3"
   }
 }
