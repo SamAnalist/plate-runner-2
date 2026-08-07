@@ -6,8 +6,8 @@ import { Button } from '../ui/Button';
 const TIMEOUT_PRESETS = [5, 10, 15];
 
 const STYLE_OPTIONS: { value: ScreenSaverStyle; label: string }[] = [
-  { value: 'floating_plate', label: 'Floating Plate' },
   { value: 'moving_logo', label: 'Moving Logo' },
+  { value: 'floating_plate', label: 'Floating Plate' },
   { value: 'subtle_gradient', label: 'Subtle Gradient' },
 ];
 

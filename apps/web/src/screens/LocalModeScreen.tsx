@@ -492,11 +492,6 @@ export function LocalModeScreen({
                       />
                     ))}
                   </div>
-                  {config.vehicleColor !== 'blue' && (
-                    <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
-                      No dedicated asset yet — rendering as blue until one is added.
-                    </p>
-                  )}
                 </div>
 
                 <SpeedPhasesSection config={config} set={set} />

@@ -3057,3 +3057,299 @@ running the deploy.
 - After a successful staging run, revisit
   `SECURITY_AUDIT_RAILWAY_READINESS.md`'s residual risks to decide
   whether a production readiness review is warranted.
+
+---
+
+## Phase — Screen Saver: Moving Logo Default, Plate Text Update
+
+### Goal
+
+Small UX tweak to the Screen Saver: change the default style to
+`moving_logo` (listed first in Settings), and update the "Floating
+Plate" style's mock plate text from "READY" to "PLATE RUNNER".
+
+### Implemented
+
+- `Floating Plate` style now renders "PLATE RUNNER" on the mock plate
+  instead of "READY".
+- `moving_logo` is now the default `ScreenSaverStyle` and appears first
+  in the Settings / API → Screen Saver style list (previously
+  `floating_plate` was default and listed first).
+
+### Files Changed
+
+- `apps/web/src/components/screensaver/ScreenSaverOverlay.tsx` —
+  changed `FloatingPlate`'s plate text from `READY` to `PLATE RUNNER`.
+- `apps/web/src/components/controls/ScreenSaverSettingsPanel.tsx` —
+  reordered `STYLE_OPTIONS` so `moving_logo` is listed first.
+- `apps/web/src/features/screensaver/useScreenSaver.ts` —
+  `DEFAULT_SCREEN_SAVER_SETTINGS.style` changed from `'floating_plate'`
+  to `'moving_logo'`.
+- `docs/SCREEN_SAVER_SPEC.md` — updated default style and recommended
+  style references, updated plate text quote.
+- `docs/PROGRESS.md` — this entry.
+
+### Decisions
+
+- Only the default and list order changed — `floating_plate` and
+  `subtle_gradient` remain fully available as user-selectable options,
+  no removal.
+- Existing installs with settings already persisted to
+  `localStorage["plate-runner:screensaver:v1"]` are unaffected (their
+  saved `style` still applies) — the new default only affects
+  first-time/reset state.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` — clean, no type errors.
+- Visual check pending: open Settings / API → Screen Saver, confirm
+  "Moving Logo" is the first option in the list and is selected by
+  default on a fresh/reset profile; trigger the `Floating Plate` style
+  and confirm the plate now reads "PLATE RUNNER".
+
+### Known Limitations
+
+- None beyond those already listed in `docs/SCREEN_SAVER_SPEC.md`
+  (idle-check tick lag, `subtle_gradient`/`floating_plate` less
+  visually tuned than `moving_logo`).
+
+### Next Steps
+
+- None required — this was a self-contained visual tweak.
+
+---
+
+## Phase — Paired Controllers: Auto-Refresh + Controller Self-Unpair
+
+### Goal
+
+Fix the "Paired Controllers" section in Display Mode: it never
+auto-refreshed, and a Controller removing its own pairing (the "Remove"
+button in Controller Mode) never told the server, so the Display kept
+showing that controller as actively paired forever.
+
+### Implemented
+
+- New controller-token-authenticated endpoint,
+  `POST /api/remote/displays/:displayId/unpair`, that revokes the calling
+  controller's own pairing server-side.
+- Controller Mode's "Remove" button now calls that endpoint (best-effort)
+  before clearing the pairing from local storage, instead of only
+  clearing local storage.
+- Display Mode's "Paired Controllers" list now polls
+  `GET /api/displays/:displayId/pairings` every 4s while a display is
+  registered (same pattern as the existing 2s pairing-requests poll),
+  instead of only on mount / manual refresh.
+
+### Files Changed
+
+- `apps/server/src/routes/remote.ts` — added the `/unpair` route.
+- `apps/web/src/features/controller/useRemoteController.ts` —
+  `forgetPairing` now calls `/api/remote/displays/:displayId/unpair`
+  before clearing local storage; return type is now `Promise<void>`.
+- `apps/web/src/features/display/useDisplayCommandListener.ts` — added
+  `PAIRINGS_POLL_MS` (4000) and a polling `useEffect` for
+  `refreshPairings`, mirroring the existing pairing-requests poll.
+- `docs/PAIRING_SPEC.md` — documented the new endpoint under "Controller
+  self-unpair", removed the now-stale "cannot self-revoke" limitation.
+- `docs/PROGRESS.md` — this entry.
+
+### Decisions
+
+- A revoked pairing stays in the Display's list with a `revoked` label
+  instead of being removed outright (this UI already existed — the fix
+  was making it actually reachable) — an operator seeing "this
+  controller *was* paired and now isn't" is more useful than the row
+  silently disappearing.
+- The unpair call is best-effort from the Controller: if the server is
+  unreachable, the pairing is still cleared locally. A user who
+  explicitly asked to remove a pairing shouldn't be blocked by a network
+  error; the worst case is a stale-but-inert row on the server until the
+  Display operator revokes it manually or the token TTL expires.
+- Chose a 4s poll for pairings (vs. the 2s used for pairing requests) —
+  pairing state changes less urgently than a live approval request
+  someone is waiting on.
+
+### Manual Testing
+
+- `pnpm --filter server exec tsc --noEmit` and
+  `pnpm --filter web exec tsc --noEmit` — both clean.
+- Manual QA pending (no automated test suite exists for `apps/server`):
+  pair a Controller to a Display, confirm it appears in "Paired
+  Controllers" without a manual refresh; click "Remove" on the
+  Controller side and confirm the Display's list updates to `revoked`
+  within ~4s without needing a reload or the manual refresh button.
+
+### Known Limitations
+
+- No push/websocket — both sides still rely on polling, so there's up
+  to a ~4s lag between a Controller unpairing and the Display seeing it.
+- If the Controller is offline when "Remove" is clicked, the server-side
+  pairing stays active until the Display operator revokes it manually
+  from their side.
+
+### Next Steps
+
+- None required for this fix; a future phase could unify all
+  poll-based sync (pairings, pairing requests, commands) onto a single
+  WebSocket connection per `docs/REMOTE_MODE_SPEC.md`'s longer-term
+  direction.
+
+---
+
+## Phase — Red/Gray Vehicle Assets Wired In
+
+### Goal
+
+Finish Phase 0.6's vehicle color variants: `red` and `gray` PNG assets
+(all 6 detector placements each, provided by the user) existed on disk
+at `apps/web/public/assets/vehicles/main-car/{red,gray}/` but were never
+registered, so both colors silently rendered as `blue` via the existing
+fallback.
+
+### Implemented
+
+- Populated `RED_ASSETS` and `GRAY_ASSETS` in `VEHICLE_ASSET_REGISTRY`
+  (`assetRegistry.tsx`), mirroring `BLUE_ASSETS`'s 6-entry shape —
+  `red` and `gray` now resolve to their own images instead of falling
+  back to blue.
+- Removed the now-stale "No dedicated asset yet — rendering as blue
+  until one is added" note under the Vehicle Color swatch selector in
+  `LocalModeScreen.tsx`, since it no longer applies to any supported
+  color.
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/assetRegistry.tsx`
+  — added `RED_ASSETS`/`GRAY_ASSETS`, updated header comment.
+- `apps/web/src/screens/LocalModeScreen.tsx` — removed the fallback
+  note.
+- `docs/VEHICLE_COLOR_VARIANTS.md` — updated to reflect all three
+  colors now being fully asset-backed; added a "Status update" section.
+- `docs/PROGRESS.md` — this entry.
+
+### Decisions
+
+- Verified all 18 new/existing PNGs (`blue`/`red`/`gray` × 6 placements)
+  are 1536×1024, matching the existing blue set — required for
+  `plateAnchors.ts`'s shared, color-agnostic anchor geometry to stay
+  valid (see `VEHICLE_COLOR_VARIANTS.md`'s "Shared plate-anchor geometry
+  requirement"). No anchor changes were made.
+- Kept the `fallbackUsed` resolver logic in `getVehicleAsset` as-is —
+  it's still correct infrastructure for any future color added without
+  a full asset set, even though it's a no-op for all three colors today.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` — clean.
+- Manual QA pending: for each of `red`/`gray`, run all 6 detector
+  placements with Visual QA → Anchor bounds: ON and confirm the plate
+  overlay lands correctly on the recolored asset (same as it does for
+  blue), since the anchors are shared and were not recalibrated per
+  color.
+
+### Known Limitations
+
+- Plate anchors remain shared across all three colors (not
+  color-specific) — if a future color's asset has different framing
+  than blue's, anchors would need to become color-aware per the note in
+  `VEHICLE_COLOR_VARIANTS.md`. Not an issue for red/gray since they
+  share blue's exact geometry.
+
+### Next Steps
+
+- Manual visual QA pass across red/gray × all 6 placements (see above).
+
+---
+
+## Phase — Per-Color Plate Anchor Overrides
+
+### Goal
+
+The previous phase's assumption ("red/gray share blue's exact geometry, no
+anchor changes needed") turned out to be wrong — the user reported the
+plate position/size visibly differs by color. Confirmed by direct pixel
+inspection: `red`/`gray` are separately generated images, not recolors, so
+their car scale/crop/plate position can differ from blue's. Implemented a
+per-color plate anchor override system so each `(color, placement)` pair
+can have its own plate position/size independent of blue's calibration.
+
+### Implemented
+
+- `plateAnchors.ts`: added `PLATE_ANCHOR_OVERRIDES` (a
+  `Partial<Record<VehicleColor, Partial<Record<DetectorPlacement, Partial<PlateAnchor>>>>>`)
+  and `getPlateAnchor(color, placement)`, which merges any override onto
+  the base (blue-calibrated) `PLATE_ANCHORS[placement]`. No override →
+  falls back to the base anchor unchanged.
+- `VehicleAssetLayer.tsx`: both the real plate render and the `Visual QA →
+  Anchor bounds` debug overlay now call `getPlateAnchor(config.vehicleColor,
+  placement)` instead of reading `PLATE_ANCHORS` directly — the debug
+  overlay now shows the correct anchor for whichever color is selected.
+- Measured actual plate position deltas by direct pixel inspection of the
+  PNGs (blue vs. red vs. gray) for `center_front` and `center_back`, and
+  populated `PLATE_ANCHOR_OVERRIDES` for the two colors on `center_front`
+  (small but real offset: ~+5.5px x, ~-13px y on the 1536×1024 canvas).
+  `center_back`'s measured delta was negligible (~1px) so no override was
+  added for it.
+
+### Files Changed
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/plateAnchors.ts`
+  — added `PLATE_ANCHOR_OVERRIDES` and `getPlateAnchor()`.
+- `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx`
+  — switched both the render path and `AnchorDebugOverlay` to
+  `getPlateAnchor()`; `AnchorDebugOverlay` now takes a `color` prop;
+  corrected a stale header comment claiming only 'blue' has real assets.
+- `docs/VEHICLE_COLOR_VARIANTS.md` — replaced the "shared plate-anchor
+  geometry requirement" section (which assumed no per-color calibration
+  would ever be needed) with "Per-color plate-anchor overrides" describing
+  the actual system and current calibration status; corrected the
+  previous phase's now-wrong "Status update" note.
+- `docs/PROGRESS.md` — this entry.
+
+### Decisions
+
+- Measured `center_front` and `center_back` by direct pixel inspection of
+  the PNG files (crop + coordinate grid overlay, cross-checked with a
+  flood-fill blob detector) rather than guessing. For the four angled/
+  skewed views (`driver_front`, `passenger_front`, `driver_back`,
+  `passenger_back`), repeated measurement attempts gave inconsistent
+  results between passes — rather than ship unreliable numbers presented
+  as calibrated fact, these were left without an override (falling back
+  to blue's anchor) and explicitly flagged in code and docs as needing
+  calibration through the app's own `Visual QA → Anchor bounds: ON` tool,
+  which renders against the live composited scene and is far more
+  reliable than static-image pixel-hunting.
+- Chose absolute override values (final `xPct`/`yPct`, not deltas) in
+  `PLATE_ANCHOR_OVERRIDES`, matching how the base anchors themselves are
+  already defined — keeps both easy to hand-tune the same way.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` — clean.
+- Manual QA pending: run the app, select `red`/`gray`, `center_front`
+  placement, and confirm the plate now sits correctly (previously
+  visibly off using blue's anchor). For the four uncalibrated angled
+  views, use `Visual QA → Anchor bounds: ON` per color to measure and
+  fill in `PLATE_ANCHOR_OVERRIDES`.
+
+### Known Limitations
+
+- 4 of 6 placements (`driver_front`, `passenger_front`, `driver_back`,
+  `passenger_back`) are not yet calibrated for `red`/`gray` — they
+  currently render with blue's anchor, which may look off for those
+  specific placement + color combinations until calibrated in-app.
+- `red`/`gray` PNGs also carry a soft, partially-transparent vignette
+  around the car (not a crisp cutout like blue's) — noticed during pixel
+  inspection, unrelated to plate position. Not addressed this phase since
+  it wasn't what was asked; flagging in case it's visible as a faint halo
+  around red/gray cars in the composited scene.
+
+### Next Steps
+
+- Calibrate the 4 remaining placements for red/gray using the in-app
+  Anchor bounds overlay (either the user does this interactively, or
+  shares overlay screenshots so the exact `xPct`/`yPct`/`wPct`/`hPct`
+  values can be filled in `PLATE_ANCHOR_OVERRIDES`).
+- Optionally revisit the red/gray vignette noted above if it turns out
+  to be visible in the composited scene.

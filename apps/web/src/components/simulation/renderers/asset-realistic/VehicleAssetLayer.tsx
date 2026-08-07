@@ -17,11 +17,13 @@
  *   are genuinely distinct visual angles, not the same image with a skew.
  *
  * Vehicle colour:
- *   Resolved via getVehicleAsset({ color: config.vehicleColor, placement }).
- *   Only 'blue' has real asset files today — 'red'/'gray' fall back to the
- *   blue asset until their PNGs are added (see docs/VEHICLE_COLOR_VARIANTS.md).
+ *   Car body resolved via getVehicleAsset({ color: config.vehicleColor, placement })
+ *   — all three colors ('blue', 'red', 'gray') have real asset files.
+ *   Plate anchor resolved via getPlateAnchor(config.vehicleColor, placement) —
+ *   each color has its own independent anchor per placement (see
+ *   plateAnchors.ts's PLATE_ANCHORS_BY_COLOR and docs/VEHICLE_COLOR_VARIANTS.md).
  */
-import type { SimulationConfig } from '@plate-runner/shared';
+import type { SimulationConfig, VehicleColor } from '@plate-runner/shared';
 import {
   isPlacementAllowedForDirection,
   remapPlacementForDirection,
@@ -37,7 +39,7 @@ import {
 } from '../../../../utils/depth';
 import { getViewAwareX, getPovYOffset } from './viewMotionPaths';
 import { getVehicleAsset } from './assetRegistry';
-import { PLATE_ANCHORS, anchorToLocalRect } from './plateAnchors';
+import { getPlateAnchor, anchorToLocalRect } from './plateAnchors';
 import { DynamicPlateOverlay } from './DynamicPlateOverlay';
 import type { AssetViewKey } from './types';
 import { getSceneConfig } from './scene-configs/getSceneConfig';
@@ -88,14 +90,16 @@ interface VehicleAssetLayerProps {
  */
 function AnchorDebugOverlay({
   viewKey,
+  color,
   carLW = CAR_LW,
   carLH = CAR_LH,
 }: {
   viewKey: AssetViewKey;
+  color: VehicleColor;
   carLW?: number;
   carLH?: number;
 }) {
-  const anchor = PLATE_ANCHORS[viewKey];
+  const anchor = getPlateAnchor(color, viewKey);
   const rect   = anchorToLocalRect(anchor, carLW, carLH);
   const cx     = rect.x + rect.w / 2;
   const cy     = rect.y + rect.h / 2;
@@ -236,7 +240,7 @@ export function VehicleAssetLayer({
   // ── Asset & plate anchor lookup ─────────────────────────────────────────
   const viewKey    = safePlacement as AssetViewKey;
   const asset      = getVehicleAsset({ color: config.vehicleColor, placement: viewKey });
-  const anchor     = PLATE_ANCHORS[safePlacement];
+  const anchor     = getPlateAnchor(config.vehicleColor, safePlacement);
   const rotDeg     = sceneV.rotationDeg ?? 0;
   const rotTransform = rotDeg !== 0
     ? ` rotate(${rotDeg}, ${CAR_LW / 2}, ${CAR_LH / 2})`
@@ -270,7 +274,7 @@ export function VehicleAssetLayer({
 
         {/* Anchor debug overlay — Visual QA only, never in production / camera mode */}
         {showAnchorOverlay && (
-          <AnchorDebugOverlay viewKey={viewKey} />
+          <AnchorDebugOverlay viewKey={viewKey} color={config.vehicleColor} />
         )}
       </g>
     </g>

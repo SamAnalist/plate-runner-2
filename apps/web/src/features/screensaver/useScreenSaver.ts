@@ -19,7 +19,7 @@ const STYLES: ScreenSaverStyle[] = ['floating_plate', 'moving_logo', 'subtle_gra
 export const DEFAULT_SCREEN_SAVER_SETTINGS: ScreenSaverSettings = {
   enabled: true,
   timeoutMinutes: 10,
-  style: 'floating_plate',
+  style: 'moving_logo',
   updatedAt: new Date(0).toISOString(),
 };
 

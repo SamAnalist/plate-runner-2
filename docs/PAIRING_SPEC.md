@@ -244,8 +244,27 @@ display/pairing reads still succeed with no errors.
   Hardening phase).
 - `GET /api/displays/:displayId/pairings` and the pairing-requests
   approve/reject routes require the display's own secret — a controller
-  cannot self-inspect, self-cancel, or self-revoke its own pairing/request;
-  only the display side exposes that.
+  cannot self-inspect its own pairing; only the display side exposes that.
+  It *can* self-revoke — see "Controller self-unpair" below.
 - No way for a controller to explicitly cancel a request it created before
   the display acts on it — it can only stop polling locally (`Try Again` in
   the UI) and let the request expire naturally.
+
+## Controller self-unpair
+
+`POST /api/remote/displays/:displayId/unpair` — controller-token-authenticated
+(same `createControllerAuth` guard as the rest of `/api/remote/*`), no body.
+Revokes the calling controller's own `device_pairings` row
+(`revokedAt = now`) server-side. Controller Mode's "Remove" button
+(`useRemoteController.forgetPairing`) calls this before clearing the pairing
+from its own `localStorage`, best-effort — an unreachable server doesn't
+block the local removal, since a stale local pairing the user explicitly
+asked to remove is worse than a stray still-active server-side row.
+
+The Display side polls `GET /api/displays/:displayId/pairings` every 4s
+(`useDisplayCommandListener`'s `PAIRINGS_POLL_MS`, same pattern as the 2s
+pairing-requests poll) whenever a display is registered, independent of the
+"Listen for Remote Commands" toggle. A revoked pairing is not removed from
+the list outright — it stays visible with a `revoked` label (no `Revoke`
+button) so the Display operator can see a controller *was* paired and no
+longer is, rather than it silently vanishing.

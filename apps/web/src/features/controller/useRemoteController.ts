@@ -59,7 +59,7 @@ export interface RemoteControllerControls {
   setApiKey: (v: string) => void;
 
   pairedDisplays: PairedDisplay[];
-  forgetPairing: (displayId: string) => void;
+  forgetPairing: (displayId: string) => void | Promise<void>;
 
   pairingRequest: PairingRequestState | null;
   requestPairing: (controllerName: string, code: string) => void;
@@ -214,11 +214,18 @@ export function useRemoteController(): RemoteControllerControls {
     return () => clearInterval(interval);
   }, [pairingRequest, rawFetch, finalize]);
 
-  const forgetPairing = useCallback((displayId: string) => {
+  const forgetPairing = useCallback(async (displayId: string) => {
+    const token = pairedDisplaysRef.current.find(p => p.displayId === displayId)?.controllerToken;
+    if (token) {
+      // Best-effort: revoke server-side so the Display's "Paired Controllers"
+      // list reflects the removal too. Local state is cleared either way —
+      // an unreachable server shouldn't trap the user with a stale pairing.
+      await rawFetch(`/api/remote/displays/${displayId}/unpair`, { method: 'POST' }, token).catch(() => {});
+    }
     const next = pairedDisplaysRef.current.filter(p => p.displayId !== displayId);
     savePairings(next);
     setPairedDisplays(next);
-  }, []);
+  }, [rawFetch]);
 
   const tokenFor = useCallback((displayId: string): string | undefined => {
     return pairedDisplaysRef.current.find(p => p.displayId === displayId)?.controllerToken;

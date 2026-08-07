@@ -26,7 +26,7 @@ interface ScreenSaverSettings {
 }
 ```
 
-Default: `{ enabled: true, timeoutMinutes: 10, style: 'floating_plate' }`.
+Default: `{ enabled: true, timeoutMinutes: 10, style: 'moving_logo' }`.
 A missing key, corrupted JSON, an out-of-range `timeoutMinutes`, or an
 unrecognized `style` all fall back to this default (or, for
 `timeoutMinutes` alone, get clamped rather than fully reset) — same
@@ -104,7 +104,7 @@ inset-0 z-[100]` div (above the Camera/Fullscreen layout's `z-50`, so it
 covers those too), no sidebar/header, no real queue/plate/history data
 (the component takes only a `style` prop — it has no access to sensitive
 state by construction). Three CSS-only styles: a slowly bouncing/drifting
-fake plate reading "READY", a floating "Plate Runner" wordmark, or a
+fake plate reading "PLATE RUNNER", a floating "Plate Runner" wordmark, or a
 slow animated gradient — each with a generic "Waiting for signal…"
 line.
 
@@ -128,6 +128,6 @@ active.
 
 - The 5-second idle-check tick means activation can lag the configured
   timeout by up to ~5 seconds — acceptable for a multi-minute default.
-- `subtle_gradient` and `moving_logo` are implemented but not deeply
-  visually tuned — `floating_plate` is the recommended default and got
+- `subtle_gradient` and `floating_plate` are implemented but not deeply
+  visually tuned — `moving_logo` is the recommended default and got
   the most attention.

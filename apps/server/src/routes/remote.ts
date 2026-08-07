@@ -120,5 +120,15 @@ export async function registerRemoteRoutes(
         return reply.send({ ok: true, commandId: command.id });
       });
     }
+
+    // Self-unpair: lets a Controller revoke its own pairing (e.g. "Remove" in
+    // Controller Mode) so the Display's "Paired Controllers" list reflects it
+    // instead of silently staying "active" server-side forever.
+    scope.post('/remote/displays/:displayId/unpair', async (request, reply) => {
+      const { displayId } = request.params as { displayId: string };
+      remoteRepo.revokePairing(request.pairing!.id, new Date().toISOString());
+      request.log.info({ displayId, controllerId: request.pairing!.controllerId, event: 'controller_self_unpaired' }, 'controller self-unpaired');
+      return reply.send({ ok: true });
+    });
   });
 }

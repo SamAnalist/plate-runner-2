@@ -1,20 +1,21 @@
 /**
  * Asset registry — one raster entry per (VehicleColor, AssetViewKey).
  *
- * CURRENT STATE: camera-aware LPR/ANPR PNG assets installed for 'blue' only.
- *   All six blue views are 1536×1024 RGB images rendered from a virtual
- *   camera at 2–3 m height with a downward tilt — matching a real parking
- *   access/exit camera perspective. Each image contains a blank plate area
- *   for the DynamicPlateOverlay to render live plate text on top of.
+ * CURRENT STATE: camera-aware LPR/ANPR PNG assets installed for all three
+ *   colors ('blue', 'red', 'gray'). All eighteen views are 1536×1024 RGB
+ *   images rendered from a virtual camera at 2–3 m height with a downward
+ *   tilt — matching a real parking access/exit camera perspective. Each
+ *   image contains a blank plate area for the DynamicPlateOverlay to render
+ *   live plate text on top of.
  *
  * Files live at: public/assets/vehicles/main-car/<color>/<view>.png
  *
- * 'red' and 'gray' have no asset files yet — VEHICLE_ASSET_REGISTRY simply
- * has no entries for them, and getVehicleAsset() falls back to the blue
- * asset for the same placement, reporting fallbackUsed: true. See
- * docs/VEHICLE_COLOR_VARIANTS.md for the fallback policy and how to add a
- * new color's assets later (just populate that color's object below —
- * VehicleAssetLayer and this resolver need no changes).
+ * getVehicleAsset() still falls back to the blue asset for any (color,
+ * placement) pair that's missing from VEHICLE_ASSET_REGISTRY, reporting
+ * fallbackUsed: true — see docs/VEHICLE_COLOR_VARIANTS.md for the fallback
+ * policy and how to add a new color's assets later (just populate that
+ * color's object below — VehicleAssetLayer and this resolver need no
+ * changes).
  *
  * TO UPDATE AN ASSET:
  *   Replace the PNG file and update naturalW/naturalH if dimensions change.
@@ -71,11 +72,101 @@ const BLUE_ASSETS: Record<AssetViewKey, RasterAssetEntry> = {
   },
 };
 
-/** Color-keyed asset registry. 'red'/'gray' are intentionally empty until real assets are added. */
+const RED_ASSETS: Record<AssetViewKey, RasterAssetEntry> = {
+
+  center_front: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/red/center_front.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  driver_front: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/red/driver_front.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  passenger_front: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/red/passenger_front.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  center_back: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/red/center_back.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  driver_back: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/red/driver_back.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  passenger_back: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/red/passenger_back.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+};
+
+const GRAY_ASSETS: Record<AssetViewKey, RasterAssetEntry> = {
+
+  center_front: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/gray/center_front.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  driver_front: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/gray/driver_front.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  passenger_front: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/gray/passenger_front.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  center_back: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/gray/center_back.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  driver_back: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/gray/driver_back.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+
+  passenger_back: {
+    type:     'raster',
+    src:      '/assets/vehicles/main-car/gray/passenger_back.png',
+    naturalW: 1536,
+    naturalH: 1024,
+  },
+};
+
+/** Color-keyed asset registry. All three colors now have full asset sets. */
 export const VEHICLE_ASSET_REGISTRY: Record<VehicleColor, Partial<Record<AssetViewKey, RasterAssetEntry>>> = {
   blue: BLUE_ASSETS,
-  red:  {},
-  gray: {},
+  red:  RED_ASSETS,
+  gray: GRAY_ASSETS,
 };
 
 /** Backwards-compatible flat export — always the blue set. Prefer getVehicleAsset() for new code. */

@@ -29,7 +29,7 @@ function FloatingPlate() {
         className="px-10 py-5 rounded-lg border-2 border-white/25 bg-white/5"
         style={{ animation: 'plate-runner-float 6s ease-in-out infinite' }}
       >
-        <p className="text-3xl font-mono font-bold tracking-[0.35em] text-white/70">READY</p>
+        <p className="text-3xl font-mono font-bold tracking-[0.35em] text-white/70">PLATE RUNNER</p>
       </div>
       <p className="text-xs font-mono text-white/25 uppercase tracking-widest" style={{ animation: 'plate-runner-pulse-dim 3s ease-in-out infinite' }}>
         Waiting for signal…

@@ -73,6 +73,7 @@ const DEFAULT_API_KEY = 'dev-local-key';
 const POLL_MS = 1500;
 const HEARTBEAT_MS = 20_000;
 const PAIRING_REQUESTS_POLL_MS = 2000;
+const PAIRINGS_POLL_MS = 4000;
 const STORAGE_KEY = 'platerunner_display_registration';
 
 function loadRegistration(): DisplayRegistration | null {
@@ -303,6 +304,16 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
     const interval = setInterval(refreshPairingRequests, PAIRING_REQUESTS_POLL_MS);
     return () => clearInterval(interval);
   }, [registration, refreshPairingRequests]);
+
+  // Independent of the "Listen for Remote Commands" toggle, same as pairing
+  // requests above — a Controller unpairing itself (or being revoked
+  // elsewhere) should show up here without a manual refresh or page reload.
+  useEffect(() => {
+    if (!registration) return;
+    refreshPairings();
+    const interval = setInterval(refreshPairings, PAIRINGS_POLL_MS);
+    return () => clearInterval(interval);
+  }, [registration, refreshPairings]);
 
   useEffect(() => {
     if (!registration) return;
