@@ -110,6 +110,17 @@ export interface SceneVehicleMotionConfig {
    * Default: 1 (natural road slope).
    */
   entryDiagonalScale?: number;
+  /**
+   * t below which the away-direction entry slide-in offset (see getPovYOffset
+   * in viewMotionPaths.ts) is fully resolved (0) — i.e. the car is 100% at
+   * its natural on-screen position, no residual "sliding up from off-screen"
+   * offset left. Overrides the global AWAY.entryT (0.90) for this scene.
+   * MUST be >= readingT (ideally equal), otherwise the car can still be
+   * mid-slide while "stopped" at the gate, and the residual offset collapses
+   * abruptly once it resumes — looks like a teleport/jump right after the
+   * gate opens. Default: undefined (falls back to the global AWAY.entryT).
+   */
+  entryT?: number;
   /** Per-scene speed ranges for each animation phase */
   speed: SceneSpeedConfig;
   /** Per-scene car size multipliers for each animation phase */

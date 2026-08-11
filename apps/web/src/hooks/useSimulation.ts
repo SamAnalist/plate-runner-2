@@ -78,6 +78,7 @@ function phaseRate(speed: number, min: number, max: number): number {
  *    afterStop — finalT < t ≤ readingT
  *    final     — t ≤ finalT
  *
+ * Instant switch at every boundary — no ramping/blending between phases.
  * All timing thresholds come from the per-scene config — no global constants.
  */
 function getPhaseRate(
@@ -263,6 +264,13 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     const phase = stateRef.current.phase;
     if (phase === 'waiting_for_signal') {
       triggerGateOpen();
+    } else if (phase === 'running') {
+      // Signal arrived before the vehicle reached its stop position — ignore it.
+      // Setting gateOpen here would skip the stop check in animate() entirely
+      // (t <= stopAtT would never freeze the vehicle), so the car blows through
+      // the reading/gate position still at approach speed instead of easing out
+      // of a proper stop — a jarring jump, not a smooth resume. The vehicle will
+      // stop normally and reach 'waiting_for_signal'; send the signal again then.
     } else {
       setState(s => ({ ...s, gateOpen: true }));
     }

@@ -5,8 +5,6 @@ import { DebugOverlay } from './DebugOverlay';
 import {
   SCENE_W,
   SCENE_H,
-  VP_X,
-  VP_Y,
   getDepthValues,
 } from '../../utils/depth';
 import { AssetRealisticRenderer } from './renderers/asset-realistic/AssetRealisticRenderer';
@@ -76,20 +74,20 @@ export function SimulationScene({
 
         {/* Status overlays (hidden in camera mode) */}
         {!cameraMode && phase === 'idle' && (
-          <text x={VP_X} y={VP_Y - 18} textAnchor="middle"
-            fill="rgba(255,255,255,0.25)" fontSize={11}
-            fontFamily='"JetBrains Mono", monospace' fontWeight="600" letterSpacing="0.12em">
+          <text x={SCENE_W - 78} y={21} textAnchor="middle"
+            fill="rgba(255,255,255,0.4)" fontSize={8}
+            fontFamily='"JetBrains Mono", monospace' fontWeight="600" letterSpacing="0.08em">
             READY — PRESS START
           </text>
         )}
 
         {!cameraMode && phase === 'waiting_for_signal' && (
           <>
-            <rect x={VP_X - 110} y={VP_Y - 36} width={220} height={24} rx={4}
+            <rect x={10} y={10} width={132} height={16} rx={3}
                   fill="rgba(234,179,8,0.15)" stroke="rgba(234,179,8,0.5)" strokeWidth={1} />
-            <text x={VP_X} y={VP_Y - 20} textAnchor="middle"
-              fill="#fbbf24" fontSize={11}
-              fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.10em">
+            <text x={76} y={21} textAnchor="middle"
+              fill="#fbbf24" fontSize={8}
+              fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.08em">
               WAITING FOR SIGNAL
             </text>
           </>
@@ -97,11 +95,11 @@ export function SimulationScene({
 
         {!cameraMode && phase === 'stopped_at_gate' && (
           <>
-            <rect x={VP_X - 90} y={VP_Y - 36} width={180} height={24} rx={4}
+            <rect x={10} y={10} width={104} height={16} rx={3}
                   fill="rgba(251,146,60,0.12)" stroke="rgba(251,146,60,0.4)" strokeWidth={1} />
-            <text x={VP_X} y={VP_Y - 20} textAnchor="middle"
-              fill="#fb923c" fontSize={11}
-              fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.10em">
+            <text x={62} y={21} textAnchor="middle"
+              fill="#fb923c" fontSize={8}
+              fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.08em">
               STOPPED AT GATE
             </text>
           </>
@@ -109,11 +107,11 @@ export function SimulationScene({
 
         {!cameraMode && isGateOpening && (
           <>
-            <rect x={VP_X - 80} y={VP_Y - 36} width={160} height={24} rx={4}
+            <rect x={10} y={10} width={104} height={16} rx={3}
                   fill="rgba(34,211,238,0.10)" stroke="rgba(34,211,238,0.35)" strokeWidth={1} />
-            <text x={VP_X} y={VP_Y - 20} textAnchor="middle"
-              fill="#22d3ee" fontSize={11}
-              fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.10em">
+            <text x={62} y={21} textAnchor="middle"
+              fill="#22d3ee" fontSize={8}
+              fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.08em">
               GATE OPENING
             </text>
           </>
@@ -121,11 +119,11 @@ export function SimulationScene({
 
         {!cameraMode && phase === 'done' && (
           <>
-            <rect x={VP_X - 100} y={VP_Y - 36} width={200} height={24} rx={4}
+            <rect x={10} y={10} width={104} height={16} rx={3}
                   fill="rgba(34,197,94,0.12)" stroke="rgba(34,197,94,0.4)" strokeWidth={1} />
-            <text x={VP_X} y={VP_Y - 20} textAnchor="middle"
-              fill="#4ade80" fontSize={11}
-              fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.10em">
+            <text x={62} y={21} textAnchor="middle"
+              fill="#4ade80" fontSize={8}
+              fontFamily='"JetBrains Mono", monospace' fontWeight="700" letterSpacing="0.08em">
               VEHICLE PASSED
             </text>
           </>

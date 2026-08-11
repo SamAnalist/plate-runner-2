@@ -219,7 +219,7 @@ export function VehicleAssetLayer({
   const scaleY = carH / CAR_LH;
 
   // ── POV exit — slide off bottom, optionally diagonal ────────────────────
-  const povYOffset = getPovYOffset(vehicleT, effectiveY, carH, config.direction, sceneV.gateT);
+  const povYOffset = getPovYOffset(vehicleT, effectiveY, carH, config.direction, sceneV.gateT, sceneV.entryT);
 
   // Diagonal slide offsets — X follows road slope proportional to the Y slide distance.
   // exitDiagonal: for incoming exit (car slides off bottom after gate).

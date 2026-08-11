@@ -89,14 +89,16 @@ export function getPovYOffset(
   direction: 'incoming' | 'away',
   /** Per-scene gate t — overrides global POV_EXIT_T for incoming exit. */
   exitGateT: number = POV_EXIT_T,
+  /** Per-scene entry t — overrides global POV_ENTRY_T_AWAY for away entry. */
+  entryT: number = POV_ENTRY_T_AWAY,
 ): number {
   if (direction === 'incoming' && t > exitGateT) {
     const progress = Math.min((t - exitGateT) / (1 - exitGateT), 1);
     return lerp(0, SCENE_H + 10 - (depthY - carH), progress);
   }
-  if (direction === 'away' && t > POV_ENTRY_T_AWAY) {
-    // progress: 0 when fully on-screen (POV_ENTRY_T_AWAY), 1 when fully off-screen (t=1.0)
-    const progress = Math.min((t - POV_ENTRY_T_AWAY) / (1 - POV_ENTRY_T_AWAY), 1);
+  if (direction === 'away' && t > entryT) {
+    // progress: 0 when fully on-screen (entryT), 1 when fully off-screen (t=1.0)
+    const progress = Math.min((t - entryT) / (1 - entryT), 1);
     return lerp(0, SCENE_H + 10 - (depthY - carH), progress);
   }
   return 0;

@@ -65,9 +65,11 @@ export const driverFrontConfig: SceneRenderConfig = {
   },
 
   gate: {
-    t:                  0.93,
-    explicitPostRightX: 140,
-    armDirection:       'right',
+    t:                  1.05,
+    // Post on the road's right edge (mirrors the old left-side placement —
+    // roadRight(t=0.93) ≈ 686 with this scene's actual road constants).
+    explicitPostRightX: 755,
+    armDirection:       'left',
     openAngleDeg:        84,
     closedAngleDeg:      0,
   },

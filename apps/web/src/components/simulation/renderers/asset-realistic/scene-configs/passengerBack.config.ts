@@ -33,10 +33,23 @@ export const passengerBackConfig: SceneRenderConfig = {
 
   vehicle: {
     spawnT:      0.94,   // must be > decelStart (0.97)
-    readingT:    0.93,   // t where car stops
+    readingT:    0.90,   // t where car stops
+    // Own entry-slide threshold (overrides the shared global AWAY.entryT=0.90
+    // — see entryT in types.ts). Equal to readingT so the "sliding up from
+    // off-screen" entry offset is 100% resolved by the time the car reaches
+    // its stop position — otherwise a residual chunk of that offset collapses
+    // abruptly right when the car resumes after the gate opens (visible as a
+    // jump/teleport in the t=0.925→0.90ish range).
+    entryT:      0.86,
     gateT:       0.45,   // matches visual gate (gate.t and scene PB_GATE_T)
-    decelOffset: 0.009,   // decelStart = 0.97 — between spawnT(0.98) and readingT(0.93) ✓
-    finalT:      0.84,   // afterStop runs 0.93→0.80 (0.13 units), then final for the rest
+    decelOffset: 0.02,   // decelStart = 0.97 — between spawnT(0.98) and readingT(0.93) ✓
+    // Equal to readingT on purpose: the 'afterStop' phase's window
+    // (finalT < t <= readingT) becomes zero-width, so the instant the car
+    // resumes after the gate opens it goes straight to 'final' speed — no
+    // separate afterStop stage. speed.afterStop/carScale.afterStop below are
+    // now dead values for this scene (kept only because the type requires
+    // them) — tune speed.final / carScale.final instead.
+    finalT:      0.86,
 
     xFar:  PB_CX_FAR,    //  1060 — car disappears upper-right
     xNear: PB_CX_NEAR,   //   602 — car enters lower-left
@@ -48,16 +61,16 @@ export const passengerBackConfig: SceneRenderConfig = {
     rotationDeg: -6,     // same road tilt as driver_front (mirrored road, same angle)
 
     speed: {
-      initial:   { min: 0.013, max: 0.30  },
-      stopping:  { min: 0.010, max: 0.40  },
-      afterStop: { min: 0.007, max: 0.06  },   // brief transition before final phase
-      final:     { min: 0.045, max: 0.15  },
+      initial:   { min: 0.001, max: 0.04  },
+      stopping:  { min: 0.003, max: 0.04  },
+      afterStop: { min: 0.02, max: 0.06  },   // brief transition before final phase
+      final:     { min: 0.025, max: 0.25  },
     },
     carScale: {
-      initial:   1.39,
-      stopping:  1.35,
+      initial:   1.44,
+      stopping:  1.37,
       atGate:    1.10,
-      afterStop: 2.1,   // no dip — smooth ramp into final
+      afterStop: 2.2,   // no dip — smooth ramp into final
       final:     4,   // counteract natural depth shrink during receding phase
     },
   },
