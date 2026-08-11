@@ -60,8 +60,8 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
     },
     // Angled view from passenger's side (front-right).
     passenger_front: {
-      xPct: 0.720, yPct: 0.625, wPct: 0.130, hPct: 0.085,
-      rotateDeg: 0, skewXDeg: 2, skewYDeg: 0, side: 'front',
+      xPct: 0.620, yPct: 0.645, wPct: 0.100, hPct: 0.065,
+      rotateDeg: -6, skewXDeg: 0, skewYDeg: 0, side: 'front',
     },
     // Straight-on rear view.
     center_back: {
@@ -91,8 +91,8 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
       rotateDeg: 8, skewXDeg: 10, skewYDeg: 0, side: 'front',
     },
     passenger_front: {
-      xPct: 0.720, yPct: 0.625, wPct: 0.130, hPct: 0.085,
-      rotateDeg: 0, skewXDeg: 2, skewYDeg: 0, side: 'front',
+      xPct: 0.620, yPct: 0.645, wPct: 0.100, hPct: 0.065,
+      rotateDeg: -6, skewXDeg: 0, skewYDeg: 0, side: 'front',
     },
     center_back: {
       xPct: 0.445, yPct: 0.580, wPct: 0.110, hPct: 0.075,
@@ -119,8 +119,8 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
       rotateDeg: 8, skewXDeg: 10, skewYDeg: 0, side: 'front',
     },
     passenger_front: {
-      xPct: 0.720, yPct: 0.625, wPct: 0.130, hPct: 0.085,
-      rotateDeg: 0, skewXDeg: 2, skewYDeg: 0, side: 'front',
+      xPct: 0.620, yPct: 0.645, wPct: 0.100, hPct: 0.065,
+      rotateDeg: -6, skewXDeg: 0, skewYDeg: 0, side: 'front',
     },
     center_back: {
       xPct: 0.445, yPct: 0.540, wPct: 0.115, hPct: 0.085,

@@ -61,6 +61,18 @@ export const DIAGONAL_ROAD: KioskRoadGeometry = {
   rNear: SCENE_W * 0.830, // 664
 };
 
+/**
+ * Horizontal mirror of DIAGONAL_ROAD, used by passenger_front (and any other
+ * scene built as a true left/right mirror of driver_front) — see
+ * PassengerFrontScene.tsx's RL_FAR/RR_FAR/RL_NEAR/RR_NEAR constants.
+ */
+export const MIRRORED_DIAGONAL_ROAD: KioskRoadGeometry = {
+  lFar:  VP_X - 580,   // -180
+  rFar:  VP_X - 300,   // 100
+  lNear: SCENE_W * 0.170, // 136
+  rNear: SCENE_W * 0.875, // 700
+};
+
 export interface TicketKioskProps {
   /** Depth position (0 = far/horizon, 1 = near/bottom of frame). Drives both Y and scale. */
   t?: number;

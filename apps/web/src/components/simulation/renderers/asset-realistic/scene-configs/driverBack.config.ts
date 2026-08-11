@@ -34,7 +34,7 @@ export const driverBackConfig: SceneRenderConfig = {
       final:     { min: 0.08,  max: 0.15  },
     },
     carScale: {
-      initial:   1.4,
+      initial:   1.1,
       stopping:  1.0,
       atGate:    1.0,
       afterStop: 0.95,
