@@ -70,8 +70,8 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
     },
     // Angled view from driver's side of rear face.
     driver_back: {
-      xPct: 0.650, yPct: 0.610, wPct: 0.140, hPct: 0.080,
-      rotateDeg: 0, skewXDeg: -3, skewYDeg: 0, side: 'rear',
+      xPct: 0.595, yPct: 0.520, wPct: 0.09, hPct: 0.070,
+      rotateDeg: -3, skewXDeg: -3, skewYDeg: 0, side: 'rear',
     },
     // Angled view from passenger's side of rear face.
     passenger_back: {
@@ -99,8 +99,8 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
       rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'rear',
     },
     driver_back: {
-      xPct: 0.650, yPct: 0.610, wPct: 0.140, hPct: 0.080,
-      rotateDeg: 0, skewXDeg: -3, skewYDeg: 0, side: 'rear',
+      xPct: 0.635, yPct: 0.520, wPct: 0.092, hPct: 0.070,
+      rotateDeg: -3, skewXDeg: -3, skewYDeg: 0, side: 'rear',
     },
     passenger_back: {
       xPct: 0.265, yPct: 0.540, wPct: 0.110, hPct: 0.070,
@@ -127,8 +127,8 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
       rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'rear',
     },
     driver_back: {
-      xPct: 0.650, yPct: 0.610, wPct: 0.140, hPct: 0.080,
-      rotateDeg: 0, skewXDeg: -3, skewYDeg: 0, side: 'rear',
+      xPct: 0.635, yPct: 0.520, wPct: 0.092, hPct: 0.070,
+      rotateDeg: -3, skewXDeg: -3, skewYDeg: 0, side: 'rear',
     },
     passenger_back: {
       xPct: 0.288, yPct: 0.540, wPct: 0.080, hPct: 0.060,

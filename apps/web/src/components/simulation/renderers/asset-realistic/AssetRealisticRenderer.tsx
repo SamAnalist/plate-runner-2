@@ -329,6 +329,10 @@ export function AssetRealisticRenderer({
           the RIGHT there, per passengerFront.config.ts's armDirection: 'left'). */}
       {sceneVariant === 'passenger_front' && <TicketKiosk t={0.80} side="right" road={MIRRORED_DIAGONAL_ROAD} success={phase === 'done'} marginPx={40} />}
 
+      {/* ── Ticket kiosk — BEHIND the vehicle in driver_back (gate post is on
+          the RIGHT there, per driverBack.config.ts's armDirection: 'left'). */}
+      {sceneVariant === 'driver_back' && <TicketKiosk t={0.60} side="right" road={MIRRORED_DIAGONAL_ROAD} success={phase === 'done'} marginPx={40} />}
+
       {/* ── Z-ordered gate + vehicle ────────────────────────────────────────── */}
       {vehicleBehindGate
         ? <>{vehicle}{gate}</>
