@@ -255,8 +255,8 @@ export function CenterBackScene() {
           `${400 - ARR_BW},${ARR_HBAS_Y}`,
           `${400 - ARR_HW},${ARR_HBAS_Y}`,
         ].join(' ')}
-        fill="rgba(200,170,60,0.17)"
-        stroke="rgba(200,170,60,0.35)"
+        fill="rgba(200,170,60,0.87)"
+        stroke="rgba(200,170,60,0.55)"
         strokeWidth={0.9}
         strokeLinejoin="round"
       />

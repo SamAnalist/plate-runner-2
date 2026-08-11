@@ -73,6 +73,17 @@ export const MIRRORED_DIAGONAL_ROAD: KioskRoadGeometry = {
   rNear: SCENE_W * 0.875, // 700
 };
 
+/**
+ * What the kiosk screen shows, in sequence over one run:
+ *   hello   — vehicle hasn't reached the gate yet (idle, or approaching).
+ *   reading — vehicle stopped at the gate (stopped_at_gate / waiting_for_signal).
+ *   welcome — gate is opening, or vehicle has resumed past the gate.
+ *   check   — run complete (phase === 'done').
+ * Compute this in AssetRealisticRenderer (it has phase + gate-crossing info)
+ * and pass the result down — TicketKiosk itself has no simulation knowledge.
+ */
+export type KioskIcon = 'hello' | 'reading' | 'welcome' | 'check';
+
 export interface TicketKioskProps {
   /** Depth position (0 = far/horizon, 1 = near/bottom of frame). Drives both Y and scale. */
   t?: number;
@@ -80,13 +91,30 @@ export interface TicketKioskProps {
   side?: 'left' | 'right';
   /** Extra horizontal offset (px), positive = further out onto the shoulder. */
   marginPx?: number;
-  /** When true, the screen shows a green checkmark instead of the idle glow — pass `phase === 'done'`. */
-  success?: boolean;
+  /** What the screen shows — see KioskIcon. Default 'hello'. */
+  icon?: KioskIcon;
   /** Road geometry to position against — defaults to the "center" scene road. Use DIAGONAL_ROAD for driver_front/passenger_back. */
   road?: KioskRoadGeometry;
 }
 
-export function TicketKiosk({ t = 0.42, side = 'left', marginPx = 0, success = false, road = CENTER_ROAD }: TicketKioskProps) {
+const ICON_WASH: Record<KioskIcon, string> = {
+  hello:   '#25597a',
+  reading: '#8a6a1a',
+  welcome: '#1a5f6b',
+  check:   '#1a5c34',
+};
+
+const ICON_COLOR: Record<KioskIcon, string> = {
+  hello:   '#8fb8d8',
+  reading: '#fbbf24',
+  welcome: '#22d3ee',
+  check:   '#4ade80',
+};
+
+/** Shrinks all icon glyphs uniformly without touching the kiosk body/screen. */
+const ICON_SCALE = 0.75;
+
+export function TicketKiosk({ t = 0.42, side = 'left', marginPx = 0, icon = 'hello', road = CENTER_ROAD }: TicketKioskProps) {
   const scale  = lerp(0.04, 1.0, Math.pow(t, 0.8));
   const roadL  = lerp(road.lFar, road.lNear, t);
   const roadR  = lerp(road.rFar, road.rNear, t);
@@ -97,6 +125,10 @@ export function TicketKiosk({ t = 0.42, side = 'left', marginPx = 0, success = f
   const x = side === 'left'
     ? roadL - w * 1.15 - marginPx
     : roadR + w * 0.15 + marginPx;
+
+  // Center of the screen wash rect (x + w*0.20, yBase - h*0.80, w*0.60 x h*0.28).
+  const iconCx = x + w * 0.5;
+  const iconCy = yBase - h * 0.66;
 
   return (
     <g>
@@ -117,28 +149,59 @@ export function TicketKiosk({ t = 0.42, side = 'left', marginPx = 0, success = f
       <rect x={x + w * 0.14} y={yBase - h * 0.86}
             width={w * 0.72} height={h * 0.40}
             rx={w * 0.06} fill="#161a22" stroke="rgba(120,170,255,0.18)" strokeWidth={0.6} />
-      {success ? (
-        <>
-          {/* Success wash — green, replaces the idle blue glow */}
-          <rect x={x + w * 0.20} y={yBase - h * 0.80}
-                width={w * 0.60} height={h * 0.28}
-                fill="#1a5c34" opacity={0.45} />
-          {/* Checkmark */}
-          <path
-            d={`M ${x + w * 0.34} ${yBase - h * 0.655}
-                L ${x + w * 0.46} ${yBase - h * 0.60}
-                L ${x + w * 0.68} ${yBase - h * 0.72}`}
-            fill="none"
-            stroke="#4ade80"
-            strokeWidth={Math.max(1, w * 0.055)}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </>
-      ) : (
-        <rect x={x + w * 0.20} y={yBase - h * 0.80}
-              width={w * 0.60} height={h * 0.28}
-              fill="#25597a" opacity={0.35} />
+      {/* Screen wash — color follows the icon (same palette as the phase
+          badges: amber=waiting, cyan=gate opening, green=done). */}
+      <rect x={x + w * 0.20} y={yBase - h * 0.80}
+            width={w * 0.60} height={h * 0.28}
+            fill={ICON_WASH[icon]} opacity={icon === 'hello' ? 0.35 : 0.45} />
+
+      {icon === 'hello' && (
+        <g stroke={ICON_COLOR.hello} fill="none" strokeWidth={Math.max(0.5, w * 0.011)} opacity={0.9}>
+          {/* Smiley face — "not at the gate yet" idle greeting */}
+          <circle cx={iconCx} cy={iconCy} r={h * ICON_SCALE * 0.11} />
+          <circle cx={iconCx - h * ICON_SCALE * 0.045} cy={iconCy - h * ICON_SCALE * 0.02} r={Math.max(0.4, h * ICON_SCALE * 0.014)} fill={ICON_COLOR.hello} stroke="none" />
+          <circle cx={iconCx + h * ICON_SCALE * 0.045} cy={iconCy - h * ICON_SCALE * 0.02} r={Math.max(0.4, h * ICON_SCALE * 0.014)} fill={ICON_COLOR.hello} stroke="none" />
+          <path d={`M ${iconCx - h * ICON_SCALE * 0.05} ${iconCy + h * ICON_SCALE * 0.03} Q ${iconCx} ${iconCy + h * ICON_SCALE * 0.075} ${iconCx + h * ICON_SCALE * 0.05} ${iconCy + h * ICON_SCALE * 0.03}`}
+                strokeLinecap="round" />
+        </g>
+      )}
+
+      {icon === 'reading' && (
+        <g stroke={ICON_COLOR.reading} fill="none" strokeLinecap="round">
+          {/* Magnifying glass — plate/vehicle being scanned at the gate */}
+          <circle cx={iconCx - h * ICON_SCALE * 0.03} cy={iconCy - h * ICON_SCALE * 0.02} r={h * ICON_SCALE * 0.09} strokeWidth={Math.max(0.5, w * 0.012)} />
+          <line x1={iconCx + h * ICON_SCALE * 0.035} y1={iconCy + h * ICON_SCALE * 0.045}
+                x2={iconCx + h * ICON_SCALE * 0.10}  y2={iconCy + h * ICON_SCALE * 0.10}
+                strokeWidth={Math.max(0.7, w * 0.015)} />
+        </g>
+      )}
+
+      {icon === 'welcome' && (
+        <path
+          d={`M ${iconCx} ${iconCy - h * ICON_SCALE * 0.10}
+              L ${iconCx + h * ICON_SCALE * 0.03} ${iconCy - h * ICON_SCALE * 0.03}
+              L ${iconCx + h * ICON_SCALE * 0.10} ${iconCy}
+              L ${iconCx + h * ICON_SCALE * 0.03} ${iconCy + h * ICON_SCALE * 0.03}
+              L ${iconCx} ${iconCy + h * ICON_SCALE * 0.10}
+              L ${iconCx - h * ICON_SCALE * 0.03} ${iconCy + h * ICON_SCALE * 0.03}
+              L ${iconCx - h * ICON_SCALE * 0.10} ${iconCy}
+              L ${iconCx - h * ICON_SCALE * 0.03} ${iconCy - h * ICON_SCALE * 0.03} Z`}
+          fill={ICON_COLOR.welcome}
+          opacity={0.85}
+        />
+      )}
+
+      {icon === 'check' && (
+        <path
+          d={`M ${iconCx - w * ICON_SCALE * 0.16} ${iconCy}
+              L ${iconCx - w * ICON_SCALE * 0.04} ${iconCy + h * ICON_SCALE * 0.045}
+              L ${iconCx + w * ICON_SCALE * 0.18} ${iconCy - h * ICON_SCALE * 0.045}`}
+          fill="none"
+          stroke={ICON_COLOR.check}
+          strokeWidth={Math.max(0.9, w * 0.045)}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       )}
 
       {/* Ticket/card slot */}
