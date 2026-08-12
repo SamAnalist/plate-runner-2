@@ -5,6 +5,7 @@ import {
   type SetConfigPayload,
   remapPlacementForDirection,
   isPlacementAllowedForDirection,
+  speedPhasesForPreset,
 } from '@plate-runner/shared';
 import { SimulationScene } from './components/simulation/SimulationScene';
 import { AppShell, type StatusChip } from './components/layout/AppShell';
@@ -63,7 +64,11 @@ export default function App() {
 
   /** Applies a partial SimulationConfig change (from a set_config remote/local command) through the same direction/placement remap guard as manual edits. */
   function applyPartialConfig(partial: SetConfigPayload) {
-    handleConfigChange({ ...config, ...partial });
+    const { speedPreset, ...rest } = partial;
+    const speedFields = speedPreset
+      ? { speedPreset, speedIncoming: speedPhasesForPreset(speedPreset), speedAway: speedPhasesForPreset(speedPreset) }
+      : {};
+    handleConfigChange({ ...config, ...rest, ...speedFields });
   }
 
   const plateQueue = usePlateQueue({ config, onConfigChange: handleConfigChange, simulation });
@@ -165,6 +170,7 @@ export default function App() {
           config={config}
           simulation={simulation}
           plateQueue={plateQueue}
+          plateLists={plateLists}
           onConfigChange={handleConfigChange}
           showDebug={showDebug}
           onShowDebugChange={setShowDebug}

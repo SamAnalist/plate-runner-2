@@ -30,11 +30,13 @@ function StatusBadge({ status }: { status: PlateQueueItemStatus }) {
 
 // ─── Panel ───────────────────────────────────────────────────────────────
 
-export function PlateQueuePanel(props: PlateQueueControls) {
+/** hideInput: used by the "From List" queue source mode — the raw textarea/Apply Queue input is replaced by a saved-list picker upstream, but Queue Settings/Status/Playback Controls/Queue Items still apply to whatever got loaded. */
+export function PlateQueuePanel(props: PlateQueueControls & { hideInput?: boolean }) {
   const {
     items, currentIndex, queueStatus, queueConfig, progress, loadError,
     loadQueue, setQueueConfig,
     runQueue, pauseQueue, resumeQueue, stopQueue, skipCurrent, nextVehicle, clearQueue, resetQueue,
+    hideInput,
   } = props;
 
   const [raw, setRaw] = useState('');
@@ -59,48 +61,50 @@ export function PlateQueuePanel(props: PlateQueueControls) {
     <div className="flex flex-col gap-4">
 
       {/* ── Input ─────────────────────────────────────────────────────── */}
-      <div>
-        <Label>Input</Label>
-        <textarea
-          value={raw}
-          onChange={e => setRaw(e.target.value)}
-          placeholder={'ABC123\nXYZ999\nTEST01, 123456789012'}
-          rows={5}
-          spellCheck={false}
-          className="w-full px-2.5 py-2 rounded-md bg-white/5 border border-white/15
-            font-mono text-[11px] text-white/80 tracking-wide outline-none resize-y
-            placeholder:text-white/20 focus:border-blue-500/50"
-        />
-        <div className="mt-1.5 flex items-center justify-between text-[10px] font-mono">
-          <span className="text-white/35">
-            total <span className="text-white/60">{preview.total}</span>
-            {' · '}
-            valid <span className="text-emerald-400">{preview.valid.length}</span>
-            {' · '}
-            invalid <span className="text-red-400">{preview.invalid.length}</span>
-          </span>
-          <Button tone="primary" onClick={() => loadQueue(raw)} disabled={preview.total === 0}>
-            Apply Queue
-          </Button>
-        </div>
-        {loadError && (
-          <div className="mt-1"><FieldError>{loadError}</FieldError></div>
-        )}
-        {preview.invalid.length > 0 && (
-          <div className="mt-1.5 max-h-16 overflow-y-auto rounded-md border border-red-500/20 bg-red-500/5 px-2 py-1">
-            {preview.invalid.slice(0, 20).map((inv, i) => (
-              <p key={i} className="text-[9px] font-mono text-red-400/80 leading-snug truncate">
-                "{inv.raw}" — {inv.reason}
-              </p>
-            ))}
-            {preview.invalid.length > 20 && (
-              <p className="text-[9px] font-mono text-red-400/60">
-                +{preview.invalid.length - 20} more…
-              </p>
-            )}
+      {!hideInput && (
+        <div>
+          <Label>Input</Label>
+          <textarea
+            value={raw}
+            onChange={e => setRaw(e.target.value)}
+            placeholder={'ABC123\nXYZ999\nTEST01, 123456789012'}
+            rows={5}
+            spellCheck={false}
+            className="w-full px-2.5 py-2 rounded-md bg-white/5 border border-white/15
+              font-mono text-[11px] text-white/80 tracking-wide outline-none resize-y
+              placeholder:text-white/20 focus:border-blue-500/50"
+          />
+          <div className="mt-1.5 flex items-center justify-between text-[10px] font-mono">
+            <span className="text-white/35">
+              total <span className="text-white/60">{preview.total}</span>
+              {' · '}
+              valid <span className="text-emerald-400">{preview.valid.length}</span>
+              {' · '}
+              invalid <span className="text-red-400">{preview.invalid.length}</span>
+            </span>
+            <Button tone="primary" onClick={() => loadQueue(raw)} disabled={preview.total === 0}>
+              Apply Queue
+            </Button>
           </div>
-        )}
-      </div>
+          {loadError && (
+            <div className="mt-1"><FieldError>{loadError}</FieldError></div>
+          )}
+          {preview.invalid.length > 0 && (
+            <div className="mt-1.5 max-h-16 overflow-y-auto rounded-md border border-red-500/20 bg-red-500/5 px-2 py-1">
+              {preview.invalid.slice(0, 20).map((inv, i) => (
+                <p key={i} className="text-[9px] font-mono text-red-400/80 leading-snug truncate">
+                  "{inv.raw}" — {inv.reason}
+                </p>
+              ))}
+              {preview.invalid.length > 20 && (
+                <p className="text-[9px] font-mono text-red-400/60">
+                  +{preview.invalid.length - 20} more…
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Queue Settings ────────────────────────────────────────────── */}
       <div>
@@ -130,7 +134,7 @@ export function PlateQueuePanel(props: PlateQueueControls) {
               <span className="text-[10px] font-mono text-blue-400 font-bold">{queueConfig.gapBetweenVehiclesMs}ms</span>
             </div>
             <input
-              type="range" min={0} max={5000} step={100}
+              type="range" min={0} max={10000} step={100}
               value={queueConfig.gapBetweenVehiclesMs}
               onChange={e => setQueueConfig({ ...queueConfig, gapBetweenVehiclesMs: Number(e.target.value) })}
               className="w-full accent-blue-500 h-1 rounded cursor-pointer"

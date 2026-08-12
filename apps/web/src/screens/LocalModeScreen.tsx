@@ -1,22 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type {
   SimulationConfig,
   SpeedPhases,
+  SpeedPreset,
   Direction,
   DetectorPlacement,
   GateMode,
   GateInitialState,
   VehicleColor,
 } from '@plate-runner/shared';
-import { getPlacementsForDirection } from '@plate-runner/shared';
+import { getPlacementsForDirection, speedPhasesForPreset } from '@plate-runner/shared';
 import type { SimulationControls } from '../hooks/useSimulation';
 import type { PlateQueueControls } from '../features/queue/usePlateQueue';
+import type { PlateListsControls } from '../features/lists/usePlateLists';
 import { SimulationScene } from '../components/simulation/SimulationScene';
 import { PlateInput } from '../components/controls/PlateInput';
 import { PlateQueuePanel } from '../components/controls/PlateQueuePanel';
 import { SceneQuickControls } from '../components/simulation/SceneQuickControls';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { Label } from '../components/ui/Label';
+import { FieldError } from '../components/ui/FieldError';
 
 export const QUEUE_ACTIVE_STATUSES = ['running', 'paused', 'waiting_for_signal', 'waiting_for_next'];
 
@@ -24,6 +28,7 @@ interface LocalModeScreenProps {
   config: SimulationConfig;
   simulation: SimulationControls;
   plateQueue: PlateQueueControls;
+  plateLists: PlateListsControls;
   onConfigChange: (c: SimulationConfig) => void;
   showDebug: boolean;
   onShowDebugChange: (v: boolean) => void;
@@ -50,21 +55,25 @@ function Divider() {
 }
 
 interface ToggleGroupProps<T extends string> {
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; title?: string }[];
   value: T;
   onChange: (v: T) => void;
+  /** Buttons split the full row width evenly, single line, no wrap — used for Speed presets. */
+  fullWidth?: boolean;
 }
 
-function ToggleGroup<T extends string>({ options, value, onChange }: ToggleGroupProps<T>) {
+function ToggleGroup<T extends string>({ options, value, onChange, fullWidth = false }: ToggleGroupProps<T>) {
   return (
-    <div className="flex gap-1 flex-wrap">
+    <div className={fullWidth ? 'flex gap-1' : 'flex gap-1 flex-wrap'}>
       {options.map(opt => (
         <button
           key={opt.value}
+          title={opt.title}
           onClick={() => onChange(opt.value)}
           className={`
             px-2.5 py-1.5 rounded text-xs font-mono font-semibold
             border transition-all
+            ${fullWidth ? 'flex-1' : ''}
             ${value === opt.value
               ? 'bg-blue-600/80 border-blue-500/70 text-white'
               : 'bg-white/5 border-white/12 text-white/50 hover:text-white/80 hover:border-white/25'}
@@ -142,12 +151,21 @@ function PhaseSlider({ label, hint, value, onChange }: PhaseSliderProps) {
   );
 }
 
+const SPEED_PRESET_OPTIONS: { value: SpeedPreset; label: string; title?: string }[] = [
+  { value: 'slow', label: 'Slow' },
+  { value: 'regular', label: 'Regular' },
+  { value: 'fast', label: 'Fast' },
+  { value: 'advanced', label: '+', title: 'Advanced' },
+];
+
 function SpeedPhasesSection({
   config,
   set,
+  onConfigChange,
 }: {
   config: SimulationConfig;
   set: <K extends keyof SimulationConfig>(key: K, val: SimulationConfig[K]) => void;
+  onConfigChange: (c: SimulationConfig) => void;
 }) {
   const isIncoming = config.direction === 'incoming';
   const key = isIncoming ? 'speedIncoming' : 'speedAway';
@@ -160,18 +178,35 @@ function SpeedPhasesSection({
     set(key, { ...sp, [field]: v });
   }
 
+  // Non-advanced presets keep both directions' speedIncoming/speedAway in lockstep at the
+  // same uniform value. Advanced always opens centered ("en el medio") regardless of
+  // whatever values were last dialed in, per spec. One onConfigChange call so all three
+  // fields land in the same state update (three separate `set` calls would each start
+  // from the same stale `config` closure and clobber each other).
+  function setPreset(preset: SpeedPreset) {
+    const phases = speedPhasesForPreset(preset === 'advanced' ? 'regular' : preset);
+    onConfigChange({ ...config, speedPreset: preset, speedIncoming: phases, speedAway: phases });
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <SectionLabel>Speed</SectionLabel>
-        <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
-          {isIncoming ? 'Incoming' : 'Away'}
-        </span>
+        {config.speedPreset === 'advanced' && (
+          <span className="text-[9px] font-mono text-white/25 uppercase tracking-wider">
+            {isIncoming ? 'Incoming' : 'Away'}
+          </span>
+        )}
       </div>
-      <PhaseSlider label="Initial" hint={hint[0]} value={sp.initial} onChange={v => setPhase('initial', v)} />
-      <PhaseSlider label="Stopping" hint={hint[1]} value={sp.stopping} onChange={v => setPhase('stopping', v)} />
-      <PhaseSlider label="After Stop" hint={hint[2]} value={sp.afterStop} onChange={v => setPhase('afterStop', v)} />
-      <PhaseSlider label="Final / Exit" hint={hint[3]} value={sp.final} onChange={v => setPhase('final', v)} />
+      <ToggleGroup<SpeedPreset> options={SPEED_PRESET_OPTIONS} value={config.speedPreset} onChange={setPreset} fullWidth />
+      {config.speedPreset === 'advanced' && (
+        <div className="flex flex-col gap-3 mt-1">
+          <PhaseSlider label="Initial" hint={hint[0]} value={sp.initial} onChange={v => setPhase('initial', v)} />
+          <PhaseSlider label="Stopping" hint={hint[1]} value={sp.stopping} onChange={v => setPhase('stopping', v)} />
+          <PhaseSlider label="After Stop" hint={hint[2]} value={sp.afterStop} onChange={v => setPhase('afterStop', v)} />
+          <PhaseSlider label="Final / Exit" hint={hint[3]} value={sp.final} onChange={v => setPhase('final', v)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -197,7 +232,7 @@ function DurationInput({
     <div className="flex flex-col gap-1">
       <div className="flex justify-between items-center">
         <span className="text-[10px] text-white/40 font-mono">{label}</span>
-        <span className="text-[10px] font-mono text-blue-400 font-bold">{valueMs}ms</span>
+        <span className="text-[10px] font-mono text-blue-400 font-bold">{(valueMs / 1000).toFixed(1)}s</span>
       </div>
       <input
         type="range" min={min} max={max} step={step} value={valueMs}
@@ -242,6 +277,7 @@ function GateSection({
           ]}
           value={config.gateMode}
           onChange={v => set('gateMode', v)}
+          fullWidth
         />
         <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
           {config.gateMode === 'hidden'
@@ -264,6 +300,7 @@ function GateSection({
             ]}
             value={config.gateInitialState}
             onChange={v => set('gateInitialState', v)}
+            fullWidth
           />
           {config.gateInitialState === 'open' && (
             <p className="mt-1.5 text-[10px] text-white/25 font-mono leading-snug">
@@ -353,12 +390,169 @@ function GateSection({
   );
 }
 
+// ─── Plate Queue: Manual / From List ────────────────────────────────────────
+
+function SaveAsListDialog({
+  onCancel,
+  onSave,
+}: {
+  onCancel: () => void;
+  onSave: (name: string) => { ok: boolean; error?: string };
+}) {
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  function handleSave() {
+    const result = onSave(name);
+    if (!result.ok) {
+      setError(result.error ?? 'Could not save list.');
+      return;
+    }
+    onCancel();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-xs rounded-lg border border-white/12 bg-[#171a22] p-4 shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="text-xs font-semibold text-white/70 uppercase tracking-wider mb-3">Save as Plate List</p>
+        <Label>Name</Label>
+        <input
+          autoFocus
+          value={name}
+          onChange={e => { setName(e.target.value); setError(null); }}
+          placeholder="e.g. Morning Shift"
+          className="w-full px-2.5 py-2 rounded-md bg-white/5 border border-white/15
+            font-mono text-xs text-white/80 outline-none focus:border-blue-500/50"
+        />
+        {error && <div className="mt-1.5"><FieldError>{error}</FieldError></div>}
+        <div className="mt-3 flex justify-end gap-2">
+          <Button tone="neutral" onClick={onCancel}>Cancel</Button>
+          <Button tone="primary" onClick={handleSave} disabled={!name.trim()}>Save</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type QueueSource = 'manual' | 'from_list';
+
+function PlateQueueSection({
+  config,
+  plateQueue,
+  plateLists,
+}: {
+  config: SimulationConfig;
+  plateQueue: PlateQueueControls;
+  plateLists: PlateListsControls;
+}) {
+  const [source, setSource] = useState<QueueSource>('manual');
+  const [selectedListId, setSelectedListId] = useState('');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+
+  // Runs when a list starts playing via a path other than this section's own
+  // "From List" picker — the Plate Lists screen's Run button, or a schedule
+  // firing. plateLists.lastLoadedList is a fresh object every such run, so
+  // this fires even for a repeat run of the same list.
+  useEffect(() => {
+    if (!plateLists.lastLoadedList) return;
+    setSource('from_list');
+    setSelectedListId(plateLists.lastLoadedList.id);
+  }, [plateLists.lastLoadedList]);
+
+  function handleSelectList(id: string) {
+    setSelectedListId(id);
+    if (id) plateLists.loadListIntoQueue(id);
+  }
+
+  function handleSave(name: string) {
+    if (plateQueue.items.length === 0) {
+      return { ok: false, error: 'Apply a queue first — nothing to save.' };
+    }
+    return plateLists.createList({
+      name,
+      plates: plateQueue.items.map(item => item.plate),
+      simulationDefaults: {
+        direction: config.direction,
+        detectorPlacement: config.detectorPlacement,
+        vehicleColor: config.vehicleColor,
+        gateConfig: {
+          gateMode: config.gateMode,
+          gateInitialState: config.gateInitialState,
+          stopBeforeOpenMs: config.stopBeforeOpenMs,
+          delayAfterOpenMs: config.delayAfterOpenMs,
+        },
+        queueConfig: plateQueue.queueConfig,
+        speedPreset: config.speedPreset === 'advanced' ? undefined : config.speedPreset,
+      },
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <ToggleGroup<QueueSource>
+        options={[
+          { value: 'manual', label: 'Manual' },
+          { value: 'from_list', label: 'From List' },
+        ]}
+        value={source}
+        onChange={setSource}
+      />
+
+      {source === 'from_list' && (
+        <div>
+          <SectionLabel>Saved Plate Lists</SectionLabel>
+          {plateLists.lists.length === 0 ? (
+            <p className="text-[10px] text-white/30 font-mono">No plate lists saved yet.</p>
+          ) : (
+            <select
+              value={selectedListId}
+              onChange={e => handleSelectList(e.target.value)}
+              className="w-full px-2.5 py-2 rounded-md bg-white/5 border border-white/15
+                font-mono text-xs text-white/80 outline-none focus:border-blue-500/50"
+            >
+              <option value="">Select a plate list…</option>
+              {plateLists.lists.map(list => (
+                <option key={list.id} value={list.id}>{list.name} ({list.plates.length})</option>
+              ))}
+            </select>
+          )}
+          <p className="mt-1.5 text-[9px] text-white/25 font-mono leading-snug">
+            Loads the list's plates and simulation defaults into the queue below — press Run Queue to start.
+          </p>
+        </div>
+      )}
+
+      <PlateQueuePanel {...plateQueue} hideInput={source === 'from_list'} />
+
+      {source === 'manual' && (
+        <Button
+          variant="ghost"
+          tone="neutral"
+          className="w-full"
+          onClick={() => setShowSaveDialog(true)}
+          disabled={plateQueue.items.length === 0}
+        >
+          💾 Save as Plate List
+        </Button>
+      )}
+
+      {showSaveDialog && (
+        <SaveAsListDialog onCancel={() => setShowSaveDialog(false)} onSave={handleSave} />
+      )}
+    </div>
+  );
+}
+
 // ─── Main screen ────────────────────────────────────────────────────────────
 
 export function LocalModeScreen({
   config,
   simulation,
   plateQueue,
+  plateLists,
   onConfigChange,
   showDebug,
   onShowDebugChange,
@@ -419,66 +613,64 @@ export function LocalModeScreen({
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-4">
-            <PlateInput value={config.plate} onChange={p => set('plate', p)} disabled={queueActive} />
+            <CollapsibleSection title="License Plate" defaultOpen>
+              <PlateInput value={config.plate} onChange={p => set('plate', p)} disabled={queueActive} />
+            </CollapsibleSection>
 
             <Divider />
 
-            <div>
-              <SectionLabel>Direction</SectionLabel>
-              <ToggleGroup<Direction>
-                options={[
-                  { value: 'incoming', label: 'Incoming' },
-                  { value: 'away', label: 'Away' },
-                ]}
-                value={config.direction}
-                onChange={v => set('direction', v)}
-              />
-            </div>
-
-            <Divider />
-
-            <div>
-              <SectionLabel>Detector Placement</SectionLabel>
-              <div className="grid grid-cols-3 gap-1 text-center">
-                {(getPlacementsForDirection(config.direction) as DetectorPlacement[]).map(val => {
-                  const isFront = val.endsWith('_front');
-                  const side = val.split('_')[0].toUpperCase().slice(0, 3);
-                  const face = isFront ? 'FRONT' : 'BACK';
-                  const lbl = `${side}\n${face}`;
-                  return (
-                    <button
-                      key={val}
-                      onClick={() => set('detectorPlacement', val)}
-                      className={`
-                        py-2 rounded text-[10px] font-mono font-semibold leading-snug
-                        border transition-all whitespace-pre-line
-                        ${config.detectorPlacement === val
-                          ? 'bg-blue-600/80 border-blue-500/70 text-white'
-                          : 'bg-white/5 border-white/12 text-white/45 hover:text-white/75 hover:border-white/25'}
-                      `}
+            <CollapsibleSection title="Playback" defaultOpen>
+              <div>
+                <div className="mb-3 flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full transition-colors ${
+                    isRunning ? 'bg-emerald-400 animate-pulse' :
+                    isAtGate ? 'bg-yellow-400' :
+                    isGateOpening ? 'bg-cyan-400 animate-pulse' :
+                    state.phase === 'done' ? 'bg-blue-400' : 'bg-white/20'}`} />
+                  <span className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
+                    {phaseLabel}
+                  </span>
+                  <span className="ml-auto text-[10px] font-mono text-white/25">
+                    t={state.vehicleT.toFixed(3)}
+                  </span>
+                </div>
+                {queueActive ? (
+                  <div className="py-2 text-center">
+                    <Badge tone="info">Controlled by Plate Queue</Badge>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    {!isRunning && !isGateOpening ? (
+                      <Button variant="solid" tone="primary" className="flex-1" onClick={start}>
+                        {state.phase === 'done' || isAtGate ? 'Restart' : 'Start'}
+                      </Button>
+                    ) : (
+                      <Button variant="solid" tone="danger" className="flex-1" onClick={stop}>
+                        Stop
+                      </Button>
+                    )}
+                    <Button
+                      variant="solid"
+                      tone="neutral"
+                      onClick={state.isPaused ? resume : pause}
+                      disabled={!state.isPaused && (state.phase === 'idle' || state.phase === 'done')}
                     >
-                      {lbl}
-                    </button>
-                  );
-                })}
+                      {state.isPaused ? '⏵ Resume' : '⏸ Pause'}
+                    </Button>
+                    <Button variant="solid" tone="neutral" onClick={reset}>
+                      Reset
+                    </Button>
+                  </div>
+                )}
               </div>
-              <p className="mt-1.5 text-[10px] text-white/30 font-mono leading-snug">
-                {config.direction === 'incoming'
-                  ? 'Front face visible — front plate'
-                  : 'Rear face visible — rear plate'}
-              </p>
-            </div>
-
-            <Divider />
-
-            <CollapsibleSection title="Gate Settings" defaultOpen>
-              <GateSection config={config} onConfigChange={onConfigChange} simulation={simulation} />
             </CollapsibleSection>
 
             <Divider />
 
             <CollapsibleSection title="Visual Settings" defaultOpen>
               <div className="flex flex-col gap-4">
+                <SpeedPhasesSection config={config} set={set} onConfigChange={onConfigChange} />
+
                 <div>
                   <SectionLabel>Vehicle Color</SectionLabel>
                   <div className="flex flex-wrap gap-2">
@@ -494,56 +686,55 @@ export function LocalModeScreen({
                   </div>
                 </div>
 
-                <SpeedPhasesSection config={config} set={set} />
+                <CollapsibleSection title="Direction & Placement" defaultOpen={false}>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <SectionLabel>Direction</SectionLabel>
+                      <ToggleGroup<Direction>
+                        options={[
+                          { value: 'incoming', label: 'Incoming' },
+                          { value: 'away', label: 'Away' },
+                        ]}
+                        value={config.direction}
+                        onChange={v => set('direction', v)}
+                      />
+                    </div>
+
+                    <div>
+                      <SectionLabel>Detector Placement</SectionLabel>
+                      <div className="grid grid-cols-3 gap-1 text-center">
+                        {(getPlacementsForDirection(config.direction) as DetectorPlacement[]).map(val => {
+                          const isFront = val.endsWith('_front');
+                          const side = val.split('_')[0].toUpperCase();
+                          const face = isFront ? 'FRONT' : 'BACK';
+                          const lbl = `${side}\n${face}`;
+                          return (
+                            <button
+                              key={val}
+                              onClick={() => set('detectorPlacement', val)}
+                              className={`
+                                py-2 rounded text-[10px] font-mono font-semibold leading-snug
+                                border transition-all whitespace-pre-line
+                                ${config.detectorPlacement === val
+                                  ? 'bg-blue-600/80 border-blue-500/70 text-white'
+                                  : 'bg-white/5 border-white/12 text-white/45 hover:text-white/75 hover:border-white/25'}
+                              `}
+                            >
+                              {lbl}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-1.5 text-[10px] text-white/30 font-mono leading-snug">
+                        {config.direction === 'incoming'
+                          ? 'Front face visible — front plate'
+                          : 'Rear face visible — rear plate'}
+                      </p>
+                    </div>
+                  </div>
+                </CollapsibleSection>
               </div>
             </CollapsibleSection>
-
-            <Divider />
-
-            <div>
-              <SectionLabel>Playback</SectionLabel>
-              <div className="mb-3 flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full transition-colors ${
-                  isRunning ? 'bg-emerald-400 animate-pulse' :
-                  isAtGate ? 'bg-yellow-400' :
-                  isGateOpening ? 'bg-cyan-400 animate-pulse' :
-                  state.phase === 'done' ? 'bg-blue-400' : 'bg-white/20'}`} />
-                <span className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
-                  {phaseLabel}
-                </span>
-                <span className="ml-auto text-[10px] font-mono text-white/25">
-                  t={state.vehicleT.toFixed(3)}
-                </span>
-              </div>
-              {queueActive ? (
-                <div className="py-2 text-center">
-                  <Badge tone="info">Controlled by Plate Queue</Badge>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  {!isRunning && !isGateOpening ? (
-                    <Button variant="solid" tone="primary" className="flex-1" onClick={start}>
-                      {state.phase === 'done' || isAtGate ? 'Restart' : 'Start'}
-                    </Button>
-                  ) : (
-                    <Button variant="solid" tone="danger" className="flex-1" onClick={stop}>
-                      Stop
-                    </Button>
-                  )}
-                  <Button
-                    variant="solid"
-                    tone="neutral"
-                    onClick={state.isPaused ? resume : pause}
-                    disabled={!state.isPaused && (state.phase === 'idle' || state.phase === 'done')}
-                  >
-                    {state.isPaused ? '⏵ Resume' : '⏸ Pause'}
-                  </Button>
-                  <Button variant="solid" tone="neutral" onClick={reset}>
-                    Reset
-                  </Button>
-                </div>
-              )}
-            </div>
 
             <Divider />
 
@@ -552,81 +743,90 @@ export function LocalModeScreen({
               badge={queueActive ? plateQueue.queueStatus.toUpperCase() : undefined}
               defaultOpen={false}
             >
-              <PlateQueuePanel {...plateQueue} />
+              <PlateQueueSection config={config} plateQueue={plateQueue} plateLists={plateLists} />
             </CollapsibleSection>
 
             <Divider />
 
-            <CollapsibleSection
-              title="Visual QA"
-              badge={(showAnchorOverlay || showMotionPathOverlay) ? 'ON' : undefined}
-              defaultOpen={false}
-            >
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Quick plates</p>
-                  <div className="flex flex-col gap-1">
-                    {[
-                      { label: 'ABC123', plate: 'ABC123' },
-                      { label: 'ABCDEFGHIJ12', plate: 'ABCDEFGHIJ12' },
-                      { label: '123456789012', plate: '123456789012' },
-                    ].map(({ label, plate }) => (
-                      <button
-                        key={plate}
-                        onClick={() => onConfigChange({ ...config, plate })}
-                        className={`
-                          px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold
-                          border transition-all text-left tracking-wider
-                          ${config.plate === plate
-                            ? 'bg-green-600/25 border-green-500/50 text-green-300'
-                            : 'bg-white/4 border-white/10 text-white/45 hover:text-white/70 hover:border-white/22'}
-                        `}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Overlays</p>
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => onShowAnchorOverlayChange(!showAnchorOverlay)}
-                      className={`
-                        w-full py-1.5 rounded text-xs font-mono font-semibold
-                        border transition-all
-                        ${showAnchorOverlay
-                          ? 'bg-green-600/25 border-green-500/45 text-green-300'
-                          : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
-                      `}
-                    >
-                      {showAnchorOverlay ? '▣ Anchor bounds: ON' : '▢ Anchor bounds: OFF'}
-                    </button>
-                    <button
-                      onClick={() => onShowMotionPathOverlayChange(!showMotionPathOverlay)}
-                      className={`
-                        w-full py-1.5 rounded text-xs font-mono font-semibold
-                        border transition-all
-                        ${showMotionPathOverlay
-                          ? 'bg-orange-600/25 border-orange-500/45 text-orange-300'
-                          : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
-                      `}
-                    >
-                      {showMotionPathOverlay ? '◈ Motion path: ON' : '◇ Motion path: OFF'}
-                    </button>
-                  </div>
-                  <p className="mt-1 text-[9px] text-white/25 font-mono leading-snug">
-                    Asset Realistic only · hidden in Camera Mode
-                  </p>
-                </div>
-              </div>
+            <CollapsibleSection title="Gate Settings" defaultOpen={false}>
+              <GateSection config={config} onConfigChange={onConfigChange} simulation={simulation} />
             </CollapsibleSection>
+
+            {!import.meta.env.PROD && (
+              <>
+                <Divider />
+
+                <CollapsibleSection
+                  title="Visual QA"
+                  badge={(showAnchorOverlay || showMotionPathOverlay) ? 'ON' : undefined}
+                  defaultOpen={false}
+                >
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Quick plates</p>
+                      <div className="flex flex-col gap-1">
+                        {[
+                          { label: 'ABC123', plate: 'ABC123' },
+                          { label: 'ABCDEFGHIJ12', plate: 'ABCDEFGHIJ12' },
+                          { label: '123456789012', plate: '123456789012' },
+                        ].map(({ label, plate }) => (
+                          <button
+                            key={plate}
+                            onClick={() => onConfigChange({ ...config, plate })}
+                            className={`
+                              px-2.5 py-1.5 rounded text-[10px] font-mono font-semibold
+                              border transition-all text-left tracking-wider
+                              ${config.plate === plate
+                                ? 'bg-green-600/25 border-green-500/50 text-green-300'
+                                : 'bg-white/4 border-white/10 text-white/45 hover:text-white/70 hover:border-white/22'}
+                            `}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-white/35 uppercase tracking-widest mb-1.5">Overlays</p>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => onShowAnchorOverlayChange(!showAnchorOverlay)}
+                          className={`
+                            w-full py-1.5 rounded text-xs font-mono font-semibold
+                            border transition-all
+                            ${showAnchorOverlay
+                              ? 'bg-green-600/25 border-green-500/45 text-green-300'
+                              : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
+                          `}
+                        >
+                          {showAnchorOverlay ? '▣ Anchor bounds: ON' : '▢ Anchor bounds: OFF'}
+                        </button>
+                        <button
+                          onClick={() => onShowMotionPathOverlayChange(!showMotionPathOverlay)}
+                          className={`
+                            w-full py-1.5 rounded text-xs font-mono font-semibold
+                            border transition-all
+                            ${showMotionPathOverlay
+                              ? 'bg-orange-600/25 border-orange-500/45 text-orange-300'
+                              : 'bg-white/5 border-white/12 text-white/45 hover:text-white/70'}
+                          `}
+                        >
+                          {showMotionPathOverlay ? '◈ Motion path: ON' : '◇ Motion path: OFF'}
+                        </button>
+                      </div>
+                      <p className="mt-1 text-[9px] text-white/25 font-mono leading-snug">
+                        Asset Realistic only · hidden in Camera Mode
+                      </p>
+                    </div>
+                  </div>
+                </CollapsibleSection>
+              </>
+            )}
 
             <Divider />
 
-            <div>
-              <SectionLabel>View Modes</SectionLabel>
+            <CollapsibleSection title="View Modes" defaultOpen>
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
                   <Button
@@ -645,7 +845,7 @@ export function LocalModeScreen({
                   ◉  Camera Mode
                 </Button>
               </div>
-            </div>
+            </CollapsibleSection>
           </div>
 
           <div className="px-4 py-3 border-t border-white/8 shrink-0">

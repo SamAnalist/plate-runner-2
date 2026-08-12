@@ -47,10 +47,6 @@ export function PlateInput({ value, onChange, disabled }: PlateInputProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-white/50 uppercase tracking-widest">
-        License Plate
-      </label>
-
       <div className="relative">
         <input
           type="text"
@@ -84,24 +80,10 @@ export function PlateInput({ value, onChange, disabled }: PlateInputProps) {
         </span>
       </div>
 
-      {disabled ? (
+      {disabled && (
         <p className="text-[11px] text-cyan-400/70 font-mono leading-tight">
           Controlled by Plate Queue
         </p>
-      ) : (
-        <>
-          {/* Validation error */}
-          {error && (
-            <p className="text-[11px] text-red-400 font-mono leading-tight">{error}</p>
-          )}
-
-          {/* Valid indicator */}
-          {isValid && (
-            <p className="text-[11px] text-emerald-400/70 font-mono leading-tight">
-              Plate accepted
-            </p>
-          )}
-        </>
       )}
     </div>
   );
