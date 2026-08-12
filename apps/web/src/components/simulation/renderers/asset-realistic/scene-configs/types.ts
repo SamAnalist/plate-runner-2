@@ -157,6 +157,12 @@ export interface SceneGateConfig {
    * from the camera). Default: 1 (natural road-width sizing).
    */
   armScale?: number;
+  /**
+   * Per-scene nudge (scene px) applied to the status LED + its glow on the
+   * gate post. Negative = up, positive = down. Default: 0. Everything else
+   * about the post/arm is untouched — only the light's cy shifts.
+   */
+  lightYOffset?: number;
 }
 
 // ── Scene render config ────────────────────────────────────────────────────────

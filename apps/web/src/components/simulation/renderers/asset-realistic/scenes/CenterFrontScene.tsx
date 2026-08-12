@@ -149,6 +149,10 @@ export function CenterFrontScene() {
       />
 
 
+      <line x1={RL_FAR} y1={VP_Y} x2={CL_NEAR_X} y2={0}
+            stroke="rgba(255,255,255,0.13)" strokeWidth={0.9} />
+      <line x1={RR_FAR} y1={VP_Y} x2={CR_NEAR_X} y2={0}
+            stroke="rgba(255,255,255,0.13)" strokeWidth={0.9} />
 
       {/* ── Wall panel joints (vertical structural lines, perspective-correct) ─ */}
       {/* Left wall — two panel joints at 1/3 and 2/3 of wall face width */}
@@ -244,7 +248,7 @@ export function CenterFrontScene() {
           `${400 - ARR_BW},${ARR_HBAS_Y}`,
           `${400 - ARR_HW},${ARR_HBAS_Y}`,
         ].join(' ')}
-        fill="rgba(180,195,80,0.87)"
+        fill="rgba(180,170,90,0.87)"
         stroke="rgba(180,195,80,0.55)"
         strokeWidth={0.9}
         strokeLinejoin="round"

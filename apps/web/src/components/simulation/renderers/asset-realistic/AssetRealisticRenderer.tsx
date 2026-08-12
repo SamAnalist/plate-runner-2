@@ -80,7 +80,7 @@ function AssetGate({
 
   const lightR  = Math.max(2.8, postW * 0.40);
   const lightCX = postX + postW / 2;
-  const lightCY = postY + postH * 0.10;
+  const lightCY = postY + postH * 0.10 + (gateConfig.lightYOffset ?? 0);
   const lightCol = gateOpen ? '#4ade80' : '#f87171';
 
   // ── Arm direction ──────────────────────────────────────────────────────────
@@ -181,7 +181,7 @@ function AssetGate({
       {/* Pivot cap (static, on top of arm) */}
       <circle cx={pivotX} cy={pivotY} r={armThick * 1.0} fill="#4a5060" />
       {/* Status LED */}
-      <circle cx={lightCX} cy={lightCY + 2} r={lightR * 2.0} fill={lightCol} opacity={0.08} />
+      <circle cx={lightCX} cy={lightCY + 3.2} r={lightR * 2.0} fill={lightCol} opacity={0.08} />
       <circle cx={lightCX} cy={lightCY + 4} r={lightR}       fill={lightCol} opacity={0.95} />
       <circle cx={lightCX - lightR * 0.28} cy={lightCY - lightR * 0.28 + 4} r={lightR * 0.32} fill="white" opacity={0.45} />
     </g>

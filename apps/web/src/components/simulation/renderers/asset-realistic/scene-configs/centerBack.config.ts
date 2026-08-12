@@ -15,7 +15,7 @@ export const centerBackConfig: SceneRenderConfig = {
 
   vehicle: {
     spawnT:      0.3,
-    readingT:    0.90,
+    readingT:    0.9,
     gateT:       0.35,
     decelOffset: 0.05,
     finalT:      0.30,   // 0.30 — below this t, car uses final (slow) speed
@@ -29,7 +29,7 @@ export const centerBackConfig: SceneRenderConfig = {
       final:     { min: 0.1,  max: 0.2  },
     },
     carScale: {
-      initial:   1.4,
+      initial:   1.6,
       stopping:  1.0,
       atGate:    1.0,
       afterStop: 1.0,
@@ -43,5 +43,8 @@ export const centerBackConfig: SceneRenderConfig = {
     explicitPostRightX: 280,
     openAngleDeg:   84,
     closedAngleDeg: 0,
+    // Status LED sits a touch lower here than in the other scenes at this
+    // post height — nudge it up to match.
+    lightYOffset: -2,
   },
 };
