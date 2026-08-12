@@ -50,10 +50,10 @@ export const driverFrontConfig: SceneRenderConfig = {
     rotationDeg: -6,      // tilt to match diagonal road
 
     speed: {
-      initial:   { min: 0.033, max: 0.30  },
-      stopping:  { min: 0.028, max: 0.38  },
-      afterStop: { min: 0.023, max: 0.060  },
-      final:     { min: 0.001, max: 0.021 },
+      initial:   { min: 0.083, max: 0.25  },
+      stopping:  { min: 0.078, max: 0.22  },
+      afterStop: { min: 0.008, max: 0.02  },
+      final:     { min: 0.0008, max: 0.006 },
     },
     carScale: {
       initial:   1.4,

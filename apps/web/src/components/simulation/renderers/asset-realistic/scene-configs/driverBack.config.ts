@@ -36,7 +36,7 @@ export const driverBackConfig: SceneRenderConfig = {
     // stops, otherwise it collapses abruptly right as the gate opens.
     entryT:      0.84,
     gateT:       0.45,   // matches visual gate (gate.t and scene DB_GATE_T)
-    decelOffset: 0.02,
+    decelOffset: 0.04,
     // Equal to readingT on purpose — see passengerBack.config.ts's note:
     // skips the 'afterStop' phase entirely, straight to 'final' on resume.
     finalT:      0.84,
@@ -51,16 +51,16 @@ export const driverBackConfig: SceneRenderConfig = {
     rotationDeg: 6,      // same road tilt as passenger_front (copy, not mirrored)
 
     speed: {
-      initial:   { min: 0.001, max: 0.04  },
-      stopping:  { min: 0.003, max: 0.04  },
-      afterStop: { min: 0.02, max: 0.06  },   // dead value — see finalT note above
-      final:     { min: 0.12, max: 0.4   },
+      initial:   { min: 0.009, max: 0.04  },
+      stopping:  { min: 0.005, max: 0.035  },
+      afterStop: { min: 0.01, max: 0.04  },   // dead value — see finalT note above
+      final:     { min: 0.12, max: 0.3   },
     },
     carScale: {
       initial:   1.44,
       stopping:  1.40,
       atGate:    1.20,
-      afterStop: 1.9,
+      afterStop: 2,
       final:     4,   // counteract natural depth shrink during receding phase
     },
   },

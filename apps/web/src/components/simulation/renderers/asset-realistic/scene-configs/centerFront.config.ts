@@ -24,10 +24,10 @@ export const centerFrontConfig: SceneRenderConfig = {
     xNear:       VP_X + INCOMING.lateral.center.xNear,  // 400
     rotationDeg: 0,
     speed: {
-      initial:   { min: 0.033, max: 0.30  },
-      stopping:  { min: 0.028, max: 0.40  },
-      afterStop: { min: 0.023, max: 0.20  },
-      final:     { min: 0.001, max: 0.008 },
+      initial:   { min: 0.050, max: 0.30  },
+      stopping:  { min: 0.050, max: 0.40  },
+      afterStop: { min: 0.050, max: 0.18  },
+      final:     { min: 0.0004, max: 0.0025 },
     },
     carScale: {
       initial:   1.1,

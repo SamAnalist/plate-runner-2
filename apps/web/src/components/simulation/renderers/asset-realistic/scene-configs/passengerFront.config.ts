@@ -51,10 +51,10 @@ export const passengerFrontConfig: SceneRenderConfig = {
     rotationDeg: 6,       // tilt to match diagonal road (mirrored sign vs driver_front's -6)
 
     speed: {
-      initial:   { min: 0.033, max: 0.30  },
-      stopping:  { min: 0.028, max: 0.38  },
-      afterStop: { min: 0.010, max: 0.030  },
-      final:     { min: 0.0005, max: 0.0008 },
+      initial:   { min: 0.09, max: 0.30  },
+      stopping:  { min: 0.08, max: 0.38  },
+      afterStop: { min: 0.008, max: 0.030  },
+      final:     { min: 0.0001, max: 0.0008 },
     },
     carScale: {
       initial:   1.4,

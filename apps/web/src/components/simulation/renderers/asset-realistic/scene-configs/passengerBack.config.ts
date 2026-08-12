@@ -61,16 +61,16 @@ export const passengerBackConfig: SceneRenderConfig = {
     rotationDeg: -6,     // same road tilt as driver_front (mirrored road, same angle)
 
     speed: {
-      initial:   { min: 0.001, max: 0.04  },
-      stopping:  { min: 0.003, max: 0.04  },
-      afterStop: { min: 0.02, max: 0.06  },   // brief transition before final phase
-      final:     { min: 0.025, max: 0.25  },
+      initial:   { min: 0.015, max: 0.04  },
+      stopping:  { min: 0.01, max: 0.04  },
+      afterStop: { min: 0.008, max: 0.03  },   // brief transition before final phase
+      final:     { min: 0.07, max: 0.25  },
     },
     carScale: {
       initial:   1.44,
       stopping:  1.37,
       atGate:    1.10,
-      afterStop: 2.2,   // no dip — smooth ramp into final
+      afterStop: 2.1,   // no dip — smooth ramp into final
       final:     4,   // counteract natural depth shrink during receding phase
     },
   },

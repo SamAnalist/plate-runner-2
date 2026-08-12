@@ -56,7 +56,7 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
     // Angled view from driver's side (front-left).
     driver_front: {
       xPct: 0.240, yPct: 0.678, wPct: 0.090, hPct: 0.060,
-      rotateDeg: 8, skewXDeg: 10, skewYDeg: 0, side: 'front',
+      rotateDeg: 10, skewXDeg: 10, skewYDeg: 0, side: 'front',
     },
     // Angled view from passenger's side (front-right).
     passenger_front: {
@@ -75,8 +75,8 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
     },
     // Angled view from passenger's side of rear face.
     passenger_back: {
-      xPct: 0.275, yPct: 0.540, wPct: 0.110, hPct: 0.070,
-      rotateDeg: 4, skewXDeg: 2, skewYDeg: 0, side: 'rear',
+      xPct: 0.275, yPct: 0.540, wPct: 0.120, hPct: 0.070,
+      rotateDeg: 5, skewXDeg: 2, skewYDeg: 0, side: 'rear',
     },
   },
 
@@ -99,11 +99,11 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
       rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'rear',
     },
     driver_back: {
-      xPct: 0.635, yPct: 0.520, wPct: 0.092, hPct: 0.070,
-      rotateDeg: -3, skewXDeg: -3, skewYDeg: 0, side: 'rear',
+      xPct: 0.635, yPct: 0.530, wPct: 0.092, hPct: 0.070,
+      rotateDeg: -4, skewXDeg: -3, skewYDeg: 0, side: 'rear',
     },
     passenger_back: {
-      xPct: 0.265, yPct: 0.540, wPct: 0.110, hPct: 0.070,
+      xPct: 0.270, yPct: 0.550, wPct: 0.100, hPct: 0.070,
       rotateDeg: 5, skewXDeg: 2, skewYDeg: 0, side: 'rear',
     },
   },
@@ -127,12 +127,12 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
       rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'rear',
     },
     driver_back: {
-      xPct: 0.635, yPct: 0.520, wPct: 0.092, hPct: 0.070,
-      rotateDeg: -3, skewXDeg: -3, skewYDeg: 0, side: 'rear',
+      xPct: 0.630, yPct: 0.530, wPct: 0.097, hPct: 0.070,
+      rotateDeg: -4, skewXDeg: -3, skewYDeg: 0, side: 'rear',
     },
     passenger_back: {
-      xPct: 0.288, yPct: 0.540, wPct: 0.080, hPct: 0.060,
-      rotateDeg: 4, skewXDeg: 2, skewYDeg: 0, side: 'rear',
+      xPct: 0.270, yPct: 0.570, wPct: 0.100, hPct: 0.070,
+      rotateDeg: 5, skewXDeg: 2, skewYDeg: 0, side: 'rear',
     },
   },
 };
