@@ -230,6 +230,27 @@ speed=10 → 0.620 t/s
 
 Frame budget: `requestAnimationFrame`, dt clamped to 100ms.
 
+### Speed presets
+
+The Speed submenu (Local Mode → Visual Settings) offers four options,
+`SpeedPreset` in `@plate-runner/shared`:
+
+| Preset | Effect |
+|---|---|
+| `slow` | All four `SpeedPhases` fields (both directions) set to `1` (minimum). |
+| `regular` | All four fields set to `5` (the pre-existing default). |
+| `fast` | All four fields set to `10` (maximum). |
+| `advanced` | Reveals the original per-phase sliders (Initial/Stopping/After Stop/Final/Exit); switching into it first resets both directions to `5` ("en el medio") so tuning always starts from a known-neutral baseline. |
+
+`slow`/`regular`/`fast` keep `speedIncoming` and `speedAway` in lockstep at
+the same uniform value — there's no way to have, say, a slow incoming and a
+fast away leg without going through `advanced`.
+
+`speedPreset` is also accepted (as `"slow" | "regular" | "fast"` only) on
+the run-a-plate API endpoints — see
+[BACKEND_API_SPEC.md](BACKEND_API_SPEC.md#post-apisimulate--run-a-single-plate).
+Requests that omit it default to `slow` server-side.
+
 ---
 
 ## 9. Focus Zone

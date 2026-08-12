@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { validatePlate, isPlacementAllowedForDirection, type SimulationCommandType } from '@plate-runner/shared';
+import { validatePlate, isPlacementAllowedForDirection, REQUEST_SPEED_PRESETS, type SimulationCommandType } from '@plate-runner/shared';
 import type { CommandService } from '../services/commandService';
 import { createControllerAuth } from '../security/controllerAuth';
 import type { RemoteRepo } from '../storage/remoteRepo';
@@ -11,7 +11,11 @@ import {
   validateQueueConfig,
   validatePlates,
   validateSetConfigPayload,
+  validateSpeedPreset,
 } from '../services/validation';
+
+/** Endpoint-level default when the caller doesn't specify speedPreset — favors camera readability over cinematic speed. */
+const DEFAULT_REQUEST_SPEED_PRESET = 'slow';
 
 const CONTROL_TYPES: { path: string; type: SimulationCommandType }[] = [
   { path: '/pause', type: 'pause' },
@@ -55,6 +59,9 @@ export async function registerRemoteRoutes(
       if (!validateVehicleColor(body.vehicleColor)) return reply.code(400).send({ ok: false, error: 'invalid vehicleColor' });
       if (!validateGateConfig(body.gateConfig)) return reply.code(400).send({ ok: false, error: 'invalid gateConfig' });
       if (!validateQueueConfig(body.queueConfig)) return reply.code(400).send({ ok: false, error: 'invalid queueConfig' });
+      if (body.speedPreset !== undefined && !validateSpeedPreset(body.speedPreset)) {
+        return reply.code(400).send({ ok: false, error: `invalid speedPreset — must be one of ${REQUEST_SPEED_PRESETS.join(', ')}` });
+      }
 
       const command = commandService.createCommand('run_plate', {
         plate: plateResult.normalized,
@@ -63,6 +70,7 @@ export async function registerRemoteRoutes(
         vehicleColor: body.vehicleColor,
         gateConfig: body.gateConfig,
         queueConfig: body.queueConfig,
+        speedPreset: body.speedPreset ?? DEFAULT_REQUEST_SPEED_PRESET,
       }, request.ip, { displayId, source: 'remote_controller', createdByControllerId: request.pairing!.controllerId });
 
       request.log.info({ displayId, controllerId: request.pairing!.controllerId, type: 'run_plate', event: 'remote_command_sent' }, 'remote command sent');
@@ -83,6 +91,9 @@ export async function registerRemoteRoutes(
       if (!validateVehicleColor(body.vehicleColor)) return reply.code(400).send({ ok: false, error: 'invalid vehicleColor' });
       if (!validateGateConfig(body.gateConfig)) return reply.code(400).send({ ok: false, error: 'invalid gateConfig' });
       if (!validateQueueConfig(body.queueConfig)) return reply.code(400).send({ ok: false, error: 'invalid queueConfig' });
+      if (body.speedPreset !== undefined && !validateSpeedPreset(body.speedPreset)) {
+        return reply.code(400).send({ ok: false, error: `invalid speedPreset — must be one of ${REQUEST_SPEED_PRESETS.join(', ')}` });
+      }
 
       const command = commandService.createCommand('run_queue', {
         plates: platesResult.plates,
@@ -91,6 +102,7 @@ export async function registerRemoteRoutes(
         vehicleColor: body.vehicleColor,
         gateConfig: body.gateConfig,
         queueConfig: body.queueConfig,
+        speedPreset: body.speedPreset ?? DEFAULT_REQUEST_SPEED_PRESET,
       }, request.ip, { displayId, source: 'remote_controller', createdByControllerId: request.pairing!.controllerId });
 
       request.log.info({ displayId, controllerId: request.pairing!.controllerId, type: 'run_queue', event: 'remote_command_sent' }, 'remote command sent');

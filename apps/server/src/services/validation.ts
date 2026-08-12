@@ -6,6 +6,7 @@ import {
   GATE_MODES,
   GATE_INITIAL_STATES,
   PLATE_QUEUE_MODES,
+  REQUEST_SPEED_PRESETS,
   MAX_QUEUE_SIZE,
   MAX_PLATE_LIST_NAME_LENGTH,
   isPlacementAllowedForDirection,
@@ -16,6 +17,8 @@ import {
   type PlateQueueConfig,
   type SetConfigPayload,
 } from '@plate-runner/shared';
+
+type RequestSpeedPreset = 'slow' | 'regular' | 'fast';
 
 /**
  * Domain validation shared between all routes that accept simulation
@@ -45,6 +48,11 @@ export function validateGateConfig(v: unknown): v is GateConfig {
     typeof g.stopBeforeOpenMs === 'number' &&
     typeof g.delayAfterOpenMs === 'number'
   );
+}
+
+/** Only slow/regular/fast are accepted from a request body — 'advanced' is a UI-only concept with no API-exposed per-phase values. */
+export function validateSpeedPreset(v: unknown): v is RequestSpeedPreset {
+  return typeof v === 'string' && REQUEST_SPEED_PRESETS.includes(v as RequestSpeedPreset);
 }
 
 export function validateQueueConfig(v: unknown): v is PlateQueueConfig {
@@ -115,6 +123,10 @@ export function validateSetConfigPayload(v: unknown): SetConfigValidationResult 
   if (body.queueConfig !== undefined) {
     if (!validateQueueConfig(body.queueConfig)) return { ok: false, error: 'invalid queueConfig' };
     payload.queueConfig = body.queueConfig;
+  }
+  if (body.speedPreset !== undefined) {
+    if (!validateSpeedPreset(body.speedPreset)) return { ok: false, error: `invalid speedPreset — must be one of ${REQUEST_SPEED_PRESETS.join(', ')}` };
+    payload.speedPreset = body.speedPreset;
   }
   if (Object.keys(payload).length === 0) return { ok: false, error: 'payload must set at least one field' };
 

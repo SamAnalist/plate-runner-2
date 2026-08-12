@@ -65,6 +65,30 @@ export interface SpeedPhases {
   final:     number;
 }
 
+/**
+ * slow/regular/fast apply the same value to all four SpeedPhases fields
+ * (min/mid/max of the 1–10 range). advanced hands control back to the
+ * per-phase sliders (SpeedPhasesSection) — it's a UI-only state, never sent
+ * to the API (see REQUEST_SPEED_PRESETS).
+ */
+export type SpeedPreset = 'slow' | 'regular' | 'fast' | 'advanced';
+export const SPEED_PRESETS: SpeedPreset[] = ['slow', 'regular', 'fast', 'advanced'];
+
+/** Subset accepted from API request bodies — 'advanced' has no meaning without explicit per-phase values, which the API doesn't expose. */
+export const REQUEST_SPEED_PRESETS: SpeedPreset[] = ['slow', 'regular', 'fast'];
+
+/** Uniform 1–10 phase value applied to every SpeedPhases field for a given non-advanced preset. */
+export const SPEED_PRESET_VALUE: Record<'slow' | 'regular' | 'fast', number> = {
+  slow: 1,
+  regular: 5,
+  fast: 10,
+};
+
+export function speedPhasesForPreset(preset: 'slow' | 'regular' | 'fast'): SpeedPhases {
+  const v = SPEED_PRESET_VALUE[preset];
+  return { initial: v, stopping: v, afterStop: v, final: v };
+}
+
 export interface SimulationConfig {
   plate: string;
   direction: Direction;
@@ -81,18 +105,20 @@ export interface SimulationConfig {
   /**
    * How long (ms) the vehicle waits at the gate before the arm starts rising.
    * Only used when gateMode === 'auto_open' and gateInitialState === 'closed'.
-   * Default: 2000ms.
+   * Default: 3000ms.
    */
   stopBeforeOpenMs: number;
   /**
    * How long (ms) to wait after the gate arm finishes opening before the vehicle
-   * resumes moving. Default: 400ms.
+   * resumes moving. Default: 1400ms.
    */
   delayAfterOpenMs: number;
   /** Phase speeds for the incoming direction (car approaching camera). */
   speedIncoming: SpeedPhases;
   /** Phase speeds for the away direction (car receding from camera). */
   speedAway: SpeedPhases;
+  /** Which Speed submenu is active. 'advanced' means speedIncoming/speedAway are hand-tuned per phase; otherwise they're kept in sync with this preset's uniform value. */
+  speedPreset: SpeedPreset;
   vehicleColor: VehicleColor;
 }
 
@@ -123,10 +149,11 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   detectorPlacement: 'center_front',
   gateMode: 'auto_open',
   gateInitialState: 'closed',
-  stopBeforeOpenMs: 2000,
-  delayAfterOpenMs: 400,
+  stopBeforeOpenMs: 3000,
+  delayAfterOpenMs: 1400,
   speedIncoming: { initial: 5, stopping: 5, afterStop: 5, final: 5 },
   speedAway:     { initial: 5, stopping: 5, afterStop: 5, final: 5 },
+  speedPreset: 'regular',
   vehicleColor: 'blue',
 };
 

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { validatePlate, isPlacementAllowedForDirection } from '@plate-runner/shared';
+import { validatePlate, isPlacementAllowedForDirection, REQUEST_SPEED_PRESETS } from '@plate-runner/shared';
 import type { CommandService } from '../services/commandService';
 import {
   validateDirection,
@@ -8,7 +8,11 @@ import {
   validateGateConfig,
   validateQueueConfig,
   validatePlates,
+  validateSpeedPreset,
 } from '../services/validation';
+
+/** Endpoint-level default when the caller doesn't specify speedPreset — favors camera readability over cinematic speed. */
+const DEFAULT_REQUEST_SPEED_PRESET = 'slow';
 
 /** POST /api/simulate and POST /api/simulate/queue — create run_plate/run_queue commands. Never executes anything itself. */
 export async function registerSimulateRoutes(fastify: FastifyInstance, commandService: CommandService): Promise<void> {
@@ -27,6 +31,9 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
     if (!validateVehicleColor(body.vehicleColor)) return reply.code(400).send({ ok: false, error: 'invalid vehicleColor' });
     if (!validateGateConfig(body.gateConfig)) return reply.code(400).send({ ok: false, error: 'invalid gateConfig' });
     if (!validateQueueConfig(body.queueConfig)) return reply.code(400).send({ ok: false, error: 'invalid queueConfig' });
+    if (body.speedPreset !== undefined && !validateSpeedPreset(body.speedPreset)) {
+      return reply.code(400).send({ ok: false, error: `invalid speedPreset — must be one of ${REQUEST_SPEED_PRESETS.join(', ')}` });
+    }
 
     const command = commandService.createCommand('run_plate', {
       plate: plateResult.normalized,
@@ -35,6 +42,7 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
       vehicleColor: body.vehicleColor,
       gateConfig: body.gateConfig,
       queueConfig: body.queueConfig,
+      speedPreset: body.speedPreset ?? DEFAULT_REQUEST_SPEED_PRESET,
     }, request.ip, { source: 'local_api' });
 
     return reply.send({ ok: true, commandId: command.id, status: command.status });
@@ -53,6 +61,9 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
     if (!validateVehicleColor(body.vehicleColor)) return reply.code(400).send({ ok: false, error: 'invalid vehicleColor' });
     if (!validateGateConfig(body.gateConfig)) return reply.code(400).send({ ok: false, error: 'invalid gateConfig' });
     if (!validateQueueConfig(body.queueConfig)) return reply.code(400).send({ ok: false, error: 'invalid queueConfig' });
+    if (body.speedPreset !== undefined && !validateSpeedPreset(body.speedPreset)) {
+      return reply.code(400).send({ ok: false, error: `invalid speedPreset — must be one of ${REQUEST_SPEED_PRESETS.join(', ')}` });
+    }
 
     const command = commandService.createCommand('run_queue', {
       plates: platesResult.plates,
@@ -61,6 +72,7 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
       vehicleColor: body.vehicleColor,
       gateConfig: body.gateConfig,
       queueConfig: body.queueConfig,
+      speedPreset: body.speedPreset ?? DEFAULT_REQUEST_SPEED_PRESET,
     }, request.ip, { source: 'local_api' });
 
     return reply.send({ ok: true, commandId: command.id, status: command.status });

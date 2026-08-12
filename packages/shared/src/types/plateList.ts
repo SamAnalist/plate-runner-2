@@ -9,6 +9,8 @@ export interface PlateListSimulationDefaults {
   vehicleColor: VehicleColor;
   gateConfig: GateConfig;
   queueConfig: PlateQueueConfig;
+  /** Optional — absent on lists saved before the Speed presets feature; leaves the current speed untouched when applied. */
+  speedPreset?: 'slow' | 'regular' | 'fast';
 }
 
 export interface PlateList {

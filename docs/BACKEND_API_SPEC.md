@@ -116,7 +116,7 @@ is configured to treat an empty body as `{}` rather than rejecting it (see
 
 ### `POST /api/simulate` — run a single plate
 
-Body: `{ plate, direction, detectorPlacement, vehicleColor, gateConfig, queueConfig }`
+Body: `{ plate, direction, detectorPlacement, vehicleColor, gateConfig, queueConfig, speedPreset? }`
 (same shapes as `SimulationConfig`/`GateConfig`/`PlateQueueConfig` in
 `@plate-runner/shared`). Creates a `run_plate` command.
 
@@ -126,8 +126,17 @@ Body: `{ plate, direction, detectorPlacement, vehicleColor, gateConfig, queueCon
 
 ### `POST /api/simulate/queue` — run several plates
 
-Body: `{ plates: string[], direction, detectorPlacement, vehicleColor, gateConfig, queueConfig }`
+Body: `{ plates: string[], direction, detectorPlacement, vehicleColor, gateConfig, queueConfig, speedPreset? }`
 (`plates.length` ≤ `MAX_QUEUE_SIZE`, each validated). Creates a `run_queue` command.
+
+### `speedPreset` (optional, on `/api/simulate`, `/api/simulate/queue`, and their `/api/remote/displays/:displayId/*` equivalents)
+
+`"slow" | "regular" | "fast"` — sets all four `SpeedPhases` fields (initial/
+stopping/afterStop/final, both directions) to a uniform value: slow=1,
+regular=5, fast=10. Omitted → defaults to `"slow"` (favors camera
+readability for unattended/automated callers). `"advanced"` is not accepted
+here — it's a UI-only state for hand-tuning each phase individually and has
+no API-exposed equivalent.
 
 ### `POST /api/simulation/{pause,resume,stop,skip-current,open-gate}`
 

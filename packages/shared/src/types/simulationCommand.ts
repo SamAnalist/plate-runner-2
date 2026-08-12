@@ -58,6 +58,8 @@ export interface RunPlatePayload {
   vehicleColor: VehicleColor;
   gateConfig: GateConfig;
   queueConfig: PlateQueueConfig;
+  /** Defaults to 'slow' server-side when omitted from the request — see REQUEST_SPEED_PRESETS. */
+  speedPreset: 'slow' | 'regular' | 'fast';
 }
 
 export interface RunQueuePayload {
@@ -67,6 +69,8 @@ export interface RunQueuePayload {
   vehicleColor: VehicleColor;
   gateConfig: GateConfig;
   queueConfig: PlateQueueConfig;
+  /** Defaults to 'slow' server-side when omitted from the request — see REQUEST_SPEED_PRESETS. */
+  speedPreset: 'slow' | 'regular' | 'fast';
 }
 
 /**
@@ -91,4 +95,5 @@ export interface SetConfigPayload {
   vehicleColor?: VehicleColor;
   gateConfig?: GateConfig;
   queueConfig?: PlateQueueConfig;
+  speedPreset?: 'slow' | 'regular' | 'fast';
 }
