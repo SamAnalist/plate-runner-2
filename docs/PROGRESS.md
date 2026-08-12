@@ -3353,3 +3353,190 @@ can have its own plate position/size independent of blue's calibration.
   values can be filled in `PLATE_ANCHOR_OVERRIDES`).
 - Optionally revisit the red/gray vignette noted above if it turns out
   to be visible in the composited scene.
+
+## Phase — Speed Presets (Slow / Regular / Fast / Advanced)
+
+### Goal
+
+Replace the always-visible per-phase speed sliders with a quick preset
+picker (Slow/Regular/Fast/Advanced), and let API callers select a speed
+preset per run instead of only ever getting whatever speed the display's
+UI last had dialed in.
+
+### Implemented
+
+- `SpeedPreset` type (`'slow' | 'regular' | 'fast' | 'advanced'`) and
+  `speedPhasesForPreset()` helper in `packages/shared`.
+- `SimulationConfig.speedPreset` field (default `'regular'`, matching the
+  pre-existing default of `5` for all phases).
+- Local Mode "Speed" section now shows a 4-way toggle group first;
+  Slow/Regular/Fast set both directions' `SpeedPhases` uniformly (1/5/10)
+  in a single state update. Advanced reveals the original Initial/
+  Stopping/After Stop/Final sliders and resets both directions to `5`
+  ("en el medio") the moment it's selected.
+- `speedPreset` accepted (optional, `'slow' | 'regular' | 'fast'` only) on
+  `POST /api/simulate`, `/api/simulate/queue`, and their
+  `/api/remote/displays/:displayId/*` equivalents. Omitted → defaults to
+  `'slow'` server-side. `'advanced'` is rejected — it has no per-phase
+  values to attach to at the API layer.
+- `speedPreset` threaded through `RunPlatePayload`/`RunQueuePayload`/
+  `SetConfigPayload`/`PlateListSimulationDefaults` so a preset picked via
+  API, `set_config`, or a saved Plate List all expand into concrete
+  `speedIncoming`/`speedAway` on the receiving display.
+
+### Files Changed
+
+- `packages/shared/src/types/simulation.ts` — `SpeedPreset`,
+  `SPEED_PRESETS`, `REQUEST_SPEED_PRESETS`, `SPEED_PRESET_VALUE`,
+  `speedPhasesForPreset()`, `SimulationConfig.speedPreset`.
+- `packages/shared/src/types/plateList.ts` — optional `speedPreset` on
+  `PlateListSimulationDefaults`.
+- `packages/shared/src/types/simulationCommand.ts` — `speedPreset` on
+  `RunPlatePayload`/`RunQueuePayload` (required, server always fills it),
+  optional on `SetConfigPayload`.
+- `apps/server/src/services/validation.ts` — `validateSpeedPreset()`.
+- `apps/server/src/routes/simulate.ts` — validates/defaults `speedPreset`
+  for `run_plate`/`run_queue`.
+- `apps/server/src/routes/remote.ts` — same, for the remote-controller
+  equivalents.
+- `apps/web/src/screens/LocalModeScreen.tsx` — preset toggle group,
+  conditional advanced sliders.
+- `apps/web/src/App.tsx` — `applyPartialConfig` expands `speedPreset` into
+  `speedIncoming`/`speedAway` before applying a `set_config` command.
+- `apps/web/src/features/lists/usePlateLists.ts` — `applyListDefaults`
+  does the same for Plate Lists that carry a `speedPreset`.
+- `apps/web/src/features/api/commandExecutor.ts` — carries
+  `payload.speedPreset` into the synthetic `PlateList.simulationDefaults`
+  used for `run_plate`/`run_queue` commands.
+- `docs/BACKEND_API_SPEC.md`, `docs/SIMULATION_SPEC.md` — documented.
+
+### Decisions
+
+- Kept `speedIncoming`/`speedAway` as the source of truth the renderer
+  actually reads — `speedPreset` is a derived/UI-tracking field, always
+  kept in sync by whichever code path sets it, rather than replacing the
+  per-phase fields outright. This avoided touching `useSimulation.ts` or
+  any rendering code.
+- Server defaults an omitted `speedPreset` to `'slow'` (not `'regular'`,
+  which is the UI's own default) per explicit instruction — unattended/
+  automated callers should default toward readability over speed.
+- `'advanced'` is deliberately excluded from `REQUEST_SPEED_PRESETS` /
+  API validation — there's no per-phase payload shape exposed over the
+  API to attach it to.
+- Fixed a latent bug while wiring this up: the preset toggle originally
+  called `set()` three times in a row (`speedPreset`, `speedIncoming`,
+  `speedAway`), each closing over the same stale `config` — only the last
+  call would have survived. Switched to one `onConfigChange` call with
+  all three fields merged.
+
+### Manual Testing
+
+- `pnpm --filter @plate-runner/shared exec tsc --noEmit`,
+  `pnpm --filter web exec tsc --noEmit`,
+  `cd apps/server && pnpm exec tsc --noEmit` — all clean.
+- `pnpm build` (web) — succeeds.
+- Manual QA pending: in Local Mode, click Slow/Regular/Fast and confirm
+  the run speed changes uniformly; click Advanced and confirm it resets
+  to mid values and the four sliders reappear; `curl -X POST
+  .../api/simulate` with and without `speedPreset` and confirm the
+  claimed display runs at the expected speed.
+
+### Known Limitations
+
+- No persistence test for `speedPreset` on saved Plate Lists created
+  before this phase (they simply have no `speedPreset`, which is treated
+  as "leave speed untouched" — backwards compatible, but not exercised
+  manually here).
+- `PlateListsPanel.tsx`'s list-editing form does not expose a speed
+  preset field yet (out of scope for this request — that form doesn't
+  manage speed at all today).
+
+### Next Steps
+
+- Manual QA per above.
+- Optionally expose `speedPreset` in the Plate List editing form
+  (`PlateListsPanel.tsx`) if per-list speed control is wanted there too.
+
+## Phase — Local Mode Sidebar Reorder + Plate Queue Source Toggle
+
+### Goal
+
+Reorder the Local Mode sidebar into a clearer flow, make section
+collapse state consistent, and let a saved Plate List be picked (or the
+current manual queue saved as a new one) directly from the Plate Queue
+section instead of only from the separate Plate Lists screen.
+
+### Implemented
+
+- Sidebar section order is now: License Plate → Playback → Visual
+  Settings (Direction, Detector Placement, Speed, Vehicle Color) → Plate
+  Queue → Gate Settings → Visual QA (dev-only) → View Modes.
+- Every section is now a `CollapsibleSection` (License Plate, Playback,
+  and View Modes were previously plain, always-expanded blocks). Default
+  open/closed state: License Plate, Playback, Visual Settings, and View
+  Modes start open; Plate Queue and Gate Settings start collapsed.
+- Direction and Detector Placement moved from their own top-level blocks
+  into Visual Settings.
+- Visual QA is now wrapped in `!import.meta.env.PROD` — it doesn't render
+  at all in a production build ("desactivar para producción").
+- Plate Queue gained a Manual / From List toggle:
+  - **Manual** — the existing raw-plate textarea + Queue Settings +
+    Status + Playback Controls + Queue Items (unchanged), plus a new
+    "Save as Plate List" button (enabled once a queue is applied) that
+    opens a small name-entry dialog and calls `plateLists.createList()`
+    with the currently loaded queue's plates and the current
+    direction/placement/color/gate/queue/speed settings.
+  - **From List** — a `<select>` of saved Plate Lists in place of the
+    textarea; picking one calls `plateLists.loadListIntoQueue(id)`
+    (applies the list's simulation defaults and loads its plates,
+    without auto-running). Queue Settings/Status/Playback
+    Controls/Queue Items stay visible in both modes since they're what
+    actually runs whatever got loaded either way.
+
+### Files Changed
+
+- `apps/web/src/screens/LocalModeScreen.tsx` — reordered sections,
+  `PlateQueueSection`/`SaveAsListDialog` components, `plateLists` prop.
+- `apps/web/src/components/controls/PlateQueuePanel.tsx` — `hideInput`
+  prop so "From List" mode can swap out just the raw-input block.
+- `apps/web/src/components/controls/PlateInput.tsx` — dropped its own
+  "License Plate" label (now redundant with the section header).
+- `apps/web/src/App.tsx` — passes `plateLists` down to `LocalModeScreen`.
+
+### Decisions
+
+- Queue Settings/Status/Playback Controls/Queue Items are shared between
+  Manual and From List rather than duplicated or hidden — both modes
+  ultimately populate the same `plateQueue` state, and those controls are
+  what runs it regardless of how it was populated.
+- "Save as Plate List" reads plates from `plateQueue.items` (i.e. the
+  already-*applied* queue), not the raw unapplied textarea — keeps the
+  save action unambiguous about exactly what gets persisted.
+- Visual QA is fully unrendered (not just hidden/disabled) in production
+  builds via `import.meta.env.PROD`, a compile-time Vite constant, so the
+  dev-only markup doesn't ship in the prod bundle either.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` — clean.
+- `pnpm build` — succeeds.
+- Manual QA pending: confirm default-open/closed state per section on a
+  fresh load; confirm "Save as Plate List" round-trips into the Plate
+  Lists screen; confirm "From List" selection loads plates + defaults
+  correctly and Run Queue starts it; confirm Visual QA is absent from a
+  production build (`pnpm build` + serve `dist/`) but present in `pnpm
+  dev`.
+
+### Known Limitations
+
+- No inline editing of a saved Plate List from the Plate Queue section
+  itself (still only creatable there) — editing existing lists remains
+  on the dedicated Plate Lists screen.
+- Selecting a list in "From List" mode does not currently get
+  deselected/cleared when switching back to Manual or after Run Queue
+  completes — minor UX polish, not addressed this phase.
+
+### Next Steps
+
+- Manual QA per above.
+- Optionally clear `selectedListId` after a From-List run completes.
