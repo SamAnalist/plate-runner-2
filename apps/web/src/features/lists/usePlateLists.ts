@@ -7,6 +7,7 @@ import {
   type PlateListSimulationDefaults,
   type SimulationConfig,
   type TriggeredBy,
+  speedPhasesForPreset,
 } from '@plate-runner/shared';
 import {
   getPlateLists,
@@ -56,6 +57,15 @@ export interface PlateListsControls {
   lists: PlateList[];
   storageError: string | null;
   lastImportResult: ImportSummary | null;
+  /**
+   * A new object identity every time runList/runListForSchedule/loadListIntoQueue
+   * loads a *saved* list (id must exist in `lists` — API-driven runListSnapshot
+   * of an ephemeral list doesn't set this). Local Mode's Plate Queue section
+   * watches this to switch its Manual/From List toggle to "From List" and
+   * select the right list, even when the run was triggered from the Plate
+   * Lists screen or a schedule rather than from Local Mode itself.
+   */
+  lastLoadedList: { id: string } | null;
 
   createList: (draft: PlateListDraft) => MutationResult;
   updateList: (id: string, draft: PlateListDraft) => MutationResult;
@@ -98,6 +108,7 @@ function validateDraft(draft: PlateListDraft): string | null {
 export function usePlateLists({ config, onConfigChange, plateQueue, executionHistory }: UsePlateListsArgs): PlateListsControls {
   const [{ lists, error: storageError }, setStore] = useState(() => getPlateLists());
   const [lastImportResult, setLastImportResult] = useState<ImportSummary | null>(null);
+  const [lastLoadedList, setLastLoadedList] = useState<{ id: string } | null>(null);
 
   const refresh = useCallback(() => {
     setStore(getPlateLists());
@@ -132,12 +143,16 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
 
   const applyListDefaults = useCallback((list: PlateList): SimulationConfig => {
     const d = list.simulationDefaults;
+    const speedFields = d.speedPreset
+      ? { speedPreset: d.speedPreset, speedIncoming: speedPhasesForPreset(d.speedPreset), speedAway: speedPhasesForPreset(d.speedPreset) }
+      : {};
     return {
       ...configRef.current,
       direction: d.direction,
       detectorPlacement: d.detectorPlacement,
       vehicleColor: d.vehicleColor,
       ...d.gateConfig,
+      ...speedFields,
     };
   }, []);
 
@@ -169,6 +184,7 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
     const list = listsRef.current.find(l => l.id === id);
     if (!list) return { ok: false, reason: 'missing_list' };
     executeList(list, list.plates, 'manual_list_run');
+    setLastLoadedList({ id: list.id });
     return { ok: true };
   }, [executeList]);
 
@@ -176,6 +192,7 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
     const list = listsRef.current.find(l => l.id === id);
     if (!list) return { ok: false, reason: 'missing_list' };
     executeList(list, opts.plates, 'schedule', opts.scheduleId);
+    setLastLoadedList({ id: list.id });
     return { ok: true };
   }, [executeList]);
 
@@ -188,6 +205,7 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
     if (!list) return;
     onConfigChange(applyListDefaults(list));
     plateQueueRef.current.setQueueConfig(list.simulationDefaults.queueConfig);
+    setLastLoadedList({ id: list.id });
     pendingActionRef.current = { plates: list.plates, autoRun: false };
   }, [onConfigChange, applyListDefaults]);
 
@@ -267,6 +285,7 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
     lists,
     storageError,
     lastImportResult,
+    lastLoadedList,
     createList,
     updateList,
     deleteList,
