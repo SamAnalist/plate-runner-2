@@ -3540,3 +3540,162 @@ section instead of only from the separate Plate Lists screen.
 
 - Manual QA per above.
 - Optionally clear `selectedListId` after a From-List run completes.
+
+## Phase — Simulator Defaults, Settings Visual Redesign, System Status Trim
+
+### Goal
+
+Give Settings a "Simulator Defaults" section (what a fresh run starts
+with — no more re-picking direction/color/gate timings every reload),
+trim System Status down to what an end user actually cares about, and
+give the whole Settings screen a more distinct, color-coded visual
+identity instead of a flat stack of plain headings.
+
+### Implemented
+
+- New `useSimulatorDefaults` hook (`plate-runner:simulator-defaults:v1`
+  in localStorage) persisting direction, detector placement, vehicle
+  color, speed preset, and gate mode/initial state/timings — the values
+  a fresh `SimulationConfig` is seeded with at app boot
+  (`applySimulatorDefaults`), independent of the live in-session config.
+- `SimulatorDefaultsPanel` — grouped into collapsible submenus (Direction
+  & Placement, Speed, Vehicle Color, Gate Settings), mirroring Local
+  Mode's own grouping so the mental model carries over. Includes a
+  "Restore Factory Defaults" action.
+- Extracted `CollapsibleSection` and `ToggleGroup` out of
+  `LocalModeScreen.tsx` into `components/ui/` so both Local Mode and the
+  new Settings panel share one implementation.
+- New `SettingsCard` — color-accented card (left border + soft corner
+  glow, no emoji) wrapping every Settings section; each section gets a
+  distinct accent (blue/cyan/slate/violet/emerald/red) instead of a flat
+  list of plain headings.
+- `SystemStatusPanel` trimmed: removed Frontend mode, API Base URL, API
+  connection status (duplicated the Local API panel above it), Last
+  screen persisted, Browser storage available, Backend storage
+  type/ok — all internal/diagnostic noise not meaningful to an end user.
+  Kept counts/state that are (pairings, lists, schedules, history, queue
+  status, vehicle color, Screen Saver state, backend health/pending
+  commands/server time).
+- Added a "Simulator Defaults" reset action to Local Storage Management.
+
+### Files Changed
+
+- `apps/web/src/features/simulatorDefaults/useSimulatorDefaults.ts` (new)
+- `apps/web/src/components/controls/SimulatorDefaultsPanel.tsx` (new)
+- `apps/web/src/components/ui/CollapsibleSection.tsx` (new, extracted)
+- `apps/web/src/components/ui/ToggleGroup.tsx` (new, extracted)
+- `apps/web/src/components/ui/SettingsCard.tsx` (new)
+- `apps/web/src/screens/LocalModeScreen.tsx` — uses the shared
+  CollapsibleSection/ToggleGroup instead of local copies.
+- `apps/web/src/screens/SettingsScreen.tsx` — wraps every section in
+  `SettingsCard`, adds the Simulator Defaults section.
+- `apps/web/src/components/controls/SystemStatusPanel.tsx` — trimmed
+  rows, dropped the now-unused `lastScreen`/`AppScreen` prop.
+- `apps/web/src/components/controls/ScreenSaverSettingsPanel.tsx`,
+  `BackupPanel.tsx`, `LocalStorageManagementPanel.tsx` — dropped their
+  own top-level `<Label>` heading (now redundant with `SettingsCard`'s
+  title) and added the Simulator Defaults reset action.
+- `apps/web/src/App.tsx` — seeds initial `SimulationConfig` from
+  `useSimulatorDefaults()` via `applySimulatorDefaults`.
+
+### Decisions
+
+- UI stays English-only per explicit instruction — audited the whole
+  `apps/web/src` tree for stray Spanish strings in rendered JSX; found
+  none (only a stale doc-comment mention of "ENTRADA" signage that isn't
+  actually rendered — left as-is, it's not user-facing).
+- Simulator Defaults only seeds the *initial* config on app boot — it
+  intentionally does not reach into a config that's already running, to
+  avoid surprising an in-progress session.
+- Reused `speedPhasesForPreset` from `@plate-runner/shared` for the
+  defaults' speed preset expansion, keeping it in lockstep with Local
+  Mode's own preset behavior.
+- No emoji used in the visual refresh (SettingsCard's "pop" comes from
+  color-coded borders/glow + a small accent dot) — this project's UI
+  doesn't use emoji unless explicitly requested.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit`, `pnpm --filter
+  @plate-runner/shared exec tsc --noEmit`, `apps/server` tsc — all clean.
+- `pnpm build` — succeeds.
+- Manual QA pending: change Simulator Defaults in Settings, reload the
+  app, confirm Local Mode starts with the new values; confirm System
+  Status no longer shows the removed rows; visually confirm the
+  color-coded Settings cards render correctly in both light/no-preference
+  browser themes (app is dark-only today, so just the one theme).
+
+### Known Limitations
+
+- Simulator Defaults doesn't yet expose the full per-phase Speed sliders
+  (Advanced) — only Slow/Regular/Fast, consistent with what the API
+  accepts; Advanced tuning stays a Local Mode-only, per-session thing.
+- No "capture current Local Mode config as new defaults" shortcut yet —
+  defaults are edited independently in Settings.
+
+### Next Steps
+
+- Manual QA per above.
+- Consider a "Save current config as defaults" button in Local Mode as a
+  faster path than re-entering values in Settings.
+
+## Phase — Shared API Connection Across Local API / Display / Controller
+
+### Goal
+
+Local API, Display Mode, and Controller Mode each had their own
+independent `apiBaseUrl`/`apiKey` state — saving credentials in Settings
+had no effect on Display or Controller Mode, which silently kept their
+own separate (and separately-defaulted) copies.
+
+### Implemented
+
+- New `useApiConnection()` hook — the single source of truth for
+  `apiBaseUrl`/`apiKey`/`rememberCredentials`, instantiated once in
+  `App.tsx` and passed into `useApiCommandListener`,
+  `useDisplayCommandListener`, and `useRemoteController`. Editing/saving
+  the connection from any one of Local API (Settings), Display Mode, or
+  Controller Mode now reflects in the other two immediately — same
+  in-memory state, not a sync mechanism.
+- Persistence (the "Remember on this device" opt-in from the previous
+  phase) moved into this shared hook — `plate-runner:api-connection:v1`.
+- Display Mode and Controller Mode's API Key fields now note that the
+  value is shared with Settings → Local API.
+
+### Files Changed
+
+- `apps/web/src/features/api/useApiConnection.ts` (new) — extracted
+  connection state + persistence, previously living inside
+  `useApiCommandListener`.
+- `apps/web/src/features/api/useApiCommandListener.ts`,
+  `apps/web/src/features/display/useDisplayCommandListener.ts`,
+  `apps/web/src/features/controller/useRemoteController.ts` — accept
+  `apiConnection: ApiConnectionControls` instead of managing their own
+  `apiBaseUrl`/`apiKey` state; their public `*Controls` interfaces now
+  `extends ApiConnectionControls` so `LocalApiPanel`/`DisplayModePanel`/
+  `ControllerModePanel` needed no prop-shape changes.
+- `apps/web/src/App.tsx` — instantiates `useApiConnection()` once, passes
+  it into all three listener/controller hooks.
+- `apps/web/src/components/controls/DisplayModePanel.tsx`,
+  `ControllerModePanel.tsx` — added a note that the API Key field is
+  shared with Settings.
+
+### Decisions
+
+- Registration/pairing secrets (`displaySecret`, `controllerToken`)
+  stay separate and untouched — only the connection-level
+  `apiBaseUrl`/`apiKey` (the thing that was actually duplicated three
+  ways) is now shared.
+- `enabled` (each mode's own "listen for commands" toggle) stays local
+  to each hook — that's a per-mode concern, not part of "which backend".
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit`, `pnpm build` — clean.
+- Manual QA pending: set API Base URL/Key in Settings → Local API,
+  navigate to Display Mode and Controller Mode, confirm both show the
+  same values; edit from Display Mode, confirm Settings reflects it too.
+
+### Next Steps
+
+- Manual QA per above.
