@@ -7,6 +7,7 @@ import type {
   PlateQueueConfig,
   SetConfigPayload,
 } from '@plate-runner/shared';
+import type { ApiConnectionControls } from '../api/useApiConnection';
 
 export interface PairedDisplay {
   displayId: string;
@@ -52,12 +53,7 @@ export interface PairingRequestState {
   error?: string;
 }
 
-export interface RemoteControllerControls {
-  apiBaseUrl: string;
-  setApiBaseUrl: (v: string) => void;
-  apiKey: string;
-  setApiKey: (v: string) => void;
-
+export interface RemoteControllerControls extends ApiConnectionControls {
   pairedDisplays: PairedDisplay[];
   forgetPairing: (displayId: string) => void | Promise<void>;
 
@@ -75,8 +71,6 @@ export interface RemoteControllerControls {
   setConfig: (displayId: string, partial: SetConfigPayload) => Promise<RemoteActionResult>;
 }
 
-const DEFAULT_BASE_URL = 'http://localhost:8787';
-const DEFAULT_API_KEY = 'dev-local-key';
 const STORAGE_KEY = 'platerunner_controller_pairings';
 const POLL_MS = 1500;
 
@@ -107,9 +101,8 @@ function savePairings(pairings: PairedDisplay[]): void {
  * SimulationCommand on the backend, the target display's own listener
  * (useDisplayCommandListener) does the actual work.
  */
-export function useRemoteController(): RemoteControllerControls {
-  const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_BASE_URL);
-  const [apiKey, setApiKey] = useState(DEFAULT_API_KEY);
+export function useRemoteController(apiConnection: ApiConnectionControls): RemoteControllerControls {
+  const { apiBaseUrl, apiKey } = apiConnection;
   const [pairedDisplays, setPairedDisplays] = useState<PairedDisplay[]>(() => loadPairings());
   const [pairingRequest, setPairingRequest] = useState<PairingRequestState | null>(null);
 
@@ -257,7 +250,7 @@ export function useRemoteController(): RemoteControllerControls {
   const setConfig = useCallback((displayId: string, partial: SetConfigPayload) => post(displayId, '/set-config', partial), [post]);
 
   return {
-    apiBaseUrl, setApiBaseUrl, apiKey, setApiKey,
+    ...apiConnection,
     pairedDisplays, forgetPairing,
     pairingRequest, requestPairing, dismissPairingRequest,
     sendPlate, sendQueue, pause, resume, stop, skipCurrent, openGate, setConfig,

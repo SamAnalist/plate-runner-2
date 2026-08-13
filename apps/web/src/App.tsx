@@ -24,16 +24,19 @@ import { usePlateQueue } from './features/queue/usePlateQueue';
 import { usePlateLists } from './features/lists/usePlateLists';
 import { useExecutionHistory } from './features/history/useExecutionHistory';
 import { useLocalScheduler } from './features/scheduler/useLocalScheduler';
+import { useApiConnection } from './features/api/useApiConnection';
 import { useApiCommandListener } from './features/api/useApiCommandListener';
 import { useDisplayCommandListener } from './features/display/useDisplayCommandListener';
 import { useRemoteController } from './features/controller/useRemoteController';
 import { useScreenSaver } from './features/screensaver/useScreenSaver';
 import { ScreenSaverOverlay } from './components/screensaver/ScreenSaverOverlay';
+import { useSimulatorDefaults, applySimulatorDefaults } from './features/simulatorDefaults/useSimulatorDefaults';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
 export default function App() {
-  const [config, setConfig]           = useState<SimulationConfig>(DEFAULT_CONFIG);
+  const simulatorDefaults = useSimulatorDefaults();
+  const [config, setConfig]           = useState<SimulationConfig>(() => applySimulatorDefaults(DEFAULT_CONFIG, simulatorDefaults.settings));
   const [appMode, setAppMode]         = useState<AppMode>('normal');
   const { screen, setScreen }         = usePersistentAppScreen();
   const [showDebug, setShowDebug]     = useState(false);
@@ -75,9 +78,12 @@ export default function App() {
   const executionHistory = useExecutionHistory({ plateQueue });
   const plateLists = usePlateLists({ config, onConfigChange: handleConfigChange, plateQueue, executionHistory });
   const scheduler = useLocalScheduler({ plateLists, plateQueue, executionHistory });
-  const apiCommandListener = useApiCommandListener({ simulation, plateQueue, plateLists, onSetConfig: applyPartialConfig });
-  const displayCommandListener = useDisplayCommandListener({ simulation, plateQueue, plateLists, onSetConfig: applyPartialConfig });
-  const remoteController = useRemoteController();
+  // Single shared "which backend + key" connection — Local API, Display Mode, and
+  // Controller Mode all read/write this one instance instead of three disconnected copies.
+  const apiConnection = useApiConnection();
+  const apiCommandListener = useApiCommandListener({ simulation, plateQueue, plateLists, onSetConfig: applyPartialConfig, apiConnection });
+  const displayCommandListener = useDisplayCommandListener({ simulation, plateQueue, plateLists, onSetConfig: applyPartialConfig, apiConnection });
+  const remoteController = useRemoteController(apiConnection);
 
   const queueActive = QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
 
@@ -226,11 +232,10 @@ export default function App() {
           plateLists={plateLists}
           scheduler={scheduler}
           executionHistory={executionHistory}
-          queueStatus={plateQueue.queueStatus}
-          vehicleColor={config.vehicleColor}
           screen={screen}
           onNavigateHome={() => setScreen('home')}
           screenSaver={screenSaver}
+          simulatorDefaults={simulatorDefaults}
         />
       );
       break;

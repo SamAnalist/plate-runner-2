@@ -120,6 +120,10 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
             invalid={!!apiBaseUrl && !URL_SCHEME_PATTERN.test(apiBaseUrl)}
           />
           <TextInput value={apiKey} onChange={setApiKey} placeholder="dev-local-key" type="password" />
+          <p className="text-[9px] font-mono text-white/25 leading-snug">
+            Shared with Settings → Local API — editing it here changes it there too. To remember
+            it across reloads, enable "Remember on this device" in Settings.
+          </p>
         </div>
       </div>
 
@@ -127,7 +131,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
         <Label>Pair Display</Label>
         {!pairingRequest ? (
           <div className="flex flex-col gap-2">
-            <TextInput value={controllerName} onChange={setControllerName} placeholder="Controller name (e.g. Laptop Samuel)" maxLength={80} />
+            <TextInput value={controllerName} onChange={setControllerName} placeholder="Controller name (e.g. Laptop 1)" maxLength={80} />
             <TextInput value={pairCode} onChange={setPairCode} placeholder="6-digit code" maxLength={6} />
             <Button
               tone="primary"

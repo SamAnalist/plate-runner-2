@@ -123,6 +123,10 @@ export function DisplayModePanel({ listener }: { listener: DisplayCommandListene
             placeholder="dev-local-key"
             className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
           />
+          <p className="mt-1 text-[9px] font-mono text-white/25 leading-snug">
+            Shared with Settings → Local API — editing it here changes it there too. To remember
+            it across reloads, enable "Remember on this device" in Settings.
+          </p>
         </div>
         <div>
           <Label>Register This Display</Label>

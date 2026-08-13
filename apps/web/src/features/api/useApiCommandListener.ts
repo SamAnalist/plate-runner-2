@@ -3,6 +3,7 @@ import type { SetConfigPayload, SimulationCommand } from '@plate-runner/shared';
 import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 import type { PlateListsControls } from '../lists/usePlateLists';
+import type { ApiConnectionControls } from './useApiConnection';
 import { runLocalAction } from './commandExecutor';
 
 interface UseApiCommandListenerArgs {
@@ -11,25 +12,21 @@ interface UseApiCommandListenerArgs {
   plateLists: PlateListsControls;
   /** Applies a partial SimulationConfig change for 'set_config' commands. Omit to leave set_config unimplemented. */
   onSetConfig?: (partial: SetConfigPayload) => void;
+  /** Shared with Display Mode and Controller Mode — see useApiConnection. */
+  apiConnection: ApiConnectionControls;
 }
 
 export type ApiConnectionStatus = 'disconnected' | 'connected' | 'unauthorized' | 'error';
 
-export interface ApiCommandListenerControls {
+export interface ApiCommandListenerControls extends ApiConnectionControls {
   enabled: boolean;
   setEnabled: (v: boolean) => void;
-  apiBaseUrl: string;
-  setApiBaseUrl: (v: string) => void;
-  apiKey: string;
-  setApiKey: (v: string) => void;
   connectionStatus: ApiConnectionStatus;
   pendingCount: number;
   lastError: string | null;
   testConnection: () => void;
 }
 
-const DEFAULT_BASE_URL = 'http://localhost:8787';
-const DEFAULT_API_KEY = 'dev-local-key';
 const POLL_MS = 1500;
 
 function buildFetch(baseUrl: string, apiKey: string) {
@@ -53,10 +50,9 @@ function buildFetch(baseUrl: string, apiKey: string) {
  * (not inside ControlPanel) so polling keeps running in Camera Mode/Fullscreen
  * — only its UI panel is conditionally hidden there, same as every other panel.
  */
-export function useApiCommandListener({ simulation, plateQueue, plateLists, onSetConfig }: UseApiCommandListenerArgs): ApiCommandListenerControls {
+export function useApiCommandListener({ simulation, plateQueue, plateLists, onSetConfig, apiConnection }: UseApiCommandListenerArgs): ApiCommandListenerControls {
+  const { apiBaseUrl, apiKey } = apiConnection;
   const [enabled, setEnabled] = useState(false);
-  const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_BASE_URL);
-  const [apiKey, setApiKey] = useState(DEFAULT_API_KEY);
   const [connectionStatus, setConnectionStatus] = useState<ApiConnectionStatus>('disconnected');
   const [pendingCount, setPendingCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -166,12 +162,9 @@ export function useApiCommandListener({ simulation, plateQueue, plateLists, onSe
   }, []);
 
   return {
+    ...apiConnection,
     enabled,
     setEnabled,
-    apiBaseUrl,
-    setApiBaseUrl,
-    apiKey,
-    setApiKey,
     connectionStatus,
     pendingCount,
     lastError,

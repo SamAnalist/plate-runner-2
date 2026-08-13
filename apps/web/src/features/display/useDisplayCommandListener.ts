@@ -3,6 +3,7 @@ import type { DevicePairingSummary, DisplayDevice, PairingRequestSummary, SetCon
 import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 import type { PlateListsControls } from '../lists/usePlateLists';
+import type { ApiConnectionControls } from '../api/useApiConnection';
 import { runLocalAction } from '../api/commandExecutor';
 
 interface UseDisplayCommandListenerArgs {
@@ -10,6 +11,8 @@ interface UseDisplayCommandListenerArgs {
   plateQueue: PlateQueueControls;
   plateLists: PlateListsControls;
   onSetConfig?: (partial: SetConfigPayload) => void;
+  /** Shared with Local API and Controller Mode — see useApiConnection. */
+  apiConnection: ApiConnectionControls;
 }
 
 export type DisplayConnectionStatus = 'disconnected' | 'connected' | 'unauthorized' | 'error';
@@ -26,12 +29,7 @@ interface PairingCodeState {
   pairingSessionId: string;
 }
 
-export interface DisplayCommandListenerControls {
-  apiBaseUrl: string;
-  setApiBaseUrl: (v: string) => void;
-  apiKey: string;
-  setApiKey: (v: string) => void;
-
+export interface DisplayCommandListenerControls extends ApiConnectionControls {
   registration: DisplayRegistration | null;
   registerDisplay: (name: string) => void;
   forgetRegistration: () => void;
@@ -68,8 +66,6 @@ export interface DisplayCommandListenerControls {
   rejectRequest: (pairingRequestId: string) => void;
 }
 
-const DEFAULT_BASE_URL = 'http://localhost:8787';
-const DEFAULT_API_KEY = 'dev-local-key';
 const POLL_MS = 1500;
 const HEARTBEAT_MS = 20_000;
 const PAIRING_REQUESTS_POLL_MS = 2000;
@@ -118,9 +114,8 @@ function buildFetch(baseUrl: string, apiKey: string, displaySecret?: string) {
  * API key and this display's own secret. Registration is persisted to
  * localStorage so a reload doesn't require re-registering.
  */
-export function useDisplayCommandListener({ simulation, plateQueue, plateLists, onSetConfig }: UseDisplayCommandListenerArgs): DisplayCommandListenerControls {
-  const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_BASE_URL);
-  const [apiKey, setApiKey] = useState(DEFAULT_API_KEY);
+export function useDisplayCommandListener({ simulation, plateQueue, plateLists, onSetConfig, apiConnection }: UseDisplayCommandListenerArgs): DisplayCommandListenerControls {
+  const { apiBaseUrl, apiKey } = apiConnection;
   const [registration, setRegistration] = useState<DisplayRegistration | null>(() => loadRegistration());
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -431,8 +426,7 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
   }, [enabled, registration, authedFetch]);
 
   return {
-    apiBaseUrl, setApiBaseUrl,
-    apiKey, setApiKey,
+    ...apiConnection,
     registration, registerDisplay, forgetRegistration, registerError,
     enabled, setEnabled,
     connectionStatus, pendingCount, lastError, lastCommandAt, authErrorReason,

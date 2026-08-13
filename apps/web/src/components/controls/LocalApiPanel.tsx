@@ -14,7 +14,11 @@ const CONNECTION_TONE: Record<ApiConnectionStatus, BadgeTone> = {
 const URL_SCHEME_PATTERN = /^https?:\/\//i;
 
 export function LocalApiPanel({ listener }: { listener: ApiCommandListenerControls }) {
-  const { enabled, setEnabled, apiBaseUrl, setApiBaseUrl, apiKey, setApiKey, connectionStatus, pendingCount, lastError, testConnection } = listener;
+  const {
+    enabled, setEnabled, apiBaseUrl, setApiBaseUrl, apiKey, setApiKey,
+    rememberCredentials, setRememberCredentials,
+    connectionStatus, pendingCount, lastError, testConnection,
+  } = listener;
   const urlLooksValid = !apiBaseUrl || URL_SCHEME_PATTERN.test(apiBaseUrl);
 
   return (
@@ -54,11 +58,26 @@ export function LocalApiPanel({ listener }: { listener: ApiCommandListenerContro
               placeholder="dev-local-key"
               className="w-full px-2 py-1.5 rounded bg-white/5 border border-white/15 text-[11px] font-mono text-white/80 outline-none focus:border-blue-500/50"
             />
-            <p className="mt-1 text-[9px] font-mono text-white/25 leading-snug">
-              Only used in this browser session — not saved to local storage. Controller/Display
-              credentials are stored locally; clear them from Settings → Local Storage → Remote
-              Pairing Credentials.
-            </p>
+            <label className="mt-2 flex items-start gap-2 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={rememberCredentials}
+                onChange={e => setRememberCredentials(e.target.checked)}
+                className="mt-0.5 accent-blue-500"
+              />
+              <span className="text-[9px] font-mono text-white/40 group-hover:text-white/60 leading-snug transition-colors">
+                Remember on this device — saves the API Base URL and API Key in this browser's
+                local storage so they survive a reload. Off by default; the key is stored in
+                plaintext, so only enable this on a device you trust.
+              </span>
+            </label>
+            {!rememberCredentials && (
+              <p className="mt-1.5 text-[9px] font-mono text-white/25 leading-snug">
+                Only used in this browser session right now — not saved anywhere. Controller/Display
+                credentials are a separate thing and are always stored locally; clear them from
+                Settings → Local Storage → Remote Pairing Credentials.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button tone="primary" onClick={testConnection}>Test Connection</Button>
