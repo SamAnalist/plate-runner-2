@@ -4,7 +4,6 @@ import type { AppScreen } from '../../navigation/appScreens';
 import type { ScreenSaverSettings } from '../../features/screensaver/useScreenSaver';
 import { buildLocalBackup, parseLocalBackup, applyLocalBackup } from '../../features/backup/localBackup';
 import { downloadJSON } from '../../lib/downloadJSON';
-import { Label } from '../ui/Label';
 import { Button } from '../ui/Button';
 import { FieldError } from '../ui/FieldError';
 
@@ -59,7 +58,6 @@ export function BackupPanel({ plateLists, schedules, executionHistory, lastScree
 
   return (
     <div className="flex flex-col gap-2">
-      <Label>Local Backup</Label>
       <p className="text-[9px] font-mono text-white/25 leading-snug">
         Exports Plate Lists, Scheduler, Execution History, and non-secret app
         preferences (last screen, Screen Saver settings) as a single JSON

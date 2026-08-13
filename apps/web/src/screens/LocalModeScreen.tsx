@@ -21,6 +21,9 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Label } from '../components/ui/Label';
 import { FieldError } from '../components/ui/FieldError';
+import { CollapsibleSection } from '../components/ui/CollapsibleSection';
+import { ToggleGroup } from '../components/ui/ToggleGroup';
+import { DirectionArrow } from '../components/ui/DirectionArrow';
 
 export const QUEUE_ACTIVE_STATUSES = ['running', 'paused', 'waiting_for_signal', 'waiting_for_next'];
 
@@ -54,68 +57,6 @@ function Divider() {
   return <div className="border-t border-white/8 my-4" />;
 }
 
-interface ToggleGroupProps<T extends string> {
-  options: { value: T; label: string; title?: string }[];
-  value: T;
-  onChange: (v: T) => void;
-  /** Buttons split the full row width evenly, single line, no wrap — used for Speed presets. */
-  fullWidth?: boolean;
-}
-
-function ToggleGroup<T extends string>({ options, value, onChange, fullWidth = false }: ToggleGroupProps<T>) {
-  return (
-    <div className={fullWidth ? 'flex gap-1' : 'flex gap-1 flex-wrap'}>
-      {options.map(opt => (
-        <button
-          key={opt.value}
-          title={opt.title}
-          onClick={() => onChange(opt.value)}
-          className={`
-            px-2.5 py-1.5 rounded text-xs font-mono font-semibold
-            border transition-all
-            ${fullWidth ? 'flex-1' : ''}
-            ${value === opt.value
-              ? 'bg-blue-600/80 border-blue-500/70 text-white'
-              : 'bg-white/5 border-white/12 text-white/50 hover:text-white/80 hover:border-white/25'}
-          `}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function CollapsibleSection({
-  title,
-  children,
-  defaultOpen = false,
-  badge,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-  badge?: string;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between py-1 mb-2 group"
-      >
-        <p className="text-[10px] font-semibold text-white/35 uppercase tracking-[0.16em] group-hover:text-white/55 transition-colors flex items-center gap-1.5">
-          {title}
-          {badge && <Badge tone="info">{badge}</Badge>}
-        </p>
-        <span className="text-white/25 text-[10px] group-hover:text-white/45 transition-colors">
-          {open ? '▾' : '▸'}
-        </span>
-      </button>
-      {open && <div>{children}</div>}
-    </div>
-  );
-}
 
 // ─── Color swatch ─────────────────────────────────────────────────────────
 
@@ -613,13 +554,13 @@ export function LocalModeScreen({
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-4">
-            <CollapsibleSection title="License Plate" defaultOpen>
+            <CollapsibleSection title="License Plate" defaultOpen chevronClassName="text-lg">
               <PlateInput value={config.plate} onChange={p => set('plate', p)} disabled={queueActive} />
             </CollapsibleSection>
 
             <Divider />
 
-            <CollapsibleSection title="Playback" defaultOpen>
+            <CollapsibleSection title="Playback" defaultOpen chevronClassName="text-lg">
               <div>
                 <div className="mb-3 flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full transition-colors ${
@@ -667,7 +608,7 @@ export function LocalModeScreen({
 
             <Divider />
 
-            <CollapsibleSection title="Visual Settings" defaultOpen>
+            <CollapsibleSection title="Visual Settings" defaultOpen chevronClassName="text-lg">
               <div className="flex flex-col gap-4">
                 <SpeedPhasesSection config={config} set={set} onConfigChange={onConfigChange} />
 
@@ -686,17 +627,18 @@ export function LocalModeScreen({
                   </div>
                 </div>
 
-                <CollapsibleSection title="Direction & Placement" defaultOpen={false}>
+                <CollapsibleSection title="Direction & Placement" defaultOpen={false} chevronClassName="text-lg">
                   <div className="flex flex-col gap-4">
                     <div>
                       <SectionLabel>Direction</SectionLabel>
                       <ToggleGroup<Direction>
                         options={[
-                          { value: 'incoming', label: 'Incoming' },
-                          { value: 'away', label: 'Away' },
+                          { value: 'incoming', label: 'Incoming', icon: <DirectionArrow direction="down" /> },
+                          { value: 'away', label: 'Away', icon: <DirectionArrow direction="up" /> },
                         ]}
                         value={config.direction}
                         onChange={v => set('direction', v)}
+                        fullWidth
                       />
                     </div>
 
@@ -742,13 +684,14 @@ export function LocalModeScreen({
               title="Plate Queue"
               badge={queueActive ? plateQueue.queueStatus.toUpperCase() : undefined}
               defaultOpen={false}
+              chevronClassName="text-lg"
             >
               <PlateQueueSection config={config} plateQueue={plateQueue} plateLists={plateLists} />
             </CollapsibleSection>
 
             <Divider />
 
-            <CollapsibleSection title="Gate Settings" defaultOpen={false}>
+            <CollapsibleSection title="Gate Settings" defaultOpen={false} chevronClassName="text-lg">
               <GateSection config={config} onConfigChange={onConfigChange} simulation={simulation} />
             </CollapsibleSection>
 
@@ -760,6 +703,7 @@ export function LocalModeScreen({
                   title="Visual QA"
                   badge={(showAnchorOverlay || showMotionPathOverlay) ? 'ON' : undefined}
                   defaultOpen={false}
+                  chevronClassName="text-lg"
                 >
                   <div className="flex flex-col gap-3">
                     <div>
@@ -826,7 +770,7 @@ export function LocalModeScreen({
 
             <Divider />
 
-            <CollapsibleSection title="View Modes" defaultOpen>
+            <CollapsibleSection title="View Modes" defaultOpen chevronClassName="text-lg">
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
                   <Button

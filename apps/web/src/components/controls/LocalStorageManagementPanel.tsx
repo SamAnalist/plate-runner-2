@@ -1,4 +1,3 @@
-import { Label } from '../ui/Label';
 import { Button } from '../ui/Button';
 
 interface ResetAction {
@@ -17,6 +16,7 @@ interface LocalStorageManagementPanelProps {
   onResetRemoteCredentials: () => void;
   onResetAppPreferences: () => void;
   onResetScreenSaver: () => void;
+  onResetSimulatorDefaults: () => void;
 }
 
 export function LocalStorageManagementPanel({
@@ -26,6 +26,7 @@ export function LocalStorageManagementPanel({
   onResetRemoteCredentials,
   onResetAppPreferences,
   onResetScreenSaver,
+  onResetSimulatorDefaults,
 }: LocalStorageManagementPanelProps) {
   const actions: ResetAction[] = [
     {
@@ -71,6 +72,13 @@ export function LocalStorageManagementPanel({
       confirmMessage: 'Reset Screen Saver settings to defaults?',
       onReset: onResetScreenSaver,
     },
+    {
+      key: 'simulatorDefaults',
+      title: 'Simulator Defaults',
+      description: 'Restores the direction, placement, speed, color, and gate defaults a fresh run starts with.',
+      confirmMessage: 'Reset Simulator Defaults to factory values?',
+      onReset: onResetSimulatorDefaults,
+    },
   ];
 
   function handleReset(action: ResetAction) {
@@ -81,7 +89,7 @@ export function LocalStorageManagementPanel({
 
   function handleResetAll() {
     if (window.confirm(
-      'Reset ALL local browser data for Plate Runner?\n\nThis deletes Plate Lists, Scheduler, Execution History, remote pairing credentials, app preferences, and Screen Saver settings — everything stored in this browser. This cannot be undone.'
+      'Reset ALL local browser data for Plate Runner?\n\nThis deletes Plate Lists, Scheduler, Execution History, remote pairing credentials, app preferences, Screen Saver settings, and Simulator Defaults — everything stored in this browser. This cannot be undone.'
     )) {
       localStorage.clear();
       window.location.reload();
@@ -90,7 +98,6 @@ export function LocalStorageManagementPanel({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label>Local Storage</Label>
       <p className="text-[9px] font-mono text-white/25 leading-snug mb-1">
         Each action below only affects data stored in this browser — nothing on the backend is touched.
       </p>

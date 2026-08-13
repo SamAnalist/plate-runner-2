@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { ScreenSaverControls, ScreenSaverStyle } from '../../features/screensaver/useScreenSaver';
-import { Label } from '../ui/Label';
 import { Button } from '../ui/Button';
 
 const TIMEOUT_PRESETS = [5, 10, 15];
@@ -18,8 +17,7 @@ export function ScreenSaverSettingsPanel({ screenSaver }: { screenSaver: ScreenS
 
   return (
     <div className="flex flex-col gap-3">
-      <Label>Screen Saver</Label>
-      <p className="text-[9px] font-mono text-white/25 leading-snug -mt-1.5">
+      <p className="text-[9px] font-mono text-white/25 leading-snug">
         Shows a lightweight full-screen animation after a period of
         inactivity — useful when this screen is left open for a camera or
         as a Display for a long time. Any activity, including a remote

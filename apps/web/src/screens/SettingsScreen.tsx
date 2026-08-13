@@ -5,12 +5,15 @@ import type { PlateListsControls } from '../features/lists/usePlateLists';
 import type { LocalSchedulerControls } from '../features/scheduler/useLocalScheduler';
 import type { ExecutionHistoryControls } from '../features/history/useExecutionHistory';
 import type { ScreenSaverControls } from '../features/screensaver/useScreenSaver';
+import type { SimulatorDefaultsControls } from '../features/simulatorDefaults/useSimulatorDefaults';
 import type { AppScreen } from '../navigation/appScreens';
 import { LocalApiPanel } from '../components/controls/LocalApiPanel';
 import { SystemStatusPanel } from '../components/controls/SystemStatusPanel';
 import { ScreenSaverSettingsPanel } from '../components/controls/ScreenSaverSettingsPanel';
+import { SimulatorDefaultsPanel } from '../components/controls/SimulatorDefaultsPanel';
 import { BackupPanel } from '../components/controls/BackupPanel';
 import { LocalStorageManagementPanel } from '../components/controls/LocalStorageManagementPanel';
+import { SettingsCard } from '../components/ui/SettingsCard';
 
 interface SettingsScreenProps {
   apiCommandListener: ApiCommandListenerControls;
@@ -19,19 +22,10 @@ interface SettingsScreenProps {
   plateLists: PlateListsControls;
   scheduler: LocalSchedulerControls;
   executionHistory: ExecutionHistoryControls;
-  queueStatus: string;
-  vehicleColor: string;
   screen: AppScreen;
   onNavigateHome: () => void;
   screenSaver: ScreenSaverControls;
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="text-xs font-mono font-bold text-white/60 uppercase tracking-widest mb-3">
-      {children}
-    </h2>
-  );
+  simulatorDefaults: SimulatorDefaultsControls;
 }
 
 export function SettingsScreen({
@@ -41,11 +35,10 @@ export function SettingsScreen({
   plateLists,
   scheduler,
   executionHistory,
-  queueStatus,
-  vehicleColor,
   screen,
   onNavigateHome,
   screenSaver,
+  simulatorDefaults,
 }: SettingsScreenProps) {
   function resetRemoteCredentials() {
     remoteController.pairedDisplays.forEach(p => remoteController.forgetPairing(p.displayId));
@@ -54,60 +47,65 @@ export function SettingsScreen({
 
   return (
     <div className="px-6 py-6 max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-sm font-mono font-bold text-white/70 uppercase tracking-widest">
-          Settings / API
+      <div className="mb-6 relative">
+        <div className="absolute -top-4 -left-2 w-40 h-24 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+        <h1 className="relative text-sm font-mono font-bold text-white/90 uppercase tracking-widest">
+          Settings <span className="text-blue-400">/</span> API
         </h1>
-        <p className="text-xs text-white/35 font-mono mt-1">
-          API connection, System Status, Screen Saver, backups, and local storage.
+        <p className="relative text-xs text-white/35 font-mono mt-1">
+          Simulator defaults, API connection, System Status, Screen Saver, backups, and local storage.
         </p>
       </div>
 
-      <div className="mb-8">
-        <SectionHeading>Local API</SectionHeading>
-        <LocalApiPanel listener={apiCommandListener} />
-      </div>
+      <div className="flex flex-col gap-4">
+        <SettingsCard title="Simulator Defaults" accent="blue"
+          description="What a fresh run starts with — direction, placement, speed, color, and gate behavior.">
+          <SimulatorDefaultsPanel controls={simulatorDefaults} />
+        </SettingsCard>
 
-      <div className="mb-8">
-        <SectionHeading>System Status</SectionHeading>
-        <SystemStatusPanel
-          apiCommandListener={apiCommandListener}
-          displayRegistered={!!displayCommandListener.registration}
-          controllerPairingsCount={remoteController.pairedDisplays.length}
-          plateListsCount={plateLists.lists.length}
-          schedulesCount={scheduler.schedules.length}
-          executionHistoryCount={executionHistory.records.length}
-          queueStatus={queueStatus}
-          vehicleColor={vehicleColor}
-          lastScreen={screen}
-          screenSaverEnabled={screenSaver.settings.enabled}
-          screenSaverTimeoutMinutes={screenSaver.settings.timeoutMinutes}
-        />
-      </div>
+        <SettingsCard title="Local API" accent="cyan"
+          description="Point this browser at a backend (local or remote) to send/receive simulation commands.">
+          <LocalApiPanel listener={apiCommandListener} />
+        </SettingsCard>
 
-      <div className="mb-8">
-        <ScreenSaverSettingsPanel screenSaver={screenSaver} />
-      </div>
+        <SettingsCard title="System Status" accent="slate">
+          <SystemStatusPanel
+            apiCommandListener={apiCommandListener}
+            displayRegistered={!!displayCommandListener.registration}
+            controllerPairingsCount={remoteController.pairedDisplays.length}
+            plateListsCount={plateLists.lists.length}
+            schedulesCount={scheduler.schedules.length}
+            executionHistoryCount={executionHistory.records.length}
+            screenSaverEnabled={screenSaver.settings.enabled}
+            screenSaverTimeoutMinutes={screenSaver.settings.timeoutMinutes}
+          />
+        </SettingsCard>
 
-      <div className="mb-8">
-        <BackupPanel
-          plateLists={plateLists.lists}
-          schedules={scheduler.schedules}
-          executionHistory={executionHistory.records}
-          lastScreen={screen}
-          screenSaver={screenSaver.settings}
-        />
-      </div>
+        <SettingsCard title="Screen Saver" accent="violet">
+          <ScreenSaverSettingsPanel screenSaver={screenSaver} />
+        </SettingsCard>
 
-      <div className="mb-6">
-        <LocalStorageManagementPanel
-          onResetPlateLists={plateLists.resetStorage}
-          onResetScheduler={scheduler.resetStorage}
-          onResetExecutionHistory={executionHistory.clearHistory}
-          onResetRemoteCredentials={resetRemoteCredentials}
-          onResetAppPreferences={onNavigateHome}
-          onResetScreenSaver={screenSaver.resetSettings}
-        />
+        <SettingsCard title="Local Backup" accent="emerald">
+          <BackupPanel
+            plateLists={plateLists.lists}
+            schedules={scheduler.schedules}
+            executionHistory={executionHistory.records}
+            lastScreen={screen}
+            screenSaver={screenSaver.settings}
+          />
+        </SettingsCard>
+
+        <SettingsCard title="Local Storage" accent="red">
+          <LocalStorageManagementPanel
+            onResetPlateLists={plateLists.resetStorage}
+            onResetScheduler={scheduler.resetStorage}
+            onResetExecutionHistory={executionHistory.clearHistory}
+            onResetRemoteCredentials={resetRemoteCredentials}
+            onResetAppPreferences={onNavigateHome}
+            onResetScreenSaver={screenSaver.resetSettings}
+            onResetSimulatorDefaults={simulatorDefaults.resetSettings}
+          />
+        </SettingsCard>
       </div>
 
       <div className="mt-6 pt-4 border-t border-white/8">
