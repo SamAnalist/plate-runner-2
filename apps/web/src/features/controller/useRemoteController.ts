@@ -8,6 +8,7 @@ import type {
   SetConfigPayload,
 } from '@plate-runner/shared';
 import type { ApiConnectionControls } from '../api/useApiConnection';
+import { normalizeApiBaseUrl } from '../api/useApiConnection';
 
 export interface PairedDisplay {
   displayId: string;
@@ -102,7 +103,8 @@ function savePairings(pairings: PairedDisplay[]): void {
  * (useDisplayCommandListener) does the actual work.
  */
 export function useRemoteController(apiConnection: ApiConnectionControls): RemoteControllerControls {
-  const { apiBaseUrl, apiKey } = apiConnection;
+  const { apiBaseUrl: apiBaseUrlRaw, apiKey } = apiConnection;
+  const apiBaseUrl = normalizeApiBaseUrl(apiBaseUrlRaw);
   const [pairedDisplays, setPairedDisplays] = useState<PairedDisplay[]>(() => loadPairings());
   const [pairingRequest, setPairingRequest] = useState<PairingRequestState | null>(null);
 

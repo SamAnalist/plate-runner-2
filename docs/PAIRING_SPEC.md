@@ -179,6 +179,18 @@ must exist, be non-revoked, and its `displayId` must match the `:displayId`
 in the request URL (`403` otherwise) — a token from one pairing is useless
 against any other display.
 
+**This stacks on top of, not instead of, the API key.** Every `/api/*`
+route — `/api/remote/*` included — requires `x-api-key` (or `Authorization:
+Bearer <apiKey>`) via the `onRequest` hook registered on the whole `/api`
+scope in `index.ts`, *before* `controllerAuth`'s `preHandler` even runs.
+Both checks return the exact same `401 { ok: false, error: 'unauthorized'
+}` body, so a request missing/wrong on either one looks identical from the
+outside — if you get `unauthorized` on a `/api/remote/...` call, verify
+both headers are set, not just the controller token. See
+[BACKEND_API_SPEC.md](BACKEND_API_SPEC.md)'s auth model summary and
+[CONTROLLER_CLI_TOOLS.md](CONTROLLER_CLI_TOOLS.md) for a case where this
+exact ambiguity caused a script to send only the controller token.
+
 ## Why SHA-256, not bcrypt/scrypt
 
 `displaySecret` and `controllerToken` are already uniformly-random 256-bit

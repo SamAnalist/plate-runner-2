@@ -42,8 +42,12 @@ command.
 ## Remote routes
 
 All under `/api/remote/displays/:displayId/*`, controller-token-
-authenticated (`controllerAuth` — see PAIRING_SPEC.md), rate-limited to
-30/min (stricter than the general 100/min):
+authenticated (`controllerAuth` — see PAIRING_SPEC.md) **and** API-key-
+authenticated like every other `/api/*` route (the API key check runs
+first, as an `onRequest` hook on the whole `/api` scope) — both headers
+are required on every call, see the curl example below and PAIRING_SPEC.md's
+"Controller auth on every remote request" section. Rate-limited to 30/min
+(stricter than the general 100/min):
 
 | Route | Command type | Notes |
 |---|---|---|

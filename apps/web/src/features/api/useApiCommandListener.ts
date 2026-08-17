@@ -4,7 +4,8 @@ import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 import type { PlateListsControls } from '../lists/usePlateLists';
 import type { ApiConnectionControls } from './useApiConnection';
-import { runLocalAction } from './commandExecutor';
+import { normalizeApiBaseUrl } from './useApiConnection';
+import { runLocalAction, isRunCommandBusy } from './commandExecutor';
 
 interface UseApiCommandListenerArgs {
   simulation: SimulationControls;
@@ -51,7 +52,8 @@ function buildFetch(baseUrl: string, apiKey: string) {
  * — only its UI panel is conditionally hidden there, same as every other panel.
  */
 export function useApiCommandListener({ simulation, plateQueue, plateLists, onSetConfig, apiConnection }: UseApiCommandListenerArgs): ApiCommandListenerControls {
-  const { apiBaseUrl, apiKey } = apiConnection;
+  const { apiBaseUrl: apiBaseUrlRaw, apiKey } = apiConnection;
+  const apiBaseUrl = normalizeApiBaseUrl(apiBaseUrlRaw);
   const [enabled, setEnabled] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ApiConnectionStatus>('disconnected');
   const [pendingCount, setPendingCount] = useState(0);
@@ -121,7 +123,11 @@ export function useApiCommandListener({ simulation, plateQueue, plateLists, onSe
       setConnectionStatus('connected');
       setLastError(null);
       setPendingCount(data.commands.length);
-      if (data.commands.length > 0) {
+      // A run_plate/run_queue/run_list command arriving while a previous run is
+      // still in progress is left pending (not claimed) — it retries on the next
+      // tick once the current run finishes, so back-to-back commands play in
+      // sequence instead of the 2nd+ one being claimed-then-failed and vanishing.
+      if (data.commands.length > 0 && !isRunCommandBusy(data.commands[0], plateQueueRef.current)) {
         await executeCommand(data.commands[0]);
       }
     } catch (err) {

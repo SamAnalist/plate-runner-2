@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ApiCommandListenerControls } from '../../features/api/useApiCommandListener';
+import { normalizeApiBaseUrl } from '../../features/api/useApiConnection';
 import { Label } from '../ui/Label';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -50,7 +51,7 @@ export function SystemStatusPanel({
     setChecking(true);
     setBackendError(null);
     try {
-      const res = await fetch(`${apiCommandListener.apiBaseUrl}/api/status`, {
+      const res = await fetch(`${normalizeApiBaseUrl(apiCommandListener.apiBaseUrl)}/api/status`, {
         headers: { 'x-api-key': apiCommandListener.apiKey },
       });
       if (!res.ok) {

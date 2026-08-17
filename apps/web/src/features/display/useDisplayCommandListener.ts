@@ -4,7 +4,8 @@ import type { SimulationControls } from '../../hooks/useSimulation';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 import type { PlateListsControls } from '../lists/usePlateLists';
 import type { ApiConnectionControls } from '../api/useApiConnection';
-import { runLocalAction } from '../api/commandExecutor';
+import { normalizeApiBaseUrl } from '../api/useApiConnection';
+import { runLocalAction, isRunCommandBusy } from '../api/commandExecutor';
 
 interface UseDisplayCommandListenerArgs {
   simulation: SimulationControls;
@@ -115,7 +116,8 @@ function buildFetch(baseUrl: string, apiKey: string, displaySecret?: string) {
  * localStorage so a reload doesn't require re-registering.
  */
 export function useDisplayCommandListener({ simulation, plateQueue, plateLists, onSetConfig, apiConnection }: UseDisplayCommandListenerArgs): DisplayCommandListenerControls {
-  const { apiBaseUrl, apiKey } = apiConnection;
+  const { apiBaseUrl: apiBaseUrlRaw, apiKey } = apiConnection;
+  const apiBaseUrl = normalizeApiBaseUrl(apiBaseUrlRaw);
   const [registration, setRegistration] = useState<DisplayRegistration | null>(() => loadRegistration());
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -398,7 +400,11 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
       setLastError(null);
       setAuthErrorReason(null);
       setPendingCount(data.commands.length);
-      if (data.commands.length > 0) {
+      // A run_plate/run_queue/run_list command arriving while a previous run is
+      // still in progress is left pending (not claimed) — it retries on the next
+      // tick once the current run finishes, so back-to-back commands play in
+      // sequence instead of the 2nd+ one being claimed-then-failed and vanishing.
+      if (data.commands.length > 0 && !isRunCommandBusy(data.commands[0], plateQueueRef.current)) {
         await executeCommand(data.commands[0]);
       }
     } catch (err) {

@@ -24,13 +24,22 @@ interface StoredConnection {
   apiKey: string;
 }
 
+/**
+ * A trailing slash (e.g. "https://host.example.com/") makes every request
+ * path concatenation double up as "…//api/…", which most backends 404 on.
+ * Strip it wherever the URL is set or loaded, same as the CLI scripts do.
+ */
+export function normalizeApiBaseUrl(url: string): string {
+  return url.replace(/\/+$/, '');
+}
+
 function loadStoredConnection(): StoredConnection | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const obj = JSON.parse(raw) as Record<string, unknown>;
     return {
-      apiBaseUrl: typeof obj.apiBaseUrl === 'string' ? obj.apiBaseUrl : DEFAULT_API_BASE_URL,
+      apiBaseUrl: normalizeApiBaseUrl(typeof obj.apiBaseUrl === 'string' ? obj.apiBaseUrl : DEFAULT_API_BASE_URL),
       apiKey: typeof obj.apiKey === 'string' ? obj.apiKey : DEFAULT_API_KEY,
     };
   } catch {
@@ -70,9 +79,12 @@ export function useApiConnection(): ApiConnectionControls {
 
   // Keeps whatever is currently in the form in sync with storage while
   // "remember" is on — covers both live edits and the moment it's switched on.
+  // Normalized on the way into storage, not on every keystroke of the input
+  // itself — stripping trailing "/" live would make it impossible to type
+  // "https://" (the trailing slash would vanish after every keystroke).
   useEffect(() => {
     if (!rememberCredentials) return;
-    saveStoredConnection({ apiBaseUrl, apiKey });
+    saveStoredConnection({ apiBaseUrl: normalizeApiBaseUrl(apiBaseUrl), apiKey });
   }, [rememberCredentials, apiBaseUrl, apiKey]);
 
   const setRememberCredentials = useCallback((v: boolean) => {
