@@ -31,12 +31,22 @@ import { useRemoteController } from './features/controller/useRemoteController';
 import { useScreenSaver } from './features/screensaver/useScreenSaver';
 import { ScreenSaverOverlay } from './components/screensaver/ScreenSaverOverlay';
 import { useSimulatorDefaults, applySimulatorDefaults } from './features/simulatorDefaults/useSimulatorDefaults';
+import { generateRandomPlates } from './features/lists/randomPlateGenerator';
 
 type AppMode = 'normal' | 'fullscreen' | 'camera';
 
+/** Generated once per page load (lazy useState initializer) so Local Mode doesn't always start on the same 'ABC123' — never regenerated on a run/reset. */
+function randomInitialPlate(): string {
+  const [plate] = generateRandomPlates({ count: 1, length: 6, letterCount: 3 });
+  return plate ?? DEFAULT_CONFIG.plate;
+}
+
 export default function App() {
   const simulatorDefaults = useSimulatorDefaults();
-  const [config, setConfig]           = useState<SimulationConfig>(() => applySimulatorDefaults(DEFAULT_CONFIG, simulatorDefaults.settings));
+  const [config, setConfig]           = useState<SimulationConfig>(() => ({
+    ...applySimulatorDefaults(DEFAULT_CONFIG, simulatorDefaults.settings),
+    plate: randomInitialPlate(),
+  }));
   const [appMode, setAppMode]         = useState<AppMode>('normal');
   const { screen, setScreen }         = usePersistentAppScreen();
   const [showDebug, setShowDebug]     = useState(false);

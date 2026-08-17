@@ -3699,3 +3699,315 @@ own separate (and separately-defaulted) copies.
 ### Next Steps
 
 - Manual QA per above.
+
+---
+
+## Phase — Controller CLI Tools (macOS)
+
+**Date:** 2026-08-17
+
+### Goal
+
+Port the existing Windows-only Controller pairing wizard (`pair-controller.bat`
++ `pair-controller.ps1`) to macOS/Linux, and add a script to send a random
+plate to a paired Display from a terminal — including a `wait_for_signal`
+gate flow that pauses for a human before sending `open-gate`. Also confirm
+and document the `controllerToken` expiry behavior for CI-pipeline use.
+
+### Implemented
+
+- `pair-controller.sh` — bash port of the Windows pairing wizard: submits
+  a Display-generated pairing code (`POST /api/controllers/pair`), polls
+  `GET /api/controllers/pairing-requests/:id` every 2s until approved, then
+  finalizes (`POST /api/controllers/pairing-requests/:id/finalize`) and
+  saves the result to `pairing-result.json`. Same flags/behavior as the
+  `.ps1` version, adapted to `curl`/`jq`.
+- `send-random-plate.sh` — generates a random valid plate (uppercase
+  `A-Z0-9`, 1–12 chars, mirrors `packages/shared/src/validators/plate.ts`),
+  sends it via `POST /api/remote/displays/:displayId/simulate` with a
+  chosen `direction`/`detectorPlacement`/`vehicleColor`. Prompts whether
+  the gate should `wait_for_signal`; if yes, blocks on `read` until the
+  user confirms the vehicle is visibly stopped at the gate, then sends
+  `POST /api/remote/displays/:displayId/open-gate`. Reads
+  `apiBaseUrl`/`controllerToken`/`displayId` from `pairing-result.json` by
+  default, or accepts them as flags for non-interactive/CI use.
+- `docs/CONTROLLER_CLI_TOOLS.md` — full reference for both scripts,
+  including the confirmed `controllerToken` expiry behavior and why
+  `wait_for_signal` requires a human ack instead of polling.
+
+### Files Changed
+
+- `pair-controller.sh` — new, macOS/Linux pairing wizard.
+- `send-random-plate.sh` — new, sends a random plate with optional
+  wait-for-signal gate flow.
+- `docs/CONTROLLER_CLI_TOOLS.md` — new, documents both scripts.
+- `docs/PROGRESS.md` — this entry.
+
+### Decisions
+
+- `controllerToken` does not expire by default (verified in
+  `apps/server/src/services/pairingService.ts` and
+  `apps/server/src/security/controllerAuth.ts` — `expiresAt` is only set
+  when the backend operator sets `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS`,
+  which is unset in the current Railway deployment). It is
+  revocation-based, like an API key — safe to store as a long-lived CI
+  secret, but must be revoked from the Display if compromised.
+- No API endpoint exists to report live simulation phase (the backend is a
+  fire-and-forget command queue; phase tracking is Display-local frontend
+  state only). `send-random-plate.sh` therefore cannot auto-detect "vehicle
+  stopped at gate" — it requires a human to watch the screen and press
+  Enter before sending `open-gate`. This matches CLAUDE.md's current
+  design note that the wait_for_signal trigger "can be a local UI button"
+  for now.
+- Speed preset defaults to `"slow"` in the script to favor camera
+  readability, matching the API's own default when `speedPreset` is
+  omitted.
+
+### Manual Testing
+
+- `./pair-controller.sh` run end-to-end against the production Railway
+  backend by the user; pairing completed and `pairing-result.json` was
+  written with a valid `controllerToken`.
+- `send-random-plate.sh` not yet exercised end-to-end by the user —
+  pending manual run.
+
+### Known Limitations
+
+- `send-random-plate.sh` is bash-only (macOS/Linux); no Windows
+  equivalent exists yet.
+- `wait_for_signal` flow requires an interactive terminal (or a human at
+  the Display) — not suitable for fully unattended CI unless run with
+  `-w no` (auto_open).
+- Single-display only; no fan-out to multiple paired displays.
+
+### Next Steps
+
+- User to manually run `send-random-plate.sh` against the paired Display
+  to confirm both the `auto_open` and `wait_for_signal` flows visually.
+- Consider a Windows equivalent of `send-random-plate.sh` if the CI
+  pipeline needs to run from Windows runners too.
+
+---
+
+## Phase — Controller CLI Bugfix + Local Mode Playback Improvements
+
+**Date:** 2026-08-17
+
+### Goal
+
+Fix a real `401 unauthorized` the user hit running `send-random-plate.sh`
+against production, correct a wrong claim in the prior phase's docs about
+`controllerToken` expiry, normalize a trailing-slash API Base URL bug
+across both the app and the CLI scripts, then add three small UX
+improvements: random vehicle color on `send-random-plate.sh`, a randomized
+initial plate on Local Mode page load, and a loop/infinite playback toggle.
+
+### Implemented
+
+- **Root-caused and fixed the `401 unauthorized` bug**: `/api/remote/displays/:id/*`
+  requires **both** `x-api-key` (every `/api/*` route does, via the
+  `onRequest` hook on the whole `/api` scope in `apps/server/src/index.ts`)
+  **and** `x-controller-token` (`controllerAuth`'s `preHandler`) — both
+  checks return the identical `{ ok: false, error: 'unauthorized' }` body,
+  which is what made this hard to diagnose from the response alone.
+  `send-random-plate.sh` only sent the controller token. Verified via
+  Railway MCP (production logs, deployment history, service config — single
+  instance, persistent volume mounted, no restart around the failing
+  requests, ruling out a storage/replica-split explanation first) and
+  reproduced/fixed with direct `curl`.
+- `pair-controller.sh` now also saves `apiKey` into `pairing-result.json`;
+  `send-random-plate.sh` reads it from there (or a new `-k` flag / prompt)
+  and sends it as `x-api-key` on every request alongside
+  `x-controller-token`.
+- **Corrected a wrong claim from the prior phase**: docs said
+  `controllerToken` "never expires by default." That's only true when
+  `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` is unset — the production Railway
+  deployment (`plate-runner-2` / `plate-runner-server`) actually has it set
+  to `30`, so tokens paired against production expire after 30 days.
+  Corrected in `docs/CONTROLLER_CLI_TOOLS.md`.
+- **Documented the API-key/controller-token stacking gap** that caused the
+  bug in the first place: `docs/PAIRING_SPEC.md`'s "Controller auth on
+  every remote request" section and `docs/REMOTE_COMMANDS_SPEC.md`'s route
+  summary both described only the controller-token check, without noting
+  the API key is required too. Both now call this out explicitly.
+- **Trailing-slash API Base URL fix**, both in the CLI scripts (already
+  present via `${API_BASE_URL%/}`) and now in the web app:
+  `normalizeApiBaseUrl()` (`apps/web/src/features/api/useApiConnection.ts`)
+  strips trailing `/` — applied when persisting to `localStorage`, and at
+  every fetch-building call site (`useApiCommandListener.ts`,
+  `useDisplayCommandListener.ts`, `useRemoteController.ts`,
+  `SystemStatusPanel.tsx`). Deliberately **not** applied to the live input
+  value itself (only on save/use) — normalizing on every keystroke would
+  strip the trailing `/` out of `https://` while the user is still typing
+  it, making the field impossible to fill in.
+- `send-random-plate.sh` now picks a random vehicle color
+  (`blue`/`red`/`gray`) when `-c` isn't given, instead of always `blue`.
+- **Local Mode's initial plate is now randomized on page load**: `App.tsx`'s
+  `useState<SimulationConfig>` lazy initializer generates one random plate
+  via `generateRandomPlates` (reused from the existing random-plate-list
+  generator) instead of always starting on `DEFAULT_CONFIG.plate`
+  (`'ABC123'`). Generated once per page load, not regenerated per run/reset
+  — `DEFAULT_CONFIG.plate` itself is untouched, so Controller Mode and
+  Plate List templates are unaffected.
+- **Loop/infinite playback toggle**: a new `↻ Loop` button next to Reset in
+  Local Mode's Playback section (`LocalModeScreen.tsx`), off by default.
+  When on, a completed single-plate run (`phase === 'done'`) immediately
+  calls `start()` again instead of stopping — the vehicle repeats
+  indefinitely until the user turns the toggle off or presses Stop. Only
+  active outside Queue Mode; deliberately separate from
+  `PlateQueueConfig.loop` (which loops through a *list* of plates in Queue
+  Mode, unrelated single-plate playback state).
+- **Playback buttons reworked into a 2×2 icon+label grid**
+  (`Start`/`Stop` ▶/⏹, `Pause`/`Resume` ⏸/⏵, `Reset` ↺, `Loop` ↻) — replaces
+  the previous single-row flex layout that looked cramped/uneven with 4
+  buttons of different widths.
+
+### Files Changed
+
+- `pair-controller.sh` — saves `apiKey` to `pairing-result.json`.
+- `send-random-plate.sh` — sends `x-api-key`; reads/prompts for it; random
+  vehicle color by default.
+- `docs/CONTROLLER_CLI_TOOLS.md` — corrected TTL claim, documented the
+  dual-header requirement, updated flag tables/examples.
+- `docs/PAIRING_SPEC.md`, `docs/REMOTE_COMMANDS_SPEC.md` — documented that
+  `/api/remote/*` requires both the API key and the controller token.
+- `apps/web/src/features/api/useApiConnection.ts` — added and exported
+  `normalizeApiBaseUrl()`.
+- `apps/web/src/features/api/useApiCommandListener.ts`,
+  `apps/web/src/features/display/useDisplayCommandListener.ts`,
+  `apps/web/src/features/controller/useRemoteController.ts`,
+  `apps/web/src/components/controls/SystemStatusPanel.tsx` — apply
+  `normalizeApiBaseUrl()` at the point requests are built.
+- `apps/web/src/App.tsx` — random initial plate on page load.
+- `apps/web/src/screens/LocalModeScreen.tsx` — loop playback toggle +
+  state + effect; playback buttons reworked into a 2×2 grid with icons.
+
+### Decisions
+
+- Fixed the trailing-slash bug at the point of use (fetch-building call
+  sites) rather than by wrapping the shared `setApiBaseUrl` setter —
+  wrapping the setter would normalize on every keystroke, which breaks
+  typing `https://` into the field (the trailing slash would vanish after
+  the second `/`, making it impossible to complete the scheme).
+- Random initial plate reuses `generateRandomPlates` (already used by the
+  Plate Lists random generator) instead of a bespoke generator, keeping
+  plate-format rules in one place.
+- Loop playback is Local Mode-only state, not threaded into
+  `useSimulation.ts`'s core state machine — keeps the state machine
+  reusable/unchanged and scopes the new behavior to exactly where it was
+  requested.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` and `pnpm build` — clean.
+- `bash -n` on both CLI scripts — clean.
+- Reproduced the original `401` with `curl` (controller-token-only),
+  confirmed the fix (`x-api-key` + `x-controller-token` together succeeds)
+  directly against the production Railway backend.
+- Manual QA pending: reload Local Mode and confirm the plate field shows a
+  different value each time; run a single plate with loop ON and confirm
+  it repeats until Stop or toggling loop off; run `send-random-plate.sh`
+  end-to-end against the paired Display.
+
+### Known Limitations
+
+- Same limitations as the prior phase (no live simulation-phase API,
+  macOS/Linux-only CLI, single-display).
+- Loop playback restarts immediately on completion with no configurable
+  gap (unlike Queue Mode's `gapBetweenVehiclesMs`) — if a gap between
+  loops is wanted later, it would need its own setting.
+- `pairing-result.json` files saved before this phase won't have an
+  `apiKey` field — `send-random-plate.sh` falls back to prompting for it
+  once, but re-running `pair-controller.sh` will refresh the whole file
+  including `apiKey`.
+
+### Next Steps
+
+- Manual QA per above.
+- Consider adding a configurable gap for loop playback if the immediate
+  back-to-back restart isn't the desired look for demos.
+
+---
+
+## Phase — Fix silently-dropped back-to-back run commands
+
+**Date:** 2026-08-17
+
+### Goal
+
+Fix a reported bug: sending 2+ `run_plate` commands back-to-back (e.g. two
+`send-random-plate.sh` calls in a row) only ever played the first — the
+pending counter briefly showed the correct count, then dropped to 0
+without the 2nd+ plate ever running. Also bumped `send-random-plate.sh`'s
+random plate length to 6-8 chars (was a fixed 7) and had the user add
+`apiKey` directly into their local `pairing-result.json` (gitignored) so
+the CLI stops prompting for it.
+
+### Implemented
+
+- **Root cause**: `runLocalAction` (`apps/web/src/features/api/commandExecutor.ts`)
+  guards `run_plate`/`run_queue`/`run_list` commands with a "busy" check —
+  if a run is already in progress (`plateQueue.queueStatus` in
+  running/paused/waiting_for_signal/waiting_for_next), it returned `{
+  status: 'failed', error: 'local_queue_busy' }`. Both command listeners
+  (`useDisplayCommandListener.ts`, `useApiCommandListener.ts`) then called
+  `claim()` **before** running this check, so the 2nd command was claimed,
+  immediately failed, and reported to the server — permanently removing it
+  from `pending` (a `failed` command is terminal, never retried) without
+  ever actually running. The failure reason was never surfaced in the UI,
+  so it looked like the command just vanished.
+- **Fix**: added `isRunCommandBusy(command, plateQueue)` to
+  `commandExecutor.ts`, checked by both listeners **before** calling
+  `claim()`. If busy, the command is left `pending` entirely (not
+  claimed/failed) and retried on the next 1.5s poll tick — once the
+  current run finishes, the next poll claims and executes it. Back-to-back
+  `run_plate` commands now play in sequence instead of the 2nd+ one
+  silently failing.
+- `send-random-plate.sh`: random plate length now picks 6-8 chars by
+  default (was a fixed 7), still overridable with `-l`.
+- User's local `pairing-result.json` (gitignored, confirmed via
+  `git check-ignore`) now has `apiKey` populated directly so
+  `send-random-plate.sh` stops prompting for it — matches what a fresh
+  `pair-controller.sh` run now saves automatically (from the prior phase).
+
+### Files Changed
+
+- `apps/web/src/features/api/commandExecutor.ts` — added
+  `isRunCommandBusy()`.
+- `apps/web/src/features/display/useDisplayCommandListener.ts`,
+  `apps/web/src/features/api/useApiCommandListener.ts` — check
+  `isRunCommandBusy()` before claiming, skip (leave pending) if busy.
+- `send-random-plate.sh` — random plate length 6-8 by default.
+- `pairing-result.json` (gitignored, not committed) — added `apiKey`.
+
+### Decisions
+
+- Deferring (leaving pending, uncommitted) rather than queuing client-side
+  — the backend's `pending` list already acts as the queue once commands
+  stop being wrongly claimed-and-failed; no new client-side buffer needed.
+- Did not change the "busy" definition itself (`QUEUE_ACTIVE_STATUSES`) —
+  only when that check runs (pre-claim vs post-claim).
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` and `pnpm build` — clean.
+- Manual QA pending: send 2-3 `send-random-plate.sh` calls back-to-back
+  against a paired Display and confirm all of them play in sequence, not
+  just the first.
+
+### Known Limitations
+
+- A command left pending because the display is busy will keep showing up
+  in `pendingCount` until the current run finishes — expected, but worth
+  knowing it's not an error state.
+- Command failure reasons (e.g. genuine `set_config`/`not_implemented`
+  failures) are still not surfaced anywhere in the Display/Local Mode UI —
+  out of scope for this fix, but a real gap if a *different* kind of
+  command starts failing silently again.
+
+### Next Steps
+
+- Manual QA per above.
+- Consider surfacing per-command failure reasons in the UI (e.g. a toast
+  or the SystemStatusPanel) so a genuine failure isn't as invisible as
+  `local_queue_busy` was.

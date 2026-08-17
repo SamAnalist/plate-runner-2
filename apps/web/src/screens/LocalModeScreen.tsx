@@ -507,6 +507,17 @@ export function LocalModeScreen({
   const { state, start, stop, reset, pause, resume } = simulation;
   const queueActive = QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
 
+  // Off by default — when on, a completed single-plate run (phase 'done')
+  // immediately restarts instead of stopping, until the user turns it off
+  // or presses Stop. Separate from PlateQueueConfig.loop (that loops
+  // through a *list* of plates in Queue Mode); this loops the current
+  // single plate indefinitely and only applies outside Queue Mode.
+  const [loopPlayback, setLoopPlayback] = useState(false);
+  useEffect(() => {
+    if (!loopPlayback || queueActive || state.phase !== 'done') return;
+    start();
+  }, [loopPlayback, queueActive, state.phase, start]);
+
   function set<K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) {
     onConfigChange({ ...config, [key]: value });
   }
@@ -580,14 +591,14 @@ export function LocalModeScreen({
                     <Badge tone="info">Controlled by Plate Queue</Badge>
                   </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 grid-rows-2 gap-2">
                     {!isRunning && !isGateOpening ? (
-                      <Button variant="solid" tone="primary" className="flex-1" onClick={start}>
-                        {state.phase === 'done' || isAtGate ? 'Restart' : 'Start'}
+                      <Button variant="solid" tone="primary" onClick={start}>
+                        ▶ {state.phase === 'done' || isAtGate ? 'Restart' : 'Start'}
                       </Button>
                     ) : (
-                      <Button variant="solid" tone="danger" className="flex-1" onClick={stop}>
-                        Stop
+                      <Button variant="solid" tone="danger" onClick={stop}>
+                        ⏹ Stop
                       </Button>
                     )}
                     <Button
@@ -599,7 +610,16 @@ export function LocalModeScreen({
                       {state.isPaused ? '⏵ Resume' : '⏸ Pause'}
                     </Button>
                     <Button variant="solid" tone="neutral" onClick={reset}>
-                      Reset
+                      ↺ Reset
+                    </Button>
+                    <Button
+                      variant="solid"
+                      tone={loopPlayback ? 'primary' : 'neutral'}
+                      onClick={() => setLoopPlayback(v => !v)}
+                      aria-label={loopPlayback ? 'Loop playback: on' : 'Loop playback: off'}
+                      title={loopPlayback ? 'Loop playback: on — vehicle repeats indefinitely' : 'Loop playback: off'}
+                    >
+                      ↻ Loop
                     </Button>
                   </div>
                 )}
