@@ -23,6 +23,20 @@ export type CommandOutcome = { status: 'completed' } | { status: 'failed'; error
 
 const QUEUE_ACTIVE_STATUSES: PlateQueueStatus[] = ['running', 'paused', 'waiting_for_signal', 'waiting_for_next'];
 
+/**
+ * True when `command` is a run_plate/run_queue/run_list command that can't
+ * run right now because a previous run is still in progress. Callers
+ * should check this BEFORE claiming — leaving the command pending (instead
+ * of claiming it and then failing it with 'local_queue_busy') lets it
+ * naturally retry on the next poll tick once the current run finishes, so
+ * back-to-back remote/API run_plate commands play in sequence instead of
+ * the 2nd+ one silently failing and vanishing from the pending count.
+ */
+export function isRunCommandBusy(command: SimulationCommand, plateQueue: Pick<PlateQueueControls, 'queueStatus'>): boolean {
+  const isRunCommand = command.type === 'run_plate' || command.type === 'run_queue' || command.type === 'run_list';
+  return isRunCommand && QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
+}
+
 /** Turns a run_plate/run_queue command payload into a single-use PlateList-shaped object so it can flow through the same runListSnapshot path as run_list. */
 function runPlatePayloadToList(payload: RunPlatePayload): PlateList {
   const now = new Date().toISOString();
