@@ -8,3 +8,6 @@ dist/
 !.env.production.example
 !.env.railway.example
 apps/server/data/
+
+# Secret produced by pair-controller.bat/ps1 — never commit
+pairing-result.json
