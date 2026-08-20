@@ -24,6 +24,11 @@
  *     swings from the post across the road).
  *   - `marginPx` nudges it further from the road edge (positive = further
  *     out onto the shoulder) without changing depth/scale.
+ *   - `scaleMultiplier` — grows/shrinks the kiosk WITHOUT moving it, for
+ *     when the `t` picked for X/Y placement makes the perspective size look
+ *     too small/large for that spot (e.g. a shallow `t` chosen to sit it
+ *     further back still reads as too tiny). Default 1 = pure perspective
+ *     scale off `t`, no boost.
  *   - `road` — only needed for non-"center" scenes, see above.
  *   - Where it's actually placed in the scene is decided by AssetRealisticRenderer.tsx
  *     (which scenes render it, and whether it's before or after the gate in
@@ -95,6 +100,8 @@ export interface TicketKioskProps {
   icon?: KioskIcon;
   /** Road geometry to position against — defaults to the "center" scene road. Use DIAGONAL_ROAD for driver_front/passenger_back. */
   road?: KioskRoadGeometry;
+  /** Multiplies the perspective scale `t` produces, without touching position (x/yBase are unaffected — only w/h and everything derived from them grow/shrink). Use when a `t` chosen for X/Y placement makes the kiosk read too small/large for that spot. Default 1 = pure perspective scale, no boost. */
+  scaleMultiplier?: number;
 }
 
 const ICON_WASH: Record<KioskIcon, string> = {
@@ -114,8 +121,8 @@ const ICON_COLOR: Record<KioskIcon, string> = {
 /** Shrinks all icon glyphs uniformly without touching the kiosk body/screen. */
 const ICON_SCALE = 0.75;
 
-export function TicketKiosk({ t = 0.42, side = 'left', marginPx = 0, icon = 'hello', road = CENTER_ROAD }: TicketKioskProps) {
-  const scale  = lerp(0.04, 1.0, Math.pow(t, 0.8));
+export function TicketKiosk({ t = 0.42, side = 'left', marginPx = 0, icon = 'hello', road = CENTER_ROAD, scaleMultiplier = 1 }: TicketKioskProps) {
+  const scale  = lerp(0.04, 1.0, Math.pow(t, 0.8)) * scaleMultiplier;
   const roadL  = lerp(road.lFar, road.lNear, t);
   const roadR  = lerp(road.rFar, road.rNear, t);
   const yBase  = lerp(VP_Y, SCENE_H, t);

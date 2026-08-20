@@ -332,20 +332,20 @@ export function AssetRealisticRenderer({
 
       {/* ── Ticket kiosk — BEHIND the gate in center_front (gate post is on the
           right there, per centerFront.config.ts's armDirection: 'left') ────── */}
-      {sceneVariant === 'center_front' && <TicketKiosk t={0.68} side="right" marginPx={20} icon={kioskIcon} />}
+      {sceneVariant === 'center_front' && <TicketKiosk t={0.48} side="right" marginPx={20} icon={kioskIcon} scaleMultiplier={1.2}/>}
 
       {/* ── Ticket kiosk — BEHIND the vehicle in passenger_back (moved here, in
           front of the scene background but behind the gate+vehicle block, so
           the car always draws on top of it — was "in front of gate" before). */}
-      {sceneVariant === 'passenger_back' && <TicketKiosk t={0.60} side="left" road={DIAGONAL_ROAD} icon={kioskIcon} marginPx={40} />}
+      {sceneVariant === 'passenger_back' && <TicketKiosk t={0.50} side="left" road={DIAGONAL_ROAD} icon={kioskIcon} scaleMultiplier={1.3} marginPx={40} />}
 
       {/* ── Ticket kiosk — BEHIND the gate in passenger_front (gate post is on
           the RIGHT there, per passengerFront.config.ts's armDirection: 'left'). */}
-      {sceneVariant === 'passenger_front' && <TicketKiosk t={0.80} side="right" road={MIRRORED_DIAGONAL_ROAD} icon={kioskIcon} marginPx={40} />}
+      {sceneVariant === 'passenger_front' && <TicketKiosk t={0.22} side="right" road={MIRRORED_DIAGONAL_ROAD} icon={kioskIcon} marginPx={30} scaleMultiplier={2.1} />}
 
       {/* ── Ticket kiosk — BEHIND the vehicle in driver_back (gate post is on
           the RIGHT there, per driverBack.config.ts's armDirection: 'left'). */}
-      {sceneVariant === 'driver_back' && <TicketKiosk t={0.60} side="right" road={MIRRORED_DIAGONAL_ROAD} icon={kioskIcon} marginPx={40} />}
+      {sceneVariant === 'driver_back' && <TicketKiosk t={0.82} side="left" road={MIRRORED_DIAGONAL_ROAD} icon={kioskIcon} marginPx={40} scaleMultiplier={1.3} />}
 
       {/* ── Z-ordered gate + vehicle ────────────────────────────────────────── */}
       {vehicleBehindGate
@@ -355,12 +355,12 @@ export function AssetRealisticRenderer({
 
       {/* ── Ticket kiosk — IN FRONT OF the gate in center_back (gate post is on
           the left there, per centerBack.config.ts's armDirection: 'right') ── */}
-      {sceneVariant === 'center_back' && <TicketKiosk t={0.52} side="left" marginPx={10} icon={kioskIcon} />}
+      {sceneVariant === 'center_back' && <TicketKiosk t={0.41} side="left" marginPx={10} icon={kioskIcon} />}
 
       {/* ── Ticket kiosk — IN FRONT OF the vehicle in driver_front (moved here,
           after the gate+vehicle block, so the kiosk always draws on top of
           the car — was "behind the gate" before). */}
-      {sceneVariant === 'driver_front' && <TicketKiosk t={0.80} side="right" road={DIAGONAL_ROAD} icon={kioskIcon} marginPx={40} />}
+      {sceneVariant === 'driver_front' && <TicketKiosk t={0.80} side="right" road={DIAGONAL_ROAD} icon={kioskIcon} marginPx={40}  scaleMultiplier={1.2}/>}
 
       {/* ── Vignette ────────────────────────────────────────────────────────── */}
       <rect x={0} y={0} width={SCENE_W} height={SCENE_H}

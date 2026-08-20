@@ -33,7 +33,7 @@ export const passengerBackConfig: SceneRenderConfig = {
 
   vehicle: {
     spawnT:      0.94,   // must be > decelStart (0.97)
-    readingT:    0.90,   // t where car stops
+    readingT:    0.905,   // t where car stops
     // Own entry-slide threshold (overrides the shared global AWAY.entryT=0.90
     // — see entryT in types.ts). Equal to readingT so the "sliding up from
     // off-screen" entry offset is 100% resolved by the time the car reaches

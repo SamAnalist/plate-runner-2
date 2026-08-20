@@ -30,7 +30,7 @@ export const driverBackConfig: SceneRenderConfig = {
 
   vehicle: {
     spawnT:      0.94,   // unused — see passengerBack.config.ts's note
-    readingT:    0.88,   // t where car stops
+    readingT:    0.89,   // t where car stops
     // Same reasoning as passengerBack.config.ts's entryT: must be >= readingT
     // so the away entry-slide offset is fully resolved by the time the car
     // stops, otherwise it collapses abruptly right as the gate opens.
