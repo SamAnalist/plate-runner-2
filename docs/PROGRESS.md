@@ -4366,3 +4366,89 @@ Documented in the file's existing "WHERE TO MOVE IT (X/Y)" comment block.
 Applied `scaleMultiplier={1.8}` to `passenger_front`'s kiosk
 (`AssetRealisticRenderer.tsx`) as a starting point — adjust that one
 number directly if it still reads too small/large.
+
+---
+
+## Phase — Configurable Loop gap + randomize Vehicle Type/Color in Plate Lists generator
+
+**Date:** 2026-08-20
+
+### Goal
+
+Two follow-ups noted in the SUV phase's "Next Steps": (1) Local Mode's
+Loop playback restarted after a fixed delay borrowed from Queue Mode's
+`gapBetweenVehiclesMs` — make it its own configurable setting instead. (2)
+Plate Lists' random plate generator only randomized the plate strings
+themselves, never `vehicleType`/`vehicleColor` — expose that too.
+
+### Implemented
+
+- **Configurable Loop gap** (`LocalModeScreen.tsx`): added its own
+  `loopGapMs` state (default `1500`, matching the prior borrowed value),
+  independent of `plateQueue.queueConfig.gapBetweenVehiclesMs` — Loop and
+  Queue Mode pacing are now separately tunable. The restart `useEffect`
+  uses `loopGapMs` instead. A slider (`850`–`10000`ms, same control style
+  as `PlateQueuePanel.tsx`'s existing gap slider) renders **only when
+  `loopPlayback` is on** (and not in Queue Mode), right below the
+  Playback button grid — asking for it per the user's explicit request
+  ("que el gap toggle se muestre solo si el loop playback esta encendido").
+  Slider min is `850` (not `0`) with an inline note explaining why: below
+  850ms the gate's close-animation CSS transition (see the two prior
+  gate-close phases) doesn't have time to finish before the next vehicle
+  can occlude it again.
+- **Randomize Vehicle Type/Color in the generator** (`PlateListsPanel.tsx`):
+  added a `genRandomizeVehicle` checkbox (default off, so existing
+  behavior is unchanged unless opted into) under the Random Plate
+  Generator's Generate button. When checked, clicking Generate also picks
+  a random `vehicleType` (`sedan`/`suv`) and `vehicleColor`
+  (`blue`/`red`/`gray`) for the list's `simulationDefaults`, alongside the
+  random plate strings — mirroring `send-random-plate.sh`'s existing
+  random-type/color-by-default behavior, now available in the web UI too.
+
+### Files Changed
+
+- `apps/web/src/screens/LocalModeScreen.tsx` — `loopGapMs` state, updated
+  restart effect, conditional gap slider UI.
+- `apps/web/src/components/controls/PlateListsPanel.tsx` —
+  `genRandomizeVehicle` state + checkbox, Generate handler also
+  randomizes `vehicleType`/`vehicleColor` when checked.
+
+### Decisions
+
+- Loop gap defaults to the same `1500`ms Queue Mode ships with, but is a
+  **separate** state, not derived from `plateQueue.queueConfig` — the two
+  playback modes are conceptually independent (Loop repeats one plate
+  outside Queue Mode entirely) and the user's ask implied they should be
+  independently tunable, not just visually.
+- Enforced an 850ms slider floor (not just a comment) rather than allowing
+  `0` — going below the gate's own CSS transition duration would silently
+  reintroduce the exact bug fixed two phases ago (occluded/invisible
+  close animation), so the UI itself prevents the regression rather than
+  relying on the user to read the inline note.
+- Vehicle randomization is opt-in (checkbox, default off) rather than
+  always-on — changing the Generate button's existing behavior
+  unconditionally would have been a surprising side effect for anyone
+  just wanting fresh plate strings for an existing list's vehicle
+  settings.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` and `pnpm build` — clean.
+- Manual QA pending (user): toggle Loop on/off and confirm the gap slider
+  only appears while it's on; drag it and confirm the restart delay
+  actually changes; check the randomize-vehicle checkbox, click Generate,
+  confirm Vehicle Type/Color visibly change alongside the plates.
+
+### Known Limitations
+
+- No equivalent "randomize vehicle" affordance was added to the
+  Scheduler — it only runs existing Plate Lists, it doesn't generate
+  plates itself, so there was nothing to extend there (the original next
+  step said "Plate Lists / Scheduler" but the generator only exists on
+  the Plate Lists side).
+- Loop gap and Queue gap remain two separate settings a user has to tune
+  independently — no "link them" option, by design (see Decisions).
+
+### Next Steps
+
+- Manual QA per above.

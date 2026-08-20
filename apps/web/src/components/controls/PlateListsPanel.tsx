@@ -171,6 +171,7 @@ function ListForm({
   const [genLength, setGenLength] = useState(7);
   const [genLetterCount, setGenLetterCount] = useState(3);
   const [genPrefix, setGenPrefix] = useState('');
+  const [genRandomizeVehicle, setGenRandomizeVehicle] = useState(false);
 
   function set<K extends keyof ListFormState>(key: K, value: ListFormState[K]) {
     setForm(f => ({ ...f, [key]: value }));
@@ -273,11 +274,28 @@ function ListForm({
             <Button
               tone="primary"
               className="h-8 flex items-center justify-center !rounded-md"
-              onClick={() => set('platesRaw', generateRandomPlates({ count: genCount, length: genLength, letterCount: genLetterCount, prefix: genPrefix }).join('\n'))}
+              onClick={() => {
+                set('platesRaw', generateRandomPlates({ count: genCount, length: genLength, letterCount: genLetterCount, prefix: genPrefix }).join('\n'));
+                if (genRandomizeVehicle) {
+                  const types = VEHICLE_TYPE_OPTIONS.map(o => o.value);
+                  const colors = Object.keys(VEHICLE_COLOR_HEX) as VehicleColor[];
+                  set('vehicleType', types[Math.floor(Math.random() * types.length)]);
+                  set('vehicleColor', colors[Math.floor(Math.random() * colors.length)]);
+                }
+              }}
             >
               Generate
             </Button>
           </div>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={genRandomizeVehicle}
+              onChange={e => setGenRandomizeVehicle(e.target.checked)}
+              className="accent-blue-500"
+            />
+            <span className="text-[9px] font-mono text-white/40">🎲 Also randomize Vehicle Type &amp; Color</span>
+          </label>
           <p className="text-[9px] font-mono text-white/25 leading-snug">
             Replaces the Plates box above with {genCount} random plates, each {genLength} characters
             after the prefix{genPrefix ? ` "${genPrefix.toUpperCase().replace(/[^A-Z0-9]/g, '')}"` : ''}

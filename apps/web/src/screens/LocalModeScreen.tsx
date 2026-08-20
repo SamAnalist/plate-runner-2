@@ -513,23 +513,26 @@ export function LocalModeScreen({
   // of plates in Queue Mode); this loops the current single plate
   // indefinitely and only applies outside Queue Mode.
   //
-  // Restart is delayed by the same gapBetweenVehiclesMs Queue Mode already
-  // uses between vehicles (not immediate) — this isn't just pacing, it's
-  // required for the gate-close animation to be visible at all. The gate
-  // arm's CSS transition is 850ms; restarting immediately respawns the next
-  // vehicle at full size while the arm is still mid-close, and depth
-  // ordering (SimulationScene's vehicleBehindGate) paints the vehicle over
-  // the gate the instant it spawns for several placements (away scenes, and
-  // incoming center_front), hiding the close animation entirely. Queue Mode
-  // never showed this bug only because its gap already left enough empty-
-  // road time for the close animation to finish before the next vehicle
-  // could occlude it.
+  // Restart is delayed by loopGapMs (own setting, independent of Queue
+  // Mode's gapBetweenVehiclesMs — defaults to the same 1500ms starting
+  // point, but Loop and Queue paces are independently tunable) — not
+  // immediate. This isn't just pacing, it's required for the gate-close
+  // animation to be visible at all. The gate arm's CSS transition is
+  // 850ms; restarting immediately respawns the next vehicle at full size
+  // while the arm is still mid-close, and depth ordering (SimulationScene's
+  // vehicleBehindGate) paints the vehicle over the gate the instant it
+  // spawns for several placements (away scenes, and incoming center_front),
+  // hiding the close animation entirely. Queue Mode never showed this bug
+  // only because its gap already left enough empty-road time for the close
+  // animation to finish before the next vehicle could occlude it — keep
+  // loopGapMs at 850ms or more for the same reason.
   const [loopPlayback, setLoopPlayback] = useState(false);
+  const [loopGapMs, setLoopGapMs] = useState(1500);
   useEffect(() => {
     if (!loopPlayback || queueActive || state.phase !== 'done') return;
-    const id = setTimeout(start, plateQueue.queueConfig.gapBetweenVehiclesMs);
+    const id = setTimeout(start, loopGapMs);
     return () => clearTimeout(id);
-  }, [loopPlayback, queueActive, state.phase, start, plateQueue.queueConfig.gapBetweenVehiclesMs]);
+  }, [loopPlayback, queueActive, state.phase, start, loopGapMs]);
 
   function set<K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) {
     onConfigChange({ ...config, [key]: value });
@@ -634,6 +637,23 @@ export function LocalModeScreen({
                     >
                       ↻ Loop
                     </Button>
+                  </div>
+                )}
+                {!queueActive && loopPlayback && (
+                  <div className="mt-2 flex flex-col gap-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-white/40 font-mono">Loop gap</span>
+                      <span className="text-[10px] font-mono text-blue-400 font-bold">{loopGapMs}ms</span>
+                    </div>
+                    <input
+                      type="range" min={850} max={10000} step={100}
+                      value={loopGapMs}
+                      onChange={e => setLoopGapMs(Number(e.target.value))}
+                      className="w-full accent-blue-500 h-1 rounded cursor-pointer"
+                    />
+                    <p className="text-[9px] font-mono text-white/25 leading-snug">
+                      Delay before the next run starts. Keep at 850ms+ so the gate's close animation has time to play.
+                    </p>
                   </div>
                 )}
               </div>
