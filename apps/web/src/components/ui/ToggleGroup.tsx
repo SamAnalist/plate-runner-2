@@ -12,9 +12,16 @@ interface ToggleGroupProps<T extends string> {
   onChange: (v: T) => void;
   /** Buttons split the full row width evenly, single line, no wrap. */
   fullWidth?: boolean;
+  /** 'md' = larger padding/text/icon gap — for icon-bearing toggles that need to read clearly (e.g. Vehicle Type). Default 'sm' matches every existing toggle's sizing exactly. */
+  size?: 'sm' | 'md';
 }
 
-export function ToggleGroup<T extends string>({ options, value, onChange, fullWidth = false }: ToggleGroupProps<T>) {
+const SIZE_CLASSES: Record<'sm' | 'md', string> = {
+  sm: 'px-2.5 py-1.5 text-xs gap-1.5',
+  md: 'px-3.5 py-2.5 text-sm gap-2',
+};
+
+export function ToggleGroup<T extends string>({ options, value, onChange, fullWidth = false, size = 'sm' }: ToggleGroupProps<T>) {
   return (
     <div className={fullWidth ? 'flex gap-1' : 'flex gap-1 flex-wrap'}>
       {options.map(opt => (
@@ -23,9 +30,10 @@ export function ToggleGroup<T extends string>({ options, value, onChange, fullWi
           title={opt.title}
           onClick={() => onChange(opt.value)}
           className={`
-            px-2.5 py-1.5 rounded text-xs font-mono font-semibold
+            rounded font-mono font-semibold
             border transition-all
-            ${opt.icon ? 'flex items-center justify-center gap-1.5' : ''}
+            ${SIZE_CLASSES[size]}
+            ${opt.icon ? 'flex items-center justify-center' : ''}
             ${fullWidth ? 'flex-1' : ''}
             ${value === opt.value
               ? 'bg-blue-600/80 border-blue-500/70 text-white'

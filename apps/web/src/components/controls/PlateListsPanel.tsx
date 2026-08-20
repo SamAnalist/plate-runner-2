@@ -19,17 +19,27 @@ import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { FieldError } from '../ui/FieldError';
 import { NumberField } from '../ui/NumberField';
+import { SedanIcon, SuvIcon } from '../ui/VehicleTypeIcon';
+import { VehicleColorPicker, VEHICLE_COLOR_HEX } from '../ui/VehicleColorPicker';
 import { downloadJSON } from '../../lib/downloadJSON';
 import { generateRandomPlates } from '../../features/lists/randomPlateGenerator';
+
+const MINI_TOGGLE_SIZE_CLASSES: Record<'sm' | 'md', string> = {
+  sm: 'px-2.5 py-1.5 text-xs gap-1.5',
+  md: 'px-3.5 py-2.5 text-sm gap-2',
+};
 
 function MiniToggle<T extends string>({
   options,
   value,
   onChange,
+  size = 'sm',
 }: {
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; icon?: React.ReactNode }[];
   value: T;
   onChange: (v: T) => void;
+  /** 'md' = larger padding/text/icon gap — for icon-bearing toggles that need to read clearly (e.g. Vehicle Type). Default 'sm' matches every existing toggle's sizing exactly. */
+  size?: 'sm' | 'md';
 }) {
   return (
     <div className="flex gap-1 flex-wrap">
@@ -37,11 +47,13 @@ function MiniToggle<T extends string>({
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`px-2.5 py-1.5 rounded text-xs font-mono font-semibold border transition-all ${
+          className={`rounded font-mono font-semibold border transition-all ${MINI_TOGGLE_SIZE_CLASSES[size]} ${
+            opt.icon ? 'flex items-center' : ''} ${
             value === opt.value
               ? 'bg-blue-600/80 border-blue-500/70 text-white'
               : 'bg-white/5 border-white/12 text-white/50 hover:text-white/80'}`}
         >
+          {opt.icon}
           {opt.label}
         </button>
       ))}
@@ -53,15 +65,9 @@ function slugify(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'plate-list';
 }
 
-const VEHICLE_COLOR_HEX: Record<VehicleColor, string> = {
-  blue: '#2563eb',
-  red:  '#dc2626',
-  gray: '#6b7280',
-};
-
-const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string }[] = [
-  { value: 'sedan', label: 'Sedan' },
-  { value: 'suv', label: 'SUV' },
+const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string; icon: React.ReactNode }[] = [
+  { value: 'sedan', label: 'Sedan', icon: <SedanIcon /> },
+  { value: 'suv', label: 'SUV', icon: <SuvIcon /> },
 ];
 
 // ─── Form state ──────────────────────────────────────────────────────────
@@ -310,23 +316,12 @@ function ListForm({
 
       <div>
         <Label>Vehicle Type</Label>
-        <MiniToggle options={VEHICLE_TYPE_OPTIONS} value={form.vehicleType} onChange={v => set('vehicleType', v)} />
+        <MiniToggle options={VEHICLE_TYPE_OPTIONS} value={form.vehicleType} onChange={v => set('vehicleType', v)} size="md" />
       </div>
 
       <div>
         <Label>Vehicle Color</Label>
-        <div className="flex gap-2">
-          {(Object.keys(VEHICLE_COLOR_HEX) as VehicleColor[]).map(color => (
-            <button
-              key={color}
-              title={color}
-              onClick={() => set('vehicleColor', color)}
-              className={`w-6 h-6 rounded-full border-2 transition-all ${
-                form.vehicleColor === color ? 'border-white/80 scale-110' : 'border-white/20 hover:border-white/50'}`}
-              style={{ backgroundColor: VEHICLE_COLOR_HEX[color] }}
-            />
-          ))}
-        </div>
+        <VehicleColorPicker value={form.vehicleColor} onChange={color => set('vehicleColor', color)} size="sm" />
       </div>
 
       <div>

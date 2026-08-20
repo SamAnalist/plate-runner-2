@@ -1,16 +1,12 @@
 import { getPlacementsForDirection } from '@plate-runner/shared';
-import type { Direction, DetectorPlacement, VehicleColor, VehicleType, GateMode, GateInitialState } from '@plate-runner/shared';
+import type { Direction, DetectorPlacement, VehicleType, GateMode, GateInitialState } from '@plate-runner/shared';
 import type { SimulatorDefaultsControls } from '../../features/simulatorDefaults/useSimulatorDefaults';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { ToggleGroup } from '../ui/ToggleGroup';
 import { Button } from '../ui/Button';
 import { DirectionArrow } from '../ui/DirectionArrow';
-
-const COLOR_MAP: Record<VehicleColor, string> = {
-  blue: '#2563eb',
-  red: '#dc2626',
-  gray: '#6b7280',
-};
+import { SedanIcon, SuvIcon } from '../ui/VehicleTypeIcon';
+import { VehicleColorPicker } from '../ui/VehicleColorPicker';
 
 const SPEED_PRESET_OPTIONS: { value: 'slow' | 'regular' | 'fast'; label: string }[] = [
   { value: 'slow', label: 'Slow' },
@@ -18,9 +14,9 @@ const SPEED_PRESET_OPTIONS: { value: 'slow' | 'regular' | 'fast'; label: string 
   { value: 'fast', label: 'Fast' },
 ];
 
-const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string }[] = [
-  { value: 'sedan', label: 'Sedan' },
-  { value: 'suv', label: 'SUV' },
+const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string; icon: React.ReactNode }[] = [
+  { value: 'sedan', label: 'Sedan', icon: <SedanIcon /> },
+  { value: 'suv', label: 'SUV', icon: <SuvIcon /> },
 ];
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
@@ -129,21 +125,12 @@ export function SimulatorDefaultsPanel({ controls }: { controls: SimulatorDefaul
               value={settings.vehicleType}
               onChange={v => updateSettings({ vehicleType: v })}
               fullWidth
+              size="md"
             />
           </div>
           <div>
             <GroupLabel>Color</GroupLabel>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(COLOR_MAP) as VehicleColor[]).map(color => (
-                <button key={color} title={color} onClick={() => updateSettings({ vehicleColor: color })}
-                  className={`w-7 h-7 rounded-full border-2 transition-all ${
-                    settings.vehicleColor === color
-                      ? 'border-white/80 scale-110'
-                      : 'border-white/20 hover:border-white/50'}`}
-                  style={{ backgroundColor: COLOR_MAP[color] }}
-                />
-              ))}
-            </div>
+            <VehicleColorPicker value={settings.vehicleColor} onChange={color => updateSettings({ vehicleColor: color })} />
           </div>
         </div>
       </CollapsibleSection>
