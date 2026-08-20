@@ -7,7 +7,6 @@ import type {
   DetectorPlacement,
   GateMode,
   GateInitialState,
-  VehicleColor,
   VehicleType,
 } from '@plate-runner/shared';
 import { getPlacementsForDirection, speedPhasesForPreset } from '@plate-runner/shared';
@@ -25,6 +24,8 @@ import { FieldError } from '../components/ui/FieldError';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { ToggleGroup } from '../components/ui/ToggleGroup';
 import { DirectionArrow } from '../components/ui/DirectionArrow';
+import { SedanIcon, SuvIcon } from '../components/ui/VehicleTypeIcon';
+import { VehicleColorPicker } from '../components/ui/VehicleColorPicker';
 
 export const QUEUE_ACTIVE_STATUSES = ['running', 'paused', 'waiting_for_signal', 'waiting_for_next'];
 
@@ -59,17 +60,9 @@ function Divider() {
 }
 
 
-// ─── Color swatch ─────────────────────────────────────────────────────────
-
-const COLOR_MAP: Record<VehicleColor, string> = {
-  blue: '#2563eb',
-  red: '#dc2626',
-  gray: '#6b7280',
-};
-
-const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string }[] = [
-  { value: 'sedan', label: 'Sedan' },
-  { value: 'suv', label: 'SUV' },
+const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string; icon: React.ReactNode }[] = [
+  { value: 'sedan', label: 'Sedan', icon: <SedanIcon /> },
+  { value: 'suv', label: 'SUV', icon: <SuvIcon /> },
 ];
 
 // ─── Phase speed controls ─────────────────────────────────────────────────
@@ -515,15 +508,28 @@ export function LocalModeScreen({
   const queueActive = QUEUE_ACTIVE_STATUSES.includes(plateQueue.queueStatus);
 
   // Off by default — when on, a completed single-plate run (phase 'done')
-  // immediately restarts instead of stopping, until the user turns it off
-  // or presses Stop. Separate from PlateQueueConfig.loop (that loops
-  // through a *list* of plates in Queue Mode); this loops the current
-  // single plate indefinitely and only applies outside Queue Mode.
+  // restarts instead of stopping, until the user turns it off or presses
+  // Stop. Separate from PlateQueueConfig.loop (that loops through a *list*
+  // of plates in Queue Mode); this loops the current single plate
+  // indefinitely and only applies outside Queue Mode.
+  //
+  // Restart is delayed by the same gapBetweenVehiclesMs Queue Mode already
+  // uses between vehicles (not immediate) — this isn't just pacing, it's
+  // required for the gate-close animation to be visible at all. The gate
+  // arm's CSS transition is 850ms; restarting immediately respawns the next
+  // vehicle at full size while the arm is still mid-close, and depth
+  // ordering (SimulationScene's vehicleBehindGate) paints the vehicle over
+  // the gate the instant it spawns for several placements (away scenes, and
+  // incoming center_front), hiding the close animation entirely. Queue Mode
+  // never showed this bug only because its gap already left enough empty-
+  // road time for the close animation to finish before the next vehicle
+  // could occlude it.
   const [loopPlayback, setLoopPlayback] = useState(false);
   useEffect(() => {
     if (!loopPlayback || queueActive || state.phase !== 'done') return;
-    start();
-  }, [loopPlayback, queueActive, state.phase, start]);
+    const id = setTimeout(start, plateQueue.queueConfig.gapBetweenVehiclesMs);
+    return () => clearTimeout(id);
+  }, [loopPlayback, queueActive, state.phase, start, plateQueue.queueConfig.gapBetweenVehiclesMs]);
 
   function set<K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) {
     onConfigChange({ ...config, [key]: value });
@@ -646,22 +652,13 @@ export function LocalModeScreen({
                     value={config.vehicleType}
                     onChange={v => set('vehicleType', v)}
                     fullWidth
+                    size="md"
                   />
                 </div>
 
                 <div>
                   <SectionLabel>Vehicle Color</SectionLabel>
-                  <div className="flex flex-wrap gap-2">
-                    {(Object.keys(COLOR_MAP) as VehicleColor[]).map(color => (
-                      <button key={color} title={color} onClick={() => set('vehicleColor', color)}
-                        className={`w-7 h-7 rounded-full border-2 transition-all ${
-                          config.vehicleColor === color
-                            ? 'border-white/80 scale-110'
-                            : 'border-white/20 hover:border-white/50'}`}
-                        style={{ backgroundColor: COLOR_MAP[color] }}
-                      />
-                    ))}
-                  </div>
+                  <VehicleColorPicker value={config.vehicleColor} onChange={color => set('vehicleColor', color)} fullWidth />
                 </div>
 
                 <CollapsibleSection title="Direction & Placement" defaultOpen={false} chevronClassName="text-lg">

@@ -190,6 +190,12 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
     const stopAtT      = sceneV.readingT;
     const speedSlider  = isIncoming ? cfg.speedIncoming : cfg.speedAway;
 
+    // Only close the gate on completion if this run actually opened it from a
+    // closed start (auto_open/wait_for_signal with gateInitialState 'closed')
+    // — a config where the gate starts (and stays) open never had a "close"
+    // moment to begin with, so leave gateOpen untouched for those.
+    const closeGateOnDone = cfg.gateInitialState === 'closed';
+
     setState(prev => {
       let t        = prev.vehicleT;
       let gateOpen = prev.gateOpen;
@@ -214,7 +220,13 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
 
         if (t >= 1) {
           cancelLoop();
-          return { ...prev, vehicleT: t, gateOpen, phase: 'done', isRunning: false };
+          // Close the gate the moment the vehicle finishes passing — not left
+          // open through the idle gap until the next run's start() closes it
+          // (which used to happen in the same instant the next vehicle was
+          // already set to 'running', so the arm was still mid-close while
+          // the new car was already moving). This also flips the kiosk icon
+          // back to 'hello' right away, since it's derived from gateOpen.
+          return { ...prev, vehicleT: t, gateOpen: closeGateOnDone ? false : gateOpen, phase: 'done', isRunning: false };
         }
       } else {
         if (shouldStop && !gateOpen && t <= stopAtT) {
@@ -228,7 +240,8 @@ export function useSimulation(config: SimulationConfig): SimulationControls {
 
         if (t <= 0.02) {
           cancelLoop();
-          return { ...prev, vehicleT: t, gateOpen, phase: 'done', isRunning: false };
+          // Same close-on-done as the incoming branch above.
+          return { ...prev, vehicleT: t, gateOpen: closeGateOnDone ? false : gateOpen, phase: 'done', isRunning: false };
         }
       }
 
