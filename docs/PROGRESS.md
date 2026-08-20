@@ -4190,3 +4190,179 @@ Windows equivalent of `send-random-plate`.
   pending requests from the same code window, approving any one of them
   clears the shown code for all — matches the common single-controller
   pairing flow this was reported against; not revisited for that edge case.
+- **Per-vehicle-type car size**: the SUV is a physically larger body than
+  the sedan, so `VehicleAssetLayer.tsx` now multiplies a new
+  `VEHICLE_TYPE_SCALE_MULTIPLIER[vehicleType]` (`vehicleTypeScale.ts`,
+  `sedan: 1, suv: 1.08`) into the existing per-placement `carScale` curve
+  from `scene-configs/*.config.ts`, instead of duplicating all six
+  hand-calibrated scene configs per vehicle type. The `1.08` is an
+  approximation (not measured against the real SUV asset) — a single
+  number to tune if the SUV still looks visibly mis-sized once seen on
+  screen, no per-placement work needed unlike plate anchors.
+- **Per-(vehicleType, placement) car position offset**: the SUV was
+  reported sitting visibly too low ("sunken into the ground")
+  specifically in the `center_front` scene (confirmed with the user which
+  direction before picking a value — not every scene, so this needed to
+  be scoped rather than global). Added `vehicleTypePosition.ts`'s
+  `VEHICLE_TYPE_POSITION_OFFSET` — a `(vehicleType, placement) → {xPct,
+  yPct}` table (fractions of the car's own current width/height, so the
+  nudge scales with depth) — wired into `VehicleAssetLayer.tsx`'s
+  `carX`/`carY`. Empty for `sedan` and every other `(type, placement)`
+  pair; only `suv.center_front: { yPct: -0.06 }` (nudge up) exists so far.
+  Same "single documented starting value, adjust directly" pattern as the
+  scale multiplier and plate anchors — add more entries the same way if
+  other scenes turn out to need it, rather than special-casing anything.
+
+### Files Changed (this addendum)
+
+- `apps/web/src/components/simulation/renderers/asset-realistic/vehicleTypePosition.ts` — new.
+- `apps/web/src/components/simulation/renderers/asset-realistic/VehicleAssetLayer.tsx` — wires in the offset.
+- `docs/VEHICLE_COLOR_VARIANTS.md` — documents the mechanism.
+
+### Also: distinct Sedan/SUV icons
+
+The "Sedan"/"SUV" text labels alone read too similarly at a glance in a
+small toggle button. Added `apps/web/src/components/ui/VehicleTypeIcon.tsx`
+(`SedanIcon` — low, curvy, smoothly arched roof; `SuvIcon` — taller,
+boxier, flatter roofline, bigger wheels), stroke-only/`currentColor` like
+the existing `DirectionArrow.tsx`, so both selected/unselected toggle
+states render correctly with no hardcoded color. Wired into all three
+Vehicle Type toggles: `LocalModeScreen.tsx` and
+`SimulatorDefaultsPanel.tsx` (both use `ToggleGroup`, which already
+supported an `icon` prop) and `PlateListsPanel.tsx` (uses its own local
+`MiniToggle`, which gained an optional `icon` prop — backward compatible,
+its other users like Direction/GateMode/QueueMode are unaffected).
+`ControllerModePanel.tsx`'s vehicle type picker is a native `<select>`
+dropdown, not a button toggle — left as-is, icons don't apply there the
+same way and the confusion risk is lower (one label visible at a time,
+not two adjacent buttons).
+
+### Also: bigger Sedan/SUV icons + buttons
+
+The icons were still hard to tell apart at the original size. Cropped
+`VehicleTypeIcon.tsx`'s viewBox tight around the car silhouette (was
+leaving dead space above/below) and bumped the default render size
+(16px → 20px), so the same glyphs render noticeably larger without
+changing their shape. Added an opt-in `size?: 'sm' | 'md'` prop to both
+`ToggleGroup.tsx` and `PlateListsPanel.tsx`'s local `MiniToggle` (default
+`'sm'` = byte-identical to every existing toggle's current sizing — no
+other toggle anywhere changed), and passed `size="md"` only on the three
+Vehicle Type toggles (`LocalModeScreen.tsx`, `SimulatorDefaultsPanel.tsx`,
+`PlateListsPanel.tsx`) for larger padding/text alongside the bigger icons.
+
+### Also: Vehicle Color picker enhanced + shared, full-width in Local Mode
+
+The color swatches were bare circles duplicated three times (`COLOR_MAP`/
+`VEHICLE_COLOR_HEX` re-declared in `LocalModeScreen.tsx`,
+`SimulatorDefaultsPanel.tsx`, `PlateListsPanel.tsx`). Extracted a shared
+`apps/web/src/components/ui/VehicleColorPicker.tsx` (also the new single
+source of truth for `VEHICLE_COLOR_HEX`) with a small visual upgrade: a
+soft glow in the swatch's own color when selected (not just a white
+border), a check badge overlay so selection doesn't rely on color alone,
+a hover lift, and a text label under each dot. All three call sites now
+use it instead of their own duplicated markup; `PlateListsPanel.tsx`'s
+separate read-only summary-row swatch still uses the exported
+`VEHICLE_COLOR_HEX` map directly (that one isn't a picker).
+
+Added an opt-in `fullWidth` prop — since there are only 3 colors today,
+Local Mode's sidebar (`LocalModeScreen.tsx`) now renders them as bordered
+cards stretched to fill the row, matching the look of the Vehicle Type
+toggle right above it. `SimulatorDefaultsPanel.tsx`/`PlateListsPanel.tsx`
+keep the compact, natural-width layout (`fullWidth` defaults to `false`).
+
+### Also: gate closes (with its animation) the moment a run finishes
+
+Reported behavior: in Loop playback or Queue mode, once a vehicle finished
+passing, the gate stayed wide open through the entire idle gap and only
+started closing in the same instant the *next* vehicle's run began — so
+the arm was still mid-close while the new car was already moving toward
+it.
+
+Root cause (`apps/web/src/hooks/useSimulation.ts`'s `animate()`): the
+`phase → 'done'` transition (both the `incoming` and `away` branches, near
+where `cancelLoop()` is called at `t >= 1` / `t <= 0.02`) passed `gateOpen`
+through unchanged from `prev` — so it stayed `true` until the *next*
+`start()` call reset it via `initialGateOpen`. The gate arm's closing
+animation was never actually a bug (it already had a symmetric CSS
+`transition` on `transform`, confirmed in `AssetRealisticRenderer.tsx`'s
+`AssetGate` — opening and closing both animate over 0.85s), it just never
+got triggered at the right moment.
+
+**Fix:** both `'done'` transitions now set `gateOpen: false` immediately
+(when `cfg.gateInitialState === 'closed'` — i.e. only for runs that
+actually opened the gate from closed; a config where the gate starts/stays
+open never had a "close" moment and is left untouched). Since the kiosk
+icon (`AssetRealisticRenderer.tsx`'s `kioskIcon` ternary) is already
+derived from `gateOpen` first, this single change also fixes "poner el
+kiosk con el icono que debe" — it flips back to `'hello'` at the same
+instant the gate starts closing, instead of staying on `'check'` through
+the whole idle gap. By the time Loop's effect or the Queue's
+`gapBetweenVehiclesMs` gap fires the next `start()`, `gateOpen` is already
+`false` (matching `initialGateOpen` for closed-gate configs) — no
+conflicting reset, the 0.85s close animation just continues uninterrupted
+while the next vehicle resets/approaches from far away, so it's reliably
+finished long before the new car reaches the gate.
+
+This is a general behavior fix (in `useSimulation.ts`, not loop/queue-
+specific code), so it also applies to a single non-looping Local Mode run
+— the gate now visibly closes after the car passes instead of staying
+open indefinitely once `phase: 'done'`. Only one active renderer
+(`AssetRealisticRenderer.tsx`) reads `gateOpen`, so no other renderer
+needed changes.
+
+### Follow-up: gate-close animation invisible in Loop for away + center_front
+
+User reported the fix above worked in Queue Mode but not in Local Mode's
+Loop toggle, and specifically not for any "away" placement or incoming
+`center_front` (driver_front/passenger_front worked fine).
+
+**Root cause (confirmed by investigation, not a React/state race):** z-
+ordering, not the gate logic itself. `SimulationScene.tsx`'s
+`vehicleBehindGate = vehicleT < sceneConfig.gate.t` decides whether
+`AssetRealisticRenderer.tsx` paints the vehicle in front of or behind the
+gate arm. The instant a restart's `start()` snaps `vehicleT` back to
+`startT(direction)`, this can flip to "vehicle in front" and the
+freshly-spawned, large, near-camera vehicle visually covers the arm:
+- **Away scenes** (`centerBack`/`driverBack`/`passengerBack`): `startT('away') = 1.0`,
+  but each scene's `gate.t` is well below 1 (0.35–0.45) — so the vehicle
+  is *always* painted in front of the gate the instant it spawns.
+- **`center_front`**: its `gate.t` is `0.99` (reachable), unlike
+  `driver_front`/`passenger_front` which deliberately set `gate.t: 1.05`
+  (above the max `vehicleT` of `1.0`, so the vehicle can never occlude the
+  gate there). `center_front`'s vehicle is already at `vehicleT === 1` at
+  the moment `phase` becomes `'done'`, so it's occluding the gate through
+  the entire idle gap and any restart.
+
+This occlusion isn't itself wrong (a car that's just exited close to the
+camera legitimately renders in front of a gate that's now behind it) —
+the actual bug is **timing**: Queue Mode already waits
+`gapBetweenVehiclesMs` (default 1500ms, comfortably longer than the arm's
+850ms CSS transition) before spawning the next vehicle, so the close
+animation finishes during that empty-road gap, before anything could
+occlude it. Loop's effect (`LocalModeScreen.tsx`) called `start()`
+immediately on `phase: 'done'` with no gap at all — for the affected
+placements, the occluding vehicle reappeared before the viewer ever saw
+the arm swing shut.
+
+**Fix:** Loop's restart is now delayed by the same
+`plateQueue.queueConfig.gapBetweenVehiclesMs` Queue Mode already uses
+(`setTimeout(start, gapMs)` instead of calling `start()` synchronously
+in the effect, with proper cleanup). This directly restores the empty-
+road window the close animation needs to be visible, matching Queue
+Mode's behavior exactly, and is user-configurable via the existing Queue
+gap setting. Scene configs (`gate.t` values) were deliberately left
+untouched — the occlusion itself is correct depth staging; only the
+missing time buffer was the bug.
+
+### Also: TicketKiosk `scaleMultiplier` prop
+
+`TicketKiosk.tsx`'s size was purely a function of its `t` (perspective
+depth) prop — so a `t` chosen for X/Y placement reasons (e.g.
+`passenger_front`'s `t={0.20}`, positioned far back on purpose) had no way
+to look bigger without also moving it further down/forward. Added an
+optional `scaleMultiplier?: number` prop (default `1`) that multiplies the
+computed perspective `scale` only — position (`x`/`yBase`) is unaffected.
+Documented in the file's existing "WHERE TO MOVE IT (X/Y)" comment block.
+Applied `scaleMultiplier={1.8}` to `passenger_front`'s kiosk
+(`AssetRealisticRenderer.tsx`) as a starting point — adjust that one
+number directly if it still reads too small/large.

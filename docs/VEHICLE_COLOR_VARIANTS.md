@@ -137,6 +137,63 @@ angle looks wrong) directly in that `(type, color)` block in
 `PLATE_ANCHORS_BY_TYPE_AND_COLOR` until the green dashed rect lands on the
 plate.
 
+## Per-type car size (`vehicleTypeScale.ts`)
+
+The SUV is a physically larger body than the sedan, so it renders slightly
+bigger at every phase — via a single **uniform multiplier**, not per-scene
+duplication:
+
+```ts
+// apps/web/src/components/simulation/renderers/asset-realistic/vehicleTypeScale.ts
+export const VEHICLE_TYPE_SCALE_MULTIPLIER: Record<VehicleType, number> = {
+  sedan: 1,
+  suv: 1.08,
+};
+```
+
+`VehicleAssetLayer.tsx` multiplies this into the per-placement `carScale`
+curve from `scene-configs/*.config.ts` (`carScale = getCarScale(...) *
+VEHICLE_TYPE_SCALE_MULTIPLIER[vehicleType]`) — the six hand-calibrated
+per-placement scale curves stay the single source of truth for how the car
+grows/shrinks through a run; this just scales the whole curve up or down
+uniformly for a vehicle type. The `1.08` value is an **approximation, not
+measured** against the real SUV asset geometry — if the SUV still looks
+visibly too small/large once seen on screen, adjust this one number rather
+than touching any scene config. Unlike plate anchors, this does not need
+per-placement tuning.
+
+## Per-(type, placement) car position offset (`vehicleTypePosition.ts`)
+
+Unlike car size, car *position* sometimes needs a fix scoped to one
+specific `(vehicleType, placement)` pair rather than a uniform rule — e.g.
+the SUV was reported sitting visibly too low ("sunken into the ground")
+specifically in the `center_front` scene, not in every scene:
+
+```ts
+// apps/web/src/components/simulation/renderers/asset-realistic/vehicleTypePosition.ts
+export const VEHICLE_TYPE_POSITION_OFFSET: Partial<Record<VehicleType, Partial<Record<DetectorPlacement, { xPct: number; yPct: number }>>>> = {
+  suv: {
+    center_front: { xPct: 0, yPct: -0.06 },
+  },
+};
+```
+
+`xPct`/`yPct` are fractions of the car's **own current width/height**
+(`carW`/`carH`), not fixed scene pixels — so the nudge scales naturally
+with the car's size through the whole depth range instead of only looking
+right at one distance. Positive `yPct` moves the car down, negative moves
+it up; positive `xPct` moves right, negative moves left.
+`VehicleAssetLayer.tsx` adds `typeOffset.xPct * carW` /
+`typeOffset.yPct * carH` on top of the normal depth-model `carX`/`carY`.
+
+This table is empty for `sedan` (every scene was calibrated against it —
+it should never need an entry) and only has entries for the specific
+`(type, placement)` pairs that are visibly wrong — most pairs need none at
+all. The `-0.06` for `suv`/`center_front` is a **starting value**, not
+precisely measured; nudge it further (and add more entries here, the same
+way, for any other scene that turns out to need it) rather than
+special-casing anything in `VehicleAssetLayer.tsx` itself.
+
 ## How to add a new color's real assets (existing type)
 
 1. Render/obtain 6 PNGs (one per placement) with **identical geometry** to
@@ -172,6 +229,9 @@ To add a color beyond `blue`/`red`/`gray` entirely, also add it to the
    (copying an existing type's values per color is a reasonable starting
    point — see the SUV precedent above — but flag it PENDING CALIBRATION
    and don't skip the Anchor bounds overlay pass).
+4b. Add the new type to `VEHICLE_TYPE_SCALE_MULTIPLIER` in
+   `vehicleTypeScale.ts` (default `1` if the body is roughly sedan-sized;
+   adjust up/down after seeing it on screen if it looks visibly mis-sized).
 5. Add the new value to `VEHICLE_TYPE_OPTIONS` in `LocalModeScreen.tsx`,
    `SimulatorDefaultsPanel.tsx`, and `PlateListsPanel.tsx`, and to the
    `VEHICLE_TYPES`-driven `<Select>` in `ControllerModePanel.tsx` (that one

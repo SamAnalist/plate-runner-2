@@ -6,6 +6,12 @@ and `AGENTS.md` (generic agent overview) — all three should stay in sync.
 If this file ever conflicts with `CLAUDE.md` or `AGENTS.md`, treat that as a
 bug: reconcile them rather than picking one silently.
 
+**Most of the actual detail lives in `docs/`, not in this file.** This file
+is an orientation map — read the "Documentation Index" below to find the
+right doc before assuming something isn't implemented or isn't documented.
+With ~35 files in `docs/`, re-deriving something from source that's already
+written down wastes a turn — grep `docs/` first.
+
 ## Role
 
 You are acting as:
@@ -28,14 +34,17 @@ External cameras may point at the screen and attempt to read the plate.
 Therefore, the visual simulation is not decorative only: it must be
 stable, readable, predictable, and configurable.
 
-The system supports (or is growing toward):
+The system now supports (this is NOT a future-tense list — check `docs/`
+before assuming something below isn't built yet):
 
-- Remote display mode.
-- Pairing computers (Controller ↔ Display).
-- API-driven simulation runs.
-- Automated tests from GitHub Actions.
-- Schedules and plate lists.
-- Gate control from tests.
+- A Fastify + SQLite backend (`apps/server`).
+- Remote display mode + Controller↔Display pairing.
+- API-driven simulation runs (local and remote).
+- Plate lists, a local scheduler, and execution history.
+- Gate control from a Controller or a CLI script.
+- A CI-friendly CLI (pairing + random-plate-sending scripts).
+- Two vehicle body types (sedan, SUV) × three colors, fully crossed.
+- A production deployment on Railway — see `DEPLOYMENT.md` at the repo root.
 
 Visual simulation and camera readability remain the top priority whenever
 a change could affect them.
@@ -55,34 +64,41 @@ Current stack:
   command-queue architecture — see `docs/BACKEND_API_SPEC.md`).
 - `packages/shared`: shared types and validation, imported by both apps —
   this is the single source of truth for plate rules, config shapes, and
-  enums like `Direction`/`DetectorPlacement`/`GateMode`/`VehicleColor`.
+  enums like `Direction`/`DetectorPlacement`/`GateMode`/`VehicleColor`/
+  `VehicleType`.
 - Tailwind CSS.
 - SVG/CSS/Framer Motion for the 2.5D simulation.
 - Docker Compose exists for local dev (`docker-compose.yml`,
   `docs/DOCKER_SETUP.md`); production runs on Railway
-  (`docs/RAILWAY_DEPLOYMENT_PLAN.md`).
+  (`DEPLOYMENT.md`, `docs/RAILWAY_DEPLOYMENT_PLAN.md`).
+- CLI tooling in `scripts/macos/` (bash) and `scripts/windows/`
+  (`.bat`+`.ps1`) for pairing a Controller and sending commands without
+  the web UI — see `docs/CONTROLLER_CLI_TOOLS.md`.
 
 Do not add unnecessary heavy libraries. Do not add Three.js unless
 explicitly requested. There is no icon library dependency (`lucide-react`,
-`heroicons`, etc.) — icons are hand-rolled Unicode glyphs (`▶`, `⏸`, `⏹`,
-`↺`, `↻`) embedded directly in button labels; follow that convention rather
+`heroicons`, etc.) — icons are hand-rolled SVG/Unicode glyphs (see
+`apps/web/src/components/ui/DirectionArrow.tsx`, `VehicleTypeIcon.tsx`, and
+button labels using `▶`/`⏸`/`⏹`/`↺`/`↻`); follow that convention rather
 than introducing a new icon system.
 
 ---
 
 ## Current Scope
 
-Backend, remote pairing, and API-driven runs are already implemented —
-this is further along than "visual simulation only." Read `docs/PROGRESS.md`
-(append-only phase log, newest entries at the bottom) before assuming a
-feature doesn't exist yet. Confirm against the code, not just this file.
+Backend, remote pairing, plate lists, scheduler, and API-driven runs are
+already implemented — this is further along than "visual simulation
+only." Read `docs/PROGRESS.md` (append-only phase log, newest entries at
+the bottom) before assuming a feature doesn't exist yet. Confirm against
+the code, not just this file — `docs/PROGRESS.md` entries are historically
+accurate at the time they were written but code can drift.
 
 Always in scope:
 
 1. 2.5D vehicle simulation correctness and readability.
 2. License plate rendering and validation.
 3. Gate arm animation and gate mode behavior.
-4. Direction and detector placement.
+4. Direction, detector placement, and vehicle type/color.
 5. Camera focus zone / calibration mode.
 6. Camera mode / fullscreen scene.
 7. Backend API correctness (commands, pairing, remote control).
@@ -90,7 +106,64 @@ Always in scope:
 
 Do not start a genuinely new major phase (e.g. a new persistence layer,
 a new auth model, a new deployment target) unless the user explicitly
-asks for it — but do not assume "backend doesn't exist yet" either; check.
+asks for it — but do not assume a feature is unbuilt without checking.
+
+---
+
+## Documentation Index
+
+Everything below lives in `docs/` unless noted. When a task touches one of
+these areas, read the doc first — most non-trivial questions ("does X
+exist", "how does Y work", "what are the known limitations of Z") are
+already answered there in more depth than this file could hold.
+
+**Visual simulation / rendering**
+`SIMULATION_SPEC.md` (append-only phase log for the simulator itself),
+`SIMULATION_STATE_MACHINE.md`, `RENDERER_ARCHITECTURE.md`,
+`SCENE_CONFIG_ARCHITECTURE.md`, `SCENE_VARIANTS.md`,
+`ASSET_RENDERER_STRATEGY.md`, `MOTION_PATHS.md`, `GATE_BEHAVIOR.md`,
+`VEHICLE_COLOR_VARIANTS.md` (color AND vehicle-type asset/anchor/scale
+system), `CAMERA_VIEW_SPEC.md`, `CAMERA_CALIBRATION.md`, `VISUAL_QA.md`,
+`VISUAL_REDESIGN.md`, `UI_POLISH_NOTES.md`.
+
+**Backend / API**
+`BACKEND_API_SPEC.md` (start here for any endpoint question),
+`API_COMMANDS_SPEC.md`, `LOCAL_API_MODE.md`, `REMOTE_COMMANDS_SPEC.md`,
+`REMOTE_MODE_SPEC.md`, `PAIRING_SPEC.md` (Controller↔Display pairing +
+auth model — the "does a request need x-api-key AND x-controller-token"
+question is answered here).
+
+**Data features**
+`PLATE_LISTS_SPEC.md`, `QUEUE_SPEC.md`, `SCHEDULER_SPEC.md`,
+`EXECUTION_HISTORY_SPEC.md`, `IMPORT_EXPORT_SPEC.md`,
+`SCREEN_SAVER_SPEC.md`.
+
+**Security**
+`SECURITY_SPEC.md`, `SECURITY_NOTES.md`,
+`SECURITY_AUDIT_RAILWAY_READINESS.md`, `RAILWAY_SECURITY_CHECKLIST.md`.
+
+**Deployment / operations**
+`DEPLOYMENT.md` (repo root — start here), `DOCKER_SETUP.md`,
+`RAILWAY_DEPLOYMENT_PLAN.md`, `OPERATIONS_GUIDE.md`,
+`RAILWAY_STAGING_SMOKE_TEST.md`.
+
+**QA / testing**
+`MANUAL_TESTING_GUIDE.md`, `RELEASE_CANDIDATE_QA.md`,
+`DEMO_CHECKLIST.md`.
+
+**Tools**
+`CONTROLLER_CLI_TOOLS.md` (pairing + random-plate CLI scripts, macOS and
+Windows).
+
+**App structure**
+`APP_NAVIGATION_SPEC.md`.
+
+**History**
+`PROGRESS.md` (the canonical, append-only record of every phase — the
+single most reliable source for "when/why was X built"), `RELEASE_NOTES.md`.
+
+If you can't find something here, `grep -rl <topic> docs/` before assuming
+it isn't documented — this index is a map, not a guarantee of completeness.
 
 ---
 
@@ -153,6 +226,11 @@ The car must:
 
 - Support `incoming` and `away` directions.
 - Support all six detector placements.
+- Support both vehicle types (`sedan`, `suv`) × all three colors (`blue`,
+  `red`, `gray`) — every `(type, color, placement)` triple has its own
+  asset file and its own plate anchor (see `docs/VEHICLE_COLOR_VARIANTS.md`
+  — SUV's anchors are currently an uncalibrated copy of sedan's, flagged
+  PENDING VISUAL CALIBRATION).
 - Use perspective and depth.
 - Disappear at the end of the run.
 - Stop at the gate when required.
@@ -163,6 +241,13 @@ The gate must:
 - Visually open when triggered.
 - Stay closed in `wait_for_signal`.
 - Not hide the plate during camera reading.
+- Close again (with its own 0.85s animation) the moment a vehicle finishes
+  passing — not just at the start of the next run. This is handled in
+  `useSimulation.ts`'s `'done'` phase transition, not per-renderer; see
+  `docs/PROGRESS.md`'s "gate closes... the moment a run finishes" and
+  "gate-close animation invisible in Loop..." entries for the two-part fix
+  and why restart timing (not just the gate logic) matters for it to be
+  visible at all.
 
 ---
 
@@ -183,6 +268,32 @@ type DetectorPlacement =
 for `direction: "away"` — enforced both client- and server-side
 (`isPlacementAllowedForDirection` in `packages/shared`). This affects
 visual transforms, not just labels.
+
+---
+
+## Vehicle Type / Color Contract
+
+```ts
+type VehicleType = "sedan" | "suv";
+type VehicleColor = "blue" | "red" | "gray";
+```
+
+Both are independent, fully-crossed dimensions — every `(type, color,
+placement)` triple has its own asset (`assetRegistry.tsx`) and plate
+anchor (`plateAnchors.ts`). `sedan`'s asset folder is named `main-car` for
+historical reasons (predates the `VehicleType` field) — an internal path
+detail, never renamed, never exposed via the API/UI. See
+`docs/VEHICLE_COLOR_VARIANTS.md` before touching either dimension —
+it covers the asset/anchor/fallback system, the per-type car-size
+multiplier (`vehicleTypeScale.ts`), and the per-(type, placement) position
+nudge mechanism (`vehicleTypePosition.ts`) for cases where a type visibly
+sits wrong in one specific scene.
+
+`vehicleType` is **optional** (server-defaults to `'sedan'`) on request
+payloads (`RunPlatePayload`, `SetConfigPayload`,
+`PlateListSimulationDefaults`) for backward compatibility with callers
+that predate this field — but **required** on `SimulationConfig` itself
+(live app state, always seeded from `DEFAULT_CONFIG`).
 
 ---
 
@@ -278,23 +389,35 @@ or Escape. Useful for external camera testing.
   'unauthorized' }` — when debugging an "unauthorized" error, check both,
   not just the more specific one. See `docs/BACKEND_API_SPEC.md` and
   `docs/PAIRING_SPEC.md`.
-- `controllerToken` (issued at the end of the Controller↔Display pairing
-  handshake) only expires if the backend operator explicitly sets
+- `controllerToken` only expires if the backend operator explicitly sets
   `PLATE_RUNNER_PAIRING_TOKEN_TTL_DAYS` — check the actual deployment's
-  env vars before assuming either way; don't hardcode an assumption into
-  new docs or code.
+  env vars (see `DEPLOYMENT.md`) before assuming either way; the current
+  production Railway deployment has this set to `30` days.
 - The backend is a fire-and-forget command queue (Display/Local Mode poll
   for pending commands and execute them client-side) — there is no
   endpoint that reports live simulation phase. Don't design a feature that
   assumes one exists; if "wait until the vehicle is actually stopped" is
   needed from outside the browser, it currently has to be a human
-  judgment call (see `send-random-plate.sh` / `docs/CONTROLLER_CLI_TOOLS.md`).
+  judgment call (see `scripts/macos/send-random-plate.sh` /
+  `docs/CONTROLLER_CLI_TOOLS.md`).
 - A `run_plate`/`run_queue`/`run_list` command that arrives while a
   previous run is still in progress must be left `pending` (not
   claimed-then-failed) so it naturally retries once the display frees up —
-  see `isRunCommandBusy()` in `apps/web/src/features/api/commandExecutor.ts`
-  and the "Fix silently-dropped back-to-back run commands" phase in
-  `docs/PROGRESS.md` for why this matters.
+  see `isRunCommandBusy()` in `apps/web/src/features/api/commandExecutor.ts`.
+
+---
+
+## CLI Tools
+
+`scripts/macos/{pair-controller.sh,send-random-plate.sh}` and
+`scripts/windows/{pair-controller.bat,pair-controller.ps1,
+send-random-plate.bat,send-random-plate.ps1}` — pair a machine as a
+Controller and send simulation commands without the web UI. Both OS
+variants support random or explicit plate/color/type/direction/placement
+and an optional `wait_for_signal` → wait-for-Enter → `open-gate` flow.
+`pairing-result.json` (gitignored) is always written/read at the
+**project root**, not inside `scripts/`, regardless of which script ran.
+See `docs/CONTROLLER_CLI_TOOLS.md` for full flag/param reference.
 
 ---
 
@@ -304,21 +427,13 @@ Every phase must update documentation. At minimum:
 
 ```txt
 docs/PROGRESS.md
-docs/SIMULATION_SPEC.md
+docs/SIMULATION_SPEC.md   (only if the change touches simulation/rendering)
 ```
 
-When relevant, create/update:
-
-```txt
-docs/CAMERA_CALIBRATION.md
-docs/PLATE_LISTS_SPEC.md
-docs/BACKEND_API_SPEC.md
-docs/PAIRING_SPEC.md
-docs/REMOTE_COMMANDS_SPEC.md
-docs/SCHEDULER_SPEC.md
-docs/SECURITY_SPEC.md
-docs/DEPLOYMENT.md
-```
+When relevant, create/update the doc from the Documentation Index above
+that matches the area you touched — don't create a new doc for something
+an existing one already covers; extend it instead, same append-only-phase
+style as `PROGRESS.md`.
 
 For every phase, document: goal, what changed, files created/modified,
 technical decisions, manual test instructions, known limitations,
@@ -390,6 +505,8 @@ vice versa.
 - Never commit real secrets (`pairing-result.json`, `.env`, API keys,
   tokens) — check `.gitignore` covers them, and double-check file
   contents before staging anything that might contain one.
+- Before deploying or changing production config, read `DEPLOYMENT.md`
+  and `docs/RAILWAY_SECURITY_CHECKLIST.md`.
 
 ---
 
