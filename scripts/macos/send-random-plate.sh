@@ -14,12 +14,12 @@
 #
 # Requires: curl, jq (brew install jq)
 #
-# Usage:
-#   ./send-random-plate.sh
-#   ./send-random-plate.sh -u API_BASE_URL -t CONTROLLER_TOKEN -d DISPLAY_ID -w yes
+# Usage (run from anywhere — paths are resolved relative to this script):
+#   ./scripts/macos/send-random-plate.sh
+#   ./scripts/macos/send-random-plate.sh -u API_BASE_URL -t CONTROLLER_TOKEN -d DISPLAY_ID -w yes
 #
 # By default, API base URL / controller token / display ID are read from
-# ./pairing-result.json (written by pair-controller.sh) if present.
+# pairing-result.json at the PROJECT ROOT (written by pair-controller.sh) if present.
 
 set -euo pipefail
 
@@ -32,19 +32,22 @@ PLATE_LENGTH=""   # empty = pick randomly between 6-8
 DIRECTION="incoming"
 DETECTOR_PLACEMENT="center_front"
 VEHICLE_COLOR=""   # empty = pick randomly among blue/red/gray
+VEHICLE_TYPE=""    # empty = pick randomly among sedan/suv
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PAIRING_RESULT="$SCRIPT_DIR/pairing-result.json"
+# pairing-result.json always lives at the project root, regardless of where
+# this script itself lives (scripts/macos/) — two levels up.
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PAIRING_RESULT="$PROJECT_ROOT/pairing-result.json"
 
 usage() {
   cat <<'EOF'
 Usage: ./send-random-plate.sh [-u API_BASE_URL] [-k API_KEY] [-t CONTROLLER_TOKEN] [-d DISPLAY_ID]
                                [-w yes|no] [-l PLATE_LENGTH] [-D incoming|away]
-                               [-p DETECTOR_PLACEMENT] [-c VEHICLE_COLOR]
+                               [-p DETECTOR_PLACEMENT] [-c VEHICLE_COLOR] [-y VEHICLE_TYPE]
 
-If -u/-k/-t/-d are omitted, they're read from ./pairing-result.json
-(written by pair-controller.sh). All other flags are optional; you'll be
-prompted for anything not supplied.
+If -u/-k/-t/-d are omitted, they're read from pairing-result.json at the
+project root (written by pair-controller.sh). All other flags are
+optional; you'll be prompted for anything not supplied.
 
 Every /api/remote/... call needs BOTH the API key (same one used to pair)
 and the controller token — a missing/wrong API key and a missing/wrong
@@ -60,11 +63,12 @@ controller token both come back from the server as the same generic
   -D   Direction: incoming | away (default: incoming)
   -p   Detector placement, must match direction (default: center_front)
   -c   Vehicle color: blue | red | gray (default: random)
+  -y   Vehicle type: sedan | suv (default: random)
   -h   Show this help
 EOF
 }
 
-while getopts "u:k:t:d:w:l:D:p:c:h" opt; do
+while getopts "u:k:t:d:w:l:D:p:c:y:h" opt; do
   case "$opt" in
     u) API_BASE_URL="$OPTARG" ;;
     k) API_KEY="$OPTARG" ;;
@@ -75,6 +79,7 @@ while getopts "u:k:t:d:w:l:D:p:c:h" opt; do
     D) DIRECTION="$OPTARG" ;;
     p) DETECTOR_PLACEMENT="$OPTARG" ;;
     c) VEHICLE_COLOR="$OPTARG" ;;
+    y) VEHICLE_TYPE="$OPTARG" ;;
     h) usage; exit 0 ;;
     *) usage; exit 1 ;;
   esac
@@ -145,6 +150,13 @@ if [ -z "$VEHICLE_COLOR" ]; then
 fi
 [[ "$VEHICLE_COLOR" =~ ^(blue|red|gray)$ ]] || fail "Vehicle color must be blue, red, or gray."
 
+if [ -z "$VEHICLE_TYPE" ]; then
+  # Mirrors VEHICLE_TYPES in packages/shared/src/types/simulation.ts.
+  VEHICLE_TYPES=(sedan suv)
+  VEHICLE_TYPE="${VEHICLE_TYPES[$((RANDOM % ${#VEHICLE_TYPES[@]}))]}"
+fi
+[[ "$VEHICLE_TYPE" =~ ^(sedan|suv)$ ]] || fail "Vehicle type must be sedan or suv."
+
 if [ -z "$PLATE_LENGTH" ]; then
   PLATE_LENGTH=$((6 + RANDOM % 3))   # 6, 7, or 8
 fi
@@ -191,12 +203,14 @@ BODY=$(jq -n \
   --arg direction "$DIRECTION" \
   --arg detectorPlacement "$DETECTOR_PLACEMENT" \
   --arg vehicleColor "$VEHICLE_COLOR" \
+  --arg vehicleType "$VEHICLE_TYPE" \
   --arg gateMode "$GATE_MODE" \
   '{
     plate: $plate,
     direction: $direction,
     detectorPlacement: $detectorPlacement,
     vehicleColor: $vehicleColor,
+    vehicleType: $vehicleType,
     gateConfig: {
       gateMode: $gateMode,
       gateInitialState: "closed",
@@ -237,7 +251,7 @@ invoke_api() {
   echo "$json_body"
 }
 
-echo "Sending plate '$PLATE' (direction=$DIRECTION, placement=$DETECTOR_PLACEMENT, gateMode=$GATE_MODE) to display $DISPLAY_ID ..."
+echo "Sending plate '$PLATE' (type=$VEHICLE_TYPE, color=$VEHICLE_COLOR, direction=$DIRECTION, placement=$DETECTOR_PLACEMENT, gateMode=$GATE_MODE) to display $DISPLAY_ID ..."
 SIMULATE_RESP=$(invoke_api POST "/api/remote/displays/$DISPLAY_ID/simulate" "$BODY")
 COMMAND_ID=$(echo "$SIMULATE_RESP" | jq -r '.commandId')
 echo "Command queued: $COMMAND_ID"

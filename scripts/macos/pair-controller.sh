@@ -14,9 +14,12 @@
 #
 # Requires: curl, jq (brew install jq)
 #
-# Usage:
-#   ./pair-controller.sh
+# Usage (run from anywhere — paths are resolved relative to this script):
+#   ./scripts/macos/pair-controller.sh
 #   (or run non-interactively with flags, see --help)
+#
+# Writes pairing-result.json to the PROJECT ROOT (not this scripts/macos/
+# folder) — see scripts/macos/send-random-plate.sh, which reads it from there.
 
 set -euo pipefail
 
@@ -109,7 +112,9 @@ fi
 # Strip trailing slash
 API_BASE_URL="${API_BASE_URL%/}"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# pairing-result.json always lives at the project root, regardless of where
+# this script itself lives (scripts/macos/) — two levels up.
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Performs an API call; prints the JSON body to stdout and exits non-zero on failure.
 invoke_api() {
@@ -203,7 +208,7 @@ echo ""
 echo "IMPORTANT: save the Controller Token now - it is shown only this once."
 echo "Treat it like a password: whoever holds it can send commands to this display."
 
-RESULT_PATH="$SCRIPT_DIR/pairing-result.json"
+RESULT_PATH="$PROJECT_ROOT/pairing-result.json"
 jq -n \
   --arg displayId "$FINAL_DISPLAY_ID" \
   --arg displayName "$DISPLAY_NAME" \

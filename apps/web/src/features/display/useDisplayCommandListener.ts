@@ -278,7 +278,12 @@ export function useDisplayCommandListener({ simulation, plateQueue, plateLists, 
     const reg = registrationRef.current;
     if (!reg) return;
     void (async () => {
-      await authedFetch(`/api/displays/${reg.displayId}/pairing-requests/${pairingRequestId}/approve`, { method: 'POST' }).catch(() => {});
+      const res = await authedFetch(`/api/displays/${reg.displayId}/pairing-requests/${pairingRequestId}/approve`, { method: 'POST' }).catch(() => null);
+      // The code that led to this request is now spent (a display only ever
+      // has one active code — a new one expires it, see pairingService.ts's
+      // expirePendingForDisplay) — clear it so the panel goes back to
+      // "No active code." instead of showing a code that no longer works.
+      if (res?.ok) setPairingCode(null);
       refreshPairingRequests();
       refreshPairings();
     })();

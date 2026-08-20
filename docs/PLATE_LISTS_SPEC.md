@@ -26,8 +26,10 @@ interface PlateListSimulationDefaults {
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   vehicleColor: VehicleColor;
+  vehicleType?: VehicleType;       // optional — absent on lists saved before this field existed; leaves current type untouched when applied
   gateConfig: GateConfig;          // { gateMode, gateInitialState, stopBeforeOpenMs, delayAfterOpenMs }
   queueConfig: PlateQueueConfig;   // { mode, gapBetweenVehiclesMs, loop }
+  speedPreset?: 'slow' | 'regular' | 'fast';   // optional — same "absent means untouched" rule
 }
 
 interface PlateList {
@@ -92,7 +94,7 @@ show an inline error.
 
 ```
 runList(id):
-  1. onConfigChange(applyListDefaults(list))   — direction, placement, vehicleColor, gate fields
+  1. onConfigChange(applyListDefaults(list))   — direction, placement, vehicleColor, vehicleType (if set), gate fields
   2. plateQueue.setQueueConfig(list.simulationDefaults.queueConfig)
   3. stash { plates: list.plates, autoRun: true } in a ref
   4. a useEffect keyed on `config` fires once the real re-render happens,
@@ -115,7 +117,10 @@ this fix.
 
 `applyListDefaults` merges `direction`, `detectorPlacement`, `vehicleColor`,
 and the 4 `gateConfig` fields onto the *current* config (everything else —
-speed sliders, debug flags — is left as-is; a list does not override those).
+speed sliders, debug flags — is left as-is; a list does not override
+those). `vehicleType` is merged too, but only when the list has it set —
+lists saved before this field existed leave the current `vehicleType`
+untouched (same "absent means don't touch" rule as `speedPreset`).
 
 ## UI — `apps/web/src/components/controls/PlateListsPanel.tsx`
 

@@ -151,6 +151,7 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
       direction: d.direction,
       detectorPlacement: d.detectorPlacement,
       vehicleColor: d.vehicleColor,
+      vehicleType: d.vehicleType ?? configRef.current.vehicleType,
       ...d.gateConfig,
       ...speedFields,
     };
@@ -170,6 +171,7 @@ export function usePlateLists({ config, onConfigChange, plateQueue, executionHis
       plateListName: list.name,
       totalPlates: plates.length,
       vehicleColor: list.simulationDefaults.vehicleColor,
+      vehicleType: list.simulationDefaults.vehicleType,
       direction: list.simulationDefaults.direction,
       detectorPlacement: list.simulationDefaults.detectorPlacement,
       gateModeSummary: summarizeGateConfig(list.simulationDefaults.gateConfig),

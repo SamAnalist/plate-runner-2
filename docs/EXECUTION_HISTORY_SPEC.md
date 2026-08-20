@@ -28,6 +28,7 @@ interface ScheduledExecutionRecord {
   skippedPlates: number;
   failedPlates: number;
   vehicleColor: VehicleColor;
+  vehicleType?: VehicleType;   // optional — absent on records created before this field existed
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   gateModeSummary: string;   // e.g. "auto_open (closed)" or "hidden"

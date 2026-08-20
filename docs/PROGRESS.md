@@ -4011,3 +4011,182 @@ the CLI stops prompting for it.
 - Consider surfacing per-command failure reasons in the UI (e.g. a toast
   or the SystemStatusPanel) so a genuine failure isn't as invisible as
   `local_queue_busy` was.
+
+---
+
+## Phase — SUV Vehicle Type + CLI Reorganization
+
+**Date:** 2026-08-20
+
+### Goal
+
+Add a second vehicle body type (`suv`, alongside the original `sedan`)
+end-to-end — shared types, asset registry, plate anchors, server
+validation, every UI surface that touches vehicle color, and the remote
+API (so Displays/Controllers can select it too) — plus finish naming the
+user-provided SUV asset files to match the existing convention. Along the
+way: reorganized the CLI scripts into OS-specific folders and added a
+Windows equivalent of `send-random-plate`.
+
+### Implemented
+
+- **Renamed SUV asset files** — the user dropped 18 PNGs (3 colors × 6
+  placements) at `apps/web/public/assets/vehicles/suv/`, inconsistently
+  suffixed (`driver_back_1.png` etc., `blue/` missing the suffix on 2
+  files). Renamed all of them to `<placement>.png`, matching the existing
+  `main-car/<color>/<placement>.png` convention exactly. Confirmed all 18
+  are 1536×1024, same as the sedan set.
+- **`VehicleType = 'sedan' | 'suv'`** added to `packages/shared/src/types/simulation.ts`
+  (`VEHICLE_TYPES` array, `SimulationConfig.vehicleType` required field,
+  `DEFAULT_CONFIG.vehicleType = 'sedan'`). `'sedan'` maps to the legacy
+  `main-car` asset folder name (kept as-is — an internal path detail, never
+  exposed via the API/UI).
+- **Asset registry restructured to 3 dimensions** (`assetRegistry.tsx`):
+  `VEHICLE_ASSET_REGISTRY` is now `Record<VehicleType, Record<VehicleColor,
+  ...>>`; `getVehicleAsset({ type, color, placement })` resolves with
+  fallback to sedan/blue.
+- **Plate anchors restructured to 3 dimensions** (`plateAnchors.ts`):
+  `PLATE_ANCHORS_BY_TYPE_AND_COLOR`; `getPlateAnchor(type, color,
+  placement)`. SUV's anchors are a **direct copy of sedan's per color** —
+  explicitly flagged PENDING VISUAL CALIBRATION in code comments and docs,
+  since the SUV's body proportions almost certainly place the plate
+  differently than the sedan's.
+- **`VehicleAssetLayer.tsx`** now threads `config.vehicleType` through to
+  both the asset and anchor resolvers, and the Anchor bounds debug overlay.
+- **Server validation + routes**: `validateVehicleType` added to
+  `apps/server/src/services/validation.ts`; wired into `POST /api/simulate`,
+  `POST /api/simulate/queue`, their `/api/remote/displays/:displayId/*`
+  equivalents, `validateSetConfigPayload`, and `listService.ts`'s plate-list
+  draft validation. `vehicleType` is **optional** on every request body,
+  defaulting server-side to `'sedan'` when omitted (same pattern as
+  `speedPreset`) — so existing callers that don't send it keep working
+  unchanged.
+- **UI**: added a Vehicle Type selector (Sedan/SUV toggle) to Local Mode's
+  Visual Settings, Settings → Simulator Defaults ("Vehicle" section, now
+  grouping Type + Color together), Controller Mode's Send Single
+  Plate/Send Queue forms, and Plate Lists' create/edit form. Execution
+  History and Plate Lists' summary rows now show the vehicle type too
+  (falling back to `'sedan'` for older records/lists that predate the
+  field).
+- **Shared-type plumbing**: `vehicleType` threaded through
+  `RunPlatePayload`/`RunQueuePayload` (required, post-defaulting shape,
+  same as `speedPreset`), `SetConfigPayload` (optional), and
+  `PlateListSimulationDefaults`/`ScheduledExecutionRecord` (optional,
+  "absent means don't touch/unknown" — same rule as the existing optional
+  `speedPreset` field) across every producer/consumer:
+  `commandExecutor.ts`, `usePlateLists.ts`, `plateListStorage.ts` (JSON
+  import/export validation), `useLocalScheduler.ts`,
+  `useExecutionHistory.ts`, `useSimulatorDefaults.ts`,
+  `useRemoteController.ts`.
+- **CLI scripts reorganized** into `scripts/macos/` and `scripts/windows/`
+  (previously loose in the project root). `pairing-result.json` is still
+  always read/written at the **project root** regardless of which script
+  ran — each script resolves that path relative to its own new location.
+- **New: `scripts/windows/send-random-plate.bat` + `.ps1`** — full port of
+  the macOS `send-random-plate.sh` (random plate/color/type, wait_for_signal
+  + open-gate flow, reads `pairing-result.json` for defaults). Windows
+  previously only had the pairing wizard, not this script.
+- `send-random-plate.sh`/`.ps1` both pick a random `vehicleType` (sedan/suv)
+  by default, overridable with `-y`/`-VehicleType`.
+- `scripts/windows/pair-controller.ps1` now also saves `apiKey` into
+  `pairing-result.json` (the bash version already did this; the PowerShell
+  version had fallen behind).
+
+### Files Changed
+
+- `apps/web/public/assets/vehicles/suv/**` — renamed (no content changes).
+- `packages/shared/src/types/{simulation,simulationCommand,plateList,executionHistory}.ts`
+- `apps/web/src/components/simulation/renderers/asset-realistic/{assetRegistry.tsx,plateAnchors.ts,VehicleAssetLayer.tsx}`
+- `apps/server/src/services/validation.ts`, `apps/server/src/routes/{simulate.ts,remote.ts}`, `apps/server/src/services/listService.ts`
+- `apps/web/src/components/controls/{SimulatorDefaultsPanel,ControllerModePanel,PlateListsPanel,ExecutionHistoryPanel}.tsx`
+- `apps/web/src/screens/LocalModeScreen.tsx`
+- `apps/web/src/features/{api/commandExecutor,lists/usePlateLists,lists/plateListStorage,scheduler/useLocalScheduler,history/useExecutionHistory,simulatorDefaults/useSimulatorDefaults,controller/useRemoteController}.ts`
+- `scripts/macos/{pair-controller.sh,send-random-plate.sh}` (moved from root, updated paths + vehicleType)
+- `scripts/windows/{pair-controller.bat,pair-controller.ps1}` (moved from root, updated paths + apiKey save)
+- `scripts/windows/{send-random-plate.bat,send-random-plate.ps1}` — new
+- `docs/{VEHICLE_COLOR_VARIANTS,BACKEND_API_SPEC,REMOTE_COMMANDS_SPEC,PLATE_LISTS_SPEC,EXECUTION_HISTORY_SPEC,IMPORT_EXPORT_SPEC,RENDERER_ARCHITECTURE,SIMULATION_SPEC,CONTROLLER_CLI_TOOLS}.md`
+
+### Decisions
+
+- `vehicleType` optional (with server default) on request-payload shapes
+  (`RunPlatePayload` inputs, `SetConfigPayload`, `PlateListSimulationDefaults`)
+  rather than required like `vehicleColor` — this is a field being added to
+  an *existing* API surface, so making it required would break every
+  existing caller (CLI scripts, saved plate lists, any external
+  integration) the moment they didn't send it. Matches exactly how
+  `speedPreset` was introduced. `SimulationConfig` itself (live app state,
+  always seeded from `DEFAULT_CONFIG`) keeps `vehicleType` required — no
+  backward-compat concern there since it's never partially constructed.
+- SUV plate anchors seeded as a direct copy of sedan's rather than left
+  unset/fallback-to-sedan-visually — a copy is copy-editable in place
+  (matches the exact workflow already used for red/gray sedan anchors) and
+  keeps the type-safety of "every (type, color, placement) has a real
+  value," vs. a fallback that would need conditional logic. The tradeoff is
+  the copied numbers are known-wrong until manually calibrated — documented
+  prominently rather than silently shipped as if correct.
+- Kept the `main-car` folder name for `sedan` instead of renaming it —
+  renaming would touch 18 file paths for zero functional benefit (the name
+  is never user-facing) and risk breaking anything with a hardcoded
+  reference; documented as an intentional legacy-name exception instead.
+- `pairing-result.json` stays at the project root (not inside `scripts/`)
+  even after the reorg — it's the natural place a user expects a
+  gitignored local secret file, and keeps existing local copies (from
+  before this reorg) valid without needing to move them.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit`, `pnpm --filter server exec tsc
+  --noEmit`, `pnpm build` — all clean.
+- `bash -n` on both macOS scripts — clean.
+- Manual QA pending (user): switch Vehicle Type to SUV in Local Mode /
+  Simulator Defaults and visually confirm the SUV asset renders per
+  placement/color; expect the plate to be visibly misplaced (anchors not
+  yet calibrated — known, documented). Run
+  `scripts/windows/send-random-plate.ps1` on an actual Windows machine
+  (untestable from this session — no Windows/PowerShell environment
+  available; reviewed carefully by hand instead, mirroring the
+  already-tested bash script's logic 1:1).
+
+### Known Limitations
+
+- **SUV plate anchors are uncalibrated** — the plate will very likely
+  render in the wrong position/size on the SUV asset until someone runs
+  the Anchor bounds overlay workflow (documented in
+  `docs/VEHICLE_COLOR_VARIANTS.md`) for all 6 placements × 3 colors.
+- `scripts/windows/send-random-plate.ps1` was not run against a live
+  Windows machine or backend in this session — logic mirrors the
+  proven-working bash version, but hasn't been execution-verified on
+  Windows itself.
+- Older `pairing-result.json` files written by the previous
+  `pair-controller.ps1` (before this phase) won't have `apiKey` — same
+  fallback-to-prompt behavior as the bash version already had.
+
+### Next Steps
+
+- Calibrate SUV plate anchors visually (highest-priority follow-up — the
+  feature is functionally complete but visually wrong until this is done).
+- User to manually verify `scripts/windows/send-random-plate.bat`/`.ps1` on
+  an actual Windows machine.
+- Consider whether `PlateListsPanel`'s random-plate-generator flow or the
+  Scheduler UI should also expose vehicle type (currently only the direct
+  send/save-list paths do).
+
+### Also in this phase (small, unrelated fixes bundled in)
+
+- **Favicon**: added `apps/web/public/favicon.svg` (a small license-plate
+  icon in the app's own dark/blue palette) and linked it from
+  `apps/web/index.html` — the app previously shipped with no favicon at
+  all.
+- **Fixed stale Pairing Code display**: in `DisplayModePanel.tsx`/
+  `useDisplayCommandListener.ts`, approving a pairing request left the
+  just-generated code visible in the "Pairing Code" panel indefinitely,
+  even though that code is spent the moment a request is approved (a
+  display only ever has one active code — generating a new one expires
+  any prior pending one server-side, see `pairingService.ts`'s
+  `expirePendingForDisplay`). `approveRequest` now clears the local
+  `pairingCode` state on a successful approve, so the panel correctly
+  reverts to "No active code." instead of showing a code that no longer
+  works. Known simplification: if a display ever has multiple *simultaneous*
+  pending requests from the same code window, approving any one of them
+  clears the shown code for all — matches the common single-controller
+  pairing flow this was reported against; not revisited for that edge case.

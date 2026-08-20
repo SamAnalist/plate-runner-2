@@ -3,6 +3,7 @@ import type {
   Direction,
   DetectorPlacement,
   VehicleColor,
+  VehicleType,
   GateConfig,
   PlateQueueConfig,
   SetConfigPayload,
@@ -23,6 +24,7 @@ export interface RunPlateArgs {
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   vehicleColor: VehicleColor;
+  vehicleType?: VehicleType;
   gateConfig: GateConfig;
   queueConfig: PlateQueueConfig;
 }
@@ -32,6 +34,7 @@ export interface RunQueueArgs {
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   vehicleColor: VehicleColor;
+  vehicleType?: VehicleType;
   gateConfig: GateConfig;
   queueConfig: PlateQueueConfig;
 }

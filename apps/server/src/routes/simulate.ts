@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { validatePlate, isPlacementAllowedForDirection, REQUEST_SPEED_PRESETS } from '@plate-runner/shared';
+import { validatePlate, isPlacementAllowedForDirection, REQUEST_SPEED_PRESETS, VEHICLE_TYPES } from '@plate-runner/shared';
 import type { CommandService } from '../services/commandService';
 import {
   validateDirection,
   validateDetectorPlacement,
   validateVehicleColor,
+  validateVehicleType,
   validateGateConfig,
   validateQueueConfig,
   validatePlates,
@@ -13,6 +14,8 @@ import {
 
 /** Endpoint-level default when the caller doesn't specify speedPreset — favors camera readability over cinematic speed. */
 const DEFAULT_REQUEST_SPEED_PRESET = 'slow';
+/** Endpoint-level default when the caller doesn't specify vehicleType — the original/only vehicle before the SUV type was added. */
+const DEFAULT_REQUEST_VEHICLE_TYPE = 'sedan';
 
 /** POST /api/simulate and POST /api/simulate/queue — create run_plate/run_queue commands. Never executes anything itself. */
 export async function registerSimulateRoutes(fastify: FastifyInstance, commandService: CommandService): Promise<void> {
@@ -29,6 +32,9 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
       return reply.code(400).send({ ok: false, error: 'detectorPlacement is not valid for the given direction' });
     }
     if (!validateVehicleColor(body.vehicleColor)) return reply.code(400).send({ ok: false, error: 'invalid vehicleColor' });
+    if (body.vehicleType !== undefined && !validateVehicleType(body.vehicleType)) {
+      return reply.code(400).send({ ok: false, error: `invalid vehicleType — must be one of ${VEHICLE_TYPES.join(', ')}` });
+    }
     if (!validateGateConfig(body.gateConfig)) return reply.code(400).send({ ok: false, error: 'invalid gateConfig' });
     if (!validateQueueConfig(body.queueConfig)) return reply.code(400).send({ ok: false, error: 'invalid queueConfig' });
     if (body.speedPreset !== undefined && !validateSpeedPreset(body.speedPreset)) {
@@ -40,6 +46,7 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
       direction: body.direction,
       detectorPlacement: body.detectorPlacement,
       vehicleColor: body.vehicleColor,
+      vehicleType: body.vehicleType ?? DEFAULT_REQUEST_VEHICLE_TYPE,
       gateConfig: body.gateConfig,
       queueConfig: body.queueConfig,
       speedPreset: body.speedPreset ?? DEFAULT_REQUEST_SPEED_PRESET,
@@ -59,6 +66,9 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
       return reply.code(400).send({ ok: false, error: 'detectorPlacement is not valid for the given direction' });
     }
     if (!validateVehicleColor(body.vehicleColor)) return reply.code(400).send({ ok: false, error: 'invalid vehicleColor' });
+    if (body.vehicleType !== undefined && !validateVehicleType(body.vehicleType)) {
+      return reply.code(400).send({ ok: false, error: `invalid vehicleType — must be one of ${VEHICLE_TYPES.join(', ')}` });
+    }
     if (!validateGateConfig(body.gateConfig)) return reply.code(400).send({ ok: false, error: 'invalid gateConfig' });
     if (!validateQueueConfig(body.queueConfig)) return reply.code(400).send({ ok: false, error: 'invalid queueConfig' });
     if (body.speedPreset !== undefined && !validateSpeedPreset(body.speedPreset)) {
@@ -70,6 +80,7 @@ export async function registerSimulateRoutes(fastify: FastifyInstance, commandSe
       direction: body.direction,
       detectorPlacement: body.detectorPlacement,
       vehicleColor: body.vehicleColor,
+      vehicleType: body.vehicleType ?? DEFAULT_REQUEST_VEHICLE_TYPE,
       gateConfig: body.gateConfig,
       queueConfig: body.queueConfig,
       speedPreset: body.speedPreset ?? DEFAULT_REQUEST_SPEED_PRESET,

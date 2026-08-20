@@ -226,8 +226,42 @@ const asset = getVehicleAsset({ color: config.vehicleColor, placement: viewKey }
 
 The legacy `CarPalette`/`CAR_PALETTES` SVG-tinting fallback and the `svg-prototype` `AssetEntry` variant were removed in this phase — they were dead code for the raster pipeline (confirmed unused anywhere else) and would have required pruning to typecheck against the narrowed `VehicleColor` anyway.
 
+**Status update:** `red`/`gray` are now fully populated (not empty as shown
+in the snippet above, which reflects this phase's starting state) — see
+`docs/VEHICLE_COLOR_VARIANTS.md`'s "Status update — red/gray sedan assets
+added" section.
+
+## 9c. Type+Color-Keyed Asset Registry — `suv` added
+
+A later phase added a second vehicle type dimension, `VehicleType = 'sedan'
+| 'suv'`, orthogonal to `VehicleColor`. The registry is now keyed by
+**three** dimensions — type, then color, then `AssetViewKey`:
+
+```ts
+const VEHICLE_ASSET_REGISTRY: Record<VehicleType, Record<VehicleColor, Partial<Record<AssetViewKey, AssetEntry>>>> = {
+  sedan: { blue: {...}, red: {...}, gray: {...} },  // fully populated (folder: main-car, legacy name)
+  suv:   { blue: {...}, red: {...}, gray: {...} },  // fully populated
+};
+```
+
+Files live at `public/assets/vehicles/main-car/<color>/<view>.png` for
+`sedan` and `public/assets/vehicles/suv/<color>/<view>.png` for `suv`. The
+resolver signature grew a `type` param:
+
+```ts
+const asset = getVehicleAsset({ type: config.vehicleType, color: config.vehicleColor, placement: viewKey });
+```
+
+`getVehicleAsset` falls back to `sedan`/`blue` for the same placement when
+the requested `(type, color)` has no asset, same `fallbackUsed: true`
+mechanism as before. Plate anchors (`plateAnchors.ts`) grew the same third
+dimension — `getPlateAnchor(type, color, placement)` — with `suv`'s anchors
+currently an uncalibrated direct copy of `sedan`'s (see
+`docs/VEHICLE_COLOR_VARIANTS.md`'s calibration status section).
+
 ## 10. Extension Points
 
 - **New visual style**: add to `VisualStyle` union, add label to `VISUAL_STYLE_LABELS`, add entry to `RENDERERS` record, create `MyRenderer.tsx` implementing `SceneRendererProps`.
-- **Install a new color's real assets**: add PNG files under `public/assets/vehicles/main-car/<color>/`, populate that color's object in `VEHICLE_ASSET_REGISTRY` (`assetRegistry.tsx`) with the six placement entries. `VehicleAssetLayer` and `getVehicleAsset` need no changes. Anchors are shared across colors (see `docs/VEHICLE_COLOR_VARIANTS.md`) as long as the new image has the same geometry/crop as the blue reference.
+- **Install a new color's real assets (existing vehicle type)**: add PNG files under `public/assets/vehicles/<main-car|suv>/<color>/`, populate that color's object in `VEHICLE_ASSET_REGISTRY[type]` (`assetRegistry.tsx`) with the six placement entries. `VehicleAssetLayer` and `getVehicleAsset` need no changes. Anchors are independent per `(type, color)` (see `docs/VEHICLE_COLOR_VARIANTS.md`) — don't assume a new color's geometry matches an existing one without visual QA.
+- **New vehicle type**: see `docs/VEHICLE_COLOR_VARIANTS.md`'s "How to add a new vehicle type" section — touches `VEHICLE_TYPES` in `packages/shared`, `VEHICLE_ASSET_REGISTRY`/`PLATE_ANCHORS_BY_TYPE_AND_COLOR`, and the UI's vehicle-type selectors.
 - **New camera angle (e.g. overhead front)**: extend `AssetViewKey`, add matching `DetectorPlacement`, add file + anchor entries.

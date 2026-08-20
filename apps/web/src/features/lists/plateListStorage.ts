@@ -1,6 +1,7 @@
 import {
   validatePlate,
   VEHICLE_COLORS,
+  VEHICLE_TYPES,
   DIRECTIONS,
   DETECTOR_PLACEMENTS,
   GATE_MODES,
@@ -151,6 +152,9 @@ function sanitizeImportedList(candidate: unknown): { list: PlateList | null; err
   if (typeof d.vehicleColor !== 'string' || !VEHICLE_COLORS.includes(d.vehicleColor as never)) {
     return { list: null, error: `"${name}": invalid vehicleColor.` };
   }
+  if (d.vehicleType !== undefined && (typeof d.vehicleType !== 'string' || !VEHICLE_TYPES.includes(d.vehicleType as never))) {
+    return { list: null, error: `"${name}": invalid vehicleType.` };
+  }
   const g = d.gateConfig as Record<string, unknown> | undefined;
   if (
     typeof g !== 'object' || g === null ||
@@ -182,6 +186,7 @@ function sanitizeImportedList(candidate: unknown): { list: PlateList | null; err
         direction: d.direction,
         detectorPlacement: d.detectorPlacement,
         vehicleColor: d.vehicleColor,
+        vehicleType: d.vehicleType,
         gateConfig: {
           gateMode: g.gateMode,
           gateInitialState: g.gateInitialState,

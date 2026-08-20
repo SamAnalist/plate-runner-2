@@ -1,6 +1,7 @@
 import {
   validatePlate,
   VEHICLE_COLORS,
+  VEHICLE_TYPES,
   DIRECTIONS,
   DETECTOR_PLACEMENTS,
   GATE_MODES,
@@ -13,6 +14,7 @@ import {
   type Direction,
   type DetectorPlacement,
   type VehicleColor,
+  type VehicleType,
   type GateConfig,
   type PlateQueueConfig,
   type SetConfigPayload,
@@ -37,6 +39,10 @@ export function validateDetectorPlacement(v: unknown): v is DetectorPlacement {
 
 export function validateVehicleColor(v: unknown): v is VehicleColor {
   return typeof v === 'string' && VEHICLE_COLORS.includes(v as VehicleColor);
+}
+
+export function validateVehicleType(v: unknown): v is VehicleType {
+  return typeof v === 'string' && VEHICLE_TYPES.includes(v as VehicleType);
 }
 
 export function validateGateConfig(v: unknown): v is GateConfig {
@@ -115,6 +121,10 @@ export function validateSetConfigPayload(v: unknown): SetConfigValidationResult 
   if (body.vehicleColor !== undefined) {
     if (!validateVehicleColor(body.vehicleColor)) return { ok: false, error: 'invalid vehicleColor' };
     payload.vehicleColor = body.vehicleColor;
+  }
+  if (body.vehicleType !== undefined) {
+    if (!validateVehicleType(body.vehicleType)) return { ok: false, error: `invalid vehicleType — must be one of ${VEHICLE_TYPES.join(', ')}` };
+    payload.vehicleType = body.vehicleType;
   }
   if (body.gateConfig !== undefined) {
     if (!validateGateConfig(body.gateConfig)) return { ok: false, error: 'invalid gateConfig' };

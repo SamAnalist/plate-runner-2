@@ -1,5 +1,5 @@
 import { getPlacementsForDirection } from '@plate-runner/shared';
-import type { Direction, DetectorPlacement, VehicleColor, GateMode, GateInitialState } from '@plate-runner/shared';
+import type { Direction, DetectorPlacement, VehicleColor, VehicleType, GateMode, GateInitialState } from '@plate-runner/shared';
 import type { SimulatorDefaultsControls } from '../../features/simulatorDefaults/useSimulatorDefaults';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { ToggleGroup } from '../ui/ToggleGroup';
@@ -16,6 +16,11 @@ const SPEED_PRESET_OPTIONS: { value: 'slow' | 'regular' | 'fast'; label: string 
   { value: 'slow', label: 'Slow' },
   { value: 'regular', label: 'Regular' },
   { value: 'fast', label: 'Fast' },
+];
+
+const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string }[] = [
+  { value: 'sedan', label: 'Sedan' },
+  { value: 'suv', label: 'SUV' },
 ];
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
@@ -115,17 +120,31 @@ export function SimulatorDefaultsPanel({ controls }: { controls: SimulatorDefaul
         </p>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Vehicle Color" defaultOpen chevronClassName="text-lg">
-        <div className="flex flex-wrap gap-2">
-          {(Object.keys(COLOR_MAP) as VehicleColor[]).map(color => (
-            <button key={color} title={color} onClick={() => updateSettings({ vehicleColor: color })}
-              className={`w-7 h-7 rounded-full border-2 transition-all ${
-                settings.vehicleColor === color
-                  ? 'border-white/80 scale-110'
-                  : 'border-white/20 hover:border-white/50'}`}
-              style={{ backgroundColor: COLOR_MAP[color] }}
+      <CollapsibleSection title="Vehicle" defaultOpen chevronClassName="text-lg">
+        <div className="flex flex-col gap-3">
+          <div>
+            <GroupLabel>Type</GroupLabel>
+            <ToggleGroup<VehicleType>
+              options={VEHICLE_TYPE_OPTIONS}
+              value={settings.vehicleType}
+              onChange={v => updateSettings({ vehicleType: v })}
+              fullWidth
             />
-          ))}
+          </div>
+          <div>
+            <GroupLabel>Color</GroupLabel>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(COLOR_MAP) as VehicleColor[]).map(color => (
+                <button key={color} title={color} onClick={() => updateSettings({ vehicleColor: color })}
+                  className={`w-7 h-7 rounded-full border-2 transition-all ${
+                    settings.vehicleColor === color
+                      ? 'border-white/80 scale-110'
+                      : 'border-white/20 hover:border-white/50'}`}
+                  style={{ backgroundColor: COLOR_MAP[color] }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </CollapsibleSection>
 

@@ -1,4 +1,4 @@
-import type { Direction, DetectorPlacement, VehicleColor, GateConfig } from './simulation';
+import type { Direction, DetectorPlacement, VehicleColor, VehicleType, GateConfig } from './simulation';
 import type { PlateQueueConfig } from './queue';
 
 export type PlateListId = string;
@@ -11,6 +11,8 @@ export interface PlateListSimulationDefaults {
   queueConfig: PlateQueueConfig;
   /** Optional — absent on lists saved before the Speed presets feature; leaves the current speed untouched when applied. */
   speedPreset?: 'slow' | 'regular' | 'fast';
+  /** Optional — absent on lists saved before the vehicle types feature; defaults to 'sedan' when applied. */
+  vehicleType?: VehicleType;
 }
 
 export interface PlateList {

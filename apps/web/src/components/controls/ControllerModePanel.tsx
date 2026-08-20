@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   DIRECTIONS,
   VEHICLE_COLORS,
+  VEHICLE_TYPES,
   GATE_MODES,
   DEFAULT_CONFIG,
   getPlacementsForDirection,
@@ -10,6 +11,7 @@ import {
   type Direction,
   type DetectorPlacement,
   type VehicleColor,
+  type VehicleType,
   type GateMode,
   type PlateList,
 } from '@plate-runner/shared';
@@ -81,6 +83,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
   const [direction, setDirection] = useState<Direction>(DEFAULT_CONFIG.direction);
   const [placement, setPlacement] = useState<DetectorPlacement>(DEFAULT_CONFIG.detectorPlacement);
   const [vehicleColor, setVehicleColor] = useState<VehicleColor>(DEFAULT_CONFIG.vehicleColor);
+  const [vehicleType, setVehicleType] = useState<VehicleType>(DEFAULT_CONFIG.vehicleType);
   const [gateMode, setGateMode] = useState<GateMode>(DEFAULT_CONFIG.gateMode);
   const [plateResult, setPlateResult] = useState<RemoteActionResult | null>(null);
 
@@ -206,6 +209,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
               <TextInput value={plate} onChange={v => setPlate(v.toUpperCase())} placeholder="ABC123" />
               <div className="flex gap-2">
                 <Select value={direction} onChange={onDirectionChange} options={DIRECTIONS} />
+                <Select value={vehicleType} onChange={setVehicleType} options={VEHICLE_TYPES} />
                 <Select value={vehicleColor} onChange={setVehicleColor} options={VEHICLE_COLORS} />
               </div>
               <Select value={placement} onChange={setPlacement} options={getPlacementsForDirection(direction)} />
@@ -213,7 +217,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
               <Button
                 tone="primary"
                 onClick={() => void sendPlate(effectiveDisplayId, {
-                  plate, direction, detectorPlacement: placement, vehicleColor,
+                  plate, direction, detectorPlacement: placement, vehicleColor, vehicleType,
                   gateConfig: gateConfigFor(gateMode), queueConfig: queueConfigDefault,
                 }).then(setPlateResult)}
               >
@@ -242,7 +246,7 @@ export function ControllerModePanel({ controller, localLists }: { controller: Re
                 tone="primary"
                 disabled={queuePreview.valid.length === 0}
                 onClick={() => void sendQueue(effectiveDisplayId, {
-                  plates: queuePreview.valid, direction, detectorPlacement: placement, vehicleColor,
+                  plates: queuePreview.valid, direction, detectorPlacement: placement, vehicleColor, vehicleType,
                   gateConfig: gateConfigFor(gateMode), queueConfig: queueConfigDefault,
                 }).then(setQueueResult)}
               >

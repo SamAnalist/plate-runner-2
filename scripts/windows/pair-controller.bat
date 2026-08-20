@@ -46,7 +46,7 @@ set "SCRIPT_DIR=%~dp0"
 if not exist "%SCRIPT_DIR%pair-controller.ps1" (
   echo.
   echo ERROR: pair-controller.ps1 not found next to this .bat file.
-  echo Both files must stay together in the project root.
+  echo Both files must stay together in scripts\windows\.
   pause
   exit /b 1
 )

@@ -8,6 +8,7 @@ import type {
   GateMode,
   GateInitialState,
   VehicleColor,
+  VehicleType,
 } from '@plate-runner/shared';
 import { getPlacementsForDirection, speedPhasesForPreset } from '@plate-runner/shared';
 import type { SimulationControls } from '../hooks/useSimulation';
@@ -65,6 +66,11 @@ const COLOR_MAP: Record<VehicleColor, string> = {
   red: '#dc2626',
   gray: '#6b7280',
 };
+
+const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string }[] = [
+  { value: 'sedan', label: 'Sedan' },
+  { value: 'suv', label: 'SUV' },
+];
 
 // ─── Phase speed controls ─────────────────────────────────────────────────
 
@@ -419,6 +425,7 @@ function PlateQueueSection({
         direction: config.direction,
         detectorPlacement: config.detectorPlacement,
         vehicleColor: config.vehicleColor,
+        vehicleType: config.vehicleType,
         gateConfig: {
           gateMode: config.gateMode,
           gateInitialState: config.gateInitialState,
@@ -631,6 +638,16 @@ export function LocalModeScreen({
             <CollapsibleSection title="Visual Settings" defaultOpen chevronClassName="text-lg">
               <div className="flex flex-col gap-4">
                 <SpeedPhasesSection config={config} set={set} onConfigChange={onConfigChange} />
+
+                <div>
+                  <SectionLabel>Vehicle Type</SectionLabel>
+                  <ToggleGroup<VehicleType>
+                    options={VEHICLE_TYPE_OPTIONS}
+                    value={config.vehicleType}
+                    onChange={v => set('vehicleType', v)}
+                    fullWidth
+                  />
+                </div>
 
                 <div>
                   <SectionLabel>Vehicle Color</SectionLabel>

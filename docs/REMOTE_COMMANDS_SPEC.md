@@ -100,9 +100,9 @@ now applies via an optional `onSetConfig` callback threaded from `App.tsx`
 wire up `onSetConfig`, the command is still claimed then failed with
 `not_implemented` — this is an additive capability, not a breaking change
 to hooks that don't use it. Payload fields (`direction`,
-`detectorPlacement`, `vehicleColor`, `gateConfig`, `queueConfig`) are all
-optional; only the fields present are changed, going through the same
-direction/placement remap guard manual edits use.
+`detectorPlacement`, `vehicleColor`, `vehicleType`, `gateConfig`,
+`queueConfig`) are all optional; only the fields present are changed, going
+through the same direction/placement remap guard manual edits use.
 
 ## Example
 

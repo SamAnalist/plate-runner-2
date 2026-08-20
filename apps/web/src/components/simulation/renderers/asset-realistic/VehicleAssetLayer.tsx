@@ -16,14 +16,25 @@
  *   Each placement has its own image file so driver/passenger/center views
  *   are genuinely distinct visual angles, not the same image with a skew.
  *
- * Vehicle colour:
- *   Car body resolved via getVehicleAsset({ color: config.vehicleColor, placement })
- *   — all three colors ('blue', 'red', 'gray') have real asset files.
- *   Plate anchor resolved via getPlateAnchor(config.vehicleColor, placement) —
- *   each color has its own independent anchor per placement (see
- *   plateAnchors.ts's PLATE_ANCHORS_BY_COLOR and docs/VEHICLE_COLOR_VARIANTS.md).
+ * Vehicle type + colour:
+ *   Car body resolved via getVehicleAsset({ type: config.vehicleType, color:
+ *   config.vehicleColor, placement }) — both types ('sedan', 'suv') have
+ *   real asset files for all three colors ('blue', 'red', 'gray').
+ *   Plate anchor resolved via getPlateAnchor(config.vehicleType,
+ *   config.vehicleColor, placement) — each (type, color) pair has its own
+ *   independent anchor per placement (see plateAnchors.ts's
+ *   PLATE_ANCHORS_BY_TYPE_AND_COLOR and docs/VEHICLE_COLOR_VARIANTS.md).
+ *   Car SIZE also adjusts per vehicle type — see vehicleTypeScale.ts's
+ *   VEHICLE_TYPE_SCALE_MULTIPLIER, applied on top of (not instead of) each
+ *   scene config's per-placement carScale curve.
+ *   Car POSITION can be nudged per (vehicleType, placement) too — see
+ *   vehicleTypePosition.ts's VEHICLE_TYPE_POSITION_OFFSET, for cases where
+ *   a type visibly sits in the wrong spot for one specific scene (e.g. SUV
+ *   in center_front) without affecting sedan or any other placement.
  */
-import type { SimulationConfig, VehicleColor } from '@plate-runner/shared';
+import type { SimulationConfig, VehicleColor, VehicleType } from '@plate-runner/shared';
+import { VEHICLE_TYPE_SCALE_MULTIPLIER } from './vehicleTypeScale';
+import { getVehicleTypePositionOffset } from './vehicleTypePosition';
 import {
   isPlacementAllowedForDirection,
   remapPlacementForDirection,
@@ -90,16 +101,18 @@ interface VehicleAssetLayerProps {
  */
 function AnchorDebugOverlay({
   viewKey,
+  type,
   color,
   carLW = CAR_LW,
   carLH = CAR_LH,
 }: {
   viewKey: AssetViewKey;
+  type: VehicleType;
   color: VehicleColor;
   carLW?: number;
   carLH?: number;
 }) {
-  const anchor = getPlateAnchor(color, viewKey);
+  const anchor = getPlateAnchor(type, color, viewKey);
   const rect   = anchorToLocalRect(anchor, carLW, carLH);
   const cx     = rect.x + rect.w / 2;
   const cy     = rect.y + rect.h / 2;
@@ -200,8 +213,11 @@ export function VehicleAssetLayer({
   const centerX = getViewAwareX(vehicleT, safePlacement);
   const sceneV  = getSceneConfig(safePlacement).vehicle;
 
-  // Car size = natural depth width × per-phase scale from sceneParams.
-  const carScale = getCarScale(vehicleT, config.direction, safePlacement);
+  // Car size = natural depth width × per-phase scale from sceneParams,
+  // uniformly adjusted per vehicle type (e.g. SUV renders slightly larger
+  // than sedan at every phase — see vehicleTypeScale.ts).
+  const carScale = getCarScale(vehicleT, config.direction, safePlacement)
+    * VEHICLE_TYPE_SCALE_MULTIPLIER[config.vehicleType];
   const carW     = roadWidth * CAR_ROAD_FRACTION * carScale;
   const carH     = carW * (CAR_LH / CAR_LW);
 
@@ -213,8 +229,13 @@ export function VehicleAssetLayer({
   const yFarAdj   = sceneV.yFar !== undefined ? lerp(sceneV.yFar - VP_Y, 0, vehicleT) : 0;
   const effectiveY = y + yFarAdj;
 
-  const carX  = centerX - carW / 2;
-  const carY  = effectiveY - carH;
+  // Small per-(vehicleType, placement) position nudge on top of the normal
+  // depth placement — {0, 0} for sedan and every not-yet-flagged (type,
+  // placement) pair. See vehicleTypePosition.ts.
+  const typeOffset = getVehicleTypePositionOffset(config.vehicleType, safePlacement);
+
+  const carX  = centerX - carW / 2 + typeOffset.xPct * carW;
+  const carY  = effectiveY - carH + typeOffset.yPct * carH;
   const scaleX = carW / CAR_LW;
   const scaleY = carH / CAR_LH;
 
@@ -239,8 +260,8 @@ export function VehicleAssetLayer({
 
   // ── Asset & plate anchor lookup ─────────────────────────────────────────
   const viewKey    = safePlacement as AssetViewKey;
-  const asset      = getVehicleAsset({ color: config.vehicleColor, placement: viewKey });
-  const anchor     = getPlateAnchor(config.vehicleColor, safePlacement);
+  const asset      = getVehicleAsset({ type: config.vehicleType, color: config.vehicleColor, placement: viewKey });
+  const anchor     = getPlateAnchor(config.vehicleType, config.vehicleColor, safePlacement);
   const rotDeg     = sceneV.rotationDeg ?? 0;
   const rotTransform = rotDeg !== 0
     ? ` rotate(${rotDeg}, ${CAR_LW / 2}, ${CAR_LH / 2})`
@@ -274,7 +295,7 @@ export function VehicleAssetLayer({
 
         {/* Anchor debug overlay — Visual QA only, never in production / camera mode */}
         {showAnchorOverlay && (
-          <AnchorDebugOverlay viewKey={viewKey} color={config.vehicleColor} />
+          <AnchorDebugOverlay viewKey={viewKey} type={config.vehicleType} color={config.vehicleColor} />
         )}
       </g>
     </g>

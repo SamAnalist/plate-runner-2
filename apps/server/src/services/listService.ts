@@ -10,6 +10,7 @@ import {
   validateDirection,
   validateDetectorPlacement,
   validateVehicleColor,
+  validateVehicleType,
   validateGateConfig,
   validateQueueConfig,
   validatePlates,
@@ -39,6 +40,9 @@ function validateDraft(draft: Record<string, unknown>): DraftValidationResult {
     return { ok: false, error: 'simulationDefaults.detectorPlacement is not valid for the given direction' };
   }
   if (!validateVehicleColor(sd.vehicleColor)) return { ok: false, error: 'invalid simulationDefaults.vehicleColor' };
+  if (sd.vehicleType !== undefined && !validateVehicleType(sd.vehicleType)) {
+    return { ok: false, error: 'invalid simulationDefaults.vehicleType' };
+  }
   if (!validateGateConfig(sd.gateConfig)) return { ok: false, error: 'invalid simulationDefaults.gateConfig' };
   if (!validateQueueConfig(sd.queueConfig)) return { ok: false, error: 'invalid simulationDefaults.queueConfig' };
 
@@ -52,6 +56,7 @@ function validateDraft(draft: Record<string, unknown>): DraftValidationResult {
         direction: sd.direction,
         detectorPlacement: sd.detectorPlacement,
         vehicleColor: sd.vehicleColor,
+        vehicleType: sd.vehicleType,
         gateConfig: sd.gateConfig,
         queueConfig: sd.queueConfig,
       } as PlateList['simulationDefaults'],

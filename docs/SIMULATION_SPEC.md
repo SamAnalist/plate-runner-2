@@ -436,3 +436,23 @@ shape, not a structural change to the simulator.
 Neither the scheduler nor execution history touch `useSimulation` at all —
 both are built entirely on top of the existing `usePlateQueue`/`usePlateLists`
 layers. See `docs/SCHEDULER_SPEC.md` and `docs/EXECUTION_HISTORY_SPEC.md`.
+
+---
+
+## 19. Vehicle Types — `suv` added alongside `sedan`
+
+A new `VehicleType = 'sedan' | 'suv'` dimension was added, orthogonal to
+`VehicleColor`. `SimulationConfig` gained a required `vehicleType` field
+(`DEFAULT_CONFIG.vehicleType = 'sedan'`, matching the vehicle that existed
+before this field did — its asset folder stays named `main-car` for
+historical reasons). This does **not** touch `useSimulation`'s state
+machine or animation logic at all — `vehicleType` only affects which
+asset/plate-anchor pair `VehicleAssetLayer` resolves for the current
+`(vehicleType, vehicleColor, detectorPlacement)` triple, exactly the same
+way `vehicleColor` alone did before. See
+`docs/VEHICLE_COLOR_VARIANTS.md` for the full asset/anchor/fallback
+strategy (now three-dimensional: type × color × placement) and
+`docs/BACKEND_API_SPEC.md` / `docs/REMOTE_COMMANDS_SPEC.md` for how
+`vehicleType` is exposed on `/api/simulate`, `/api/simulate/queue`, and
+their `/api/remote/displays/:displayId/*` equivalents (optional, defaults
+to `'sedan'` server-side when omitted).

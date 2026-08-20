@@ -10,6 +10,7 @@ import {
   type PlateListSimulationDefaults,
   type PlateQueueMode,
   type VehicleColor,
+  type VehicleType,
 } from '@plate-runner/shared';
 import type { PlateListsControls, PlateListDraft } from '../../features/lists/usePlateLists';
 import { parsePlateQueueInput } from '../../features/queue/plateQueueParser';
@@ -58,6 +59,11 @@ const VEHICLE_COLOR_HEX: Record<VehicleColor, string> = {
   gray: '#6b7280',
 };
 
+const VEHICLE_TYPE_OPTIONS: { value: VehicleType; label: string }[] = [
+  { value: 'sedan', label: 'Sedan' },
+  { value: 'suv', label: 'SUV' },
+];
+
 // ─── Form state ──────────────────────────────────────────────────────────
 
 interface ListFormState {
@@ -67,6 +73,7 @@ interface ListFormState {
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   vehicleColor: VehicleColor;
+  vehicleType: VehicleType;
   gateMode: GateMode;
   gateInitialState: GateInitialState;
   stopBeforeOpenMs: number;
@@ -84,6 +91,7 @@ function emptyForm(): ListFormState {
     direction: 'incoming',
     detectorPlacement: 'center_front',
     vehicleColor: 'blue',
+    vehicleType: 'sedan',
     gateMode: 'auto_open',
     gateInitialState: 'closed',
     stopBeforeOpenMs: 3000,
@@ -103,6 +111,7 @@ function formFromList(list: PlateList): ListFormState {
     direction: d.direction,
     detectorPlacement: d.detectorPlacement,
     vehicleColor: d.vehicleColor,
+    vehicleType: d.vehicleType ?? 'sedan',
     gateMode: d.gateConfig.gateMode,
     gateInitialState: d.gateConfig.gateInitialState,
     stopBeforeOpenMs: d.gateConfig.stopBeforeOpenMs,
@@ -118,6 +127,7 @@ function draftFromForm(form: ListFormState, validPlates: string[]): PlateListDra
     direction: form.direction,
     detectorPlacement: form.detectorPlacement,
     vehicleColor: form.vehicleColor,
+    vehicleType: form.vehicleType,
     gateConfig: {
       gateMode: form.gateMode,
       gateInitialState: form.gateInitialState,
@@ -299,6 +309,11 @@ function ListForm({
       </div>
 
       <div>
+        <Label>Vehicle Type</Label>
+        <MiniToggle options={VEHICLE_TYPE_OPTIONS} value={form.vehicleType} onChange={v => set('vehicleType', v)} />
+      </div>
+
+      <div>
         <Label>Vehicle Color</Label>
         <div className="flex gap-2">
           {(Object.keys(VEHICLE_COLOR_HEX) as VehicleColor[]).map(color => (
@@ -417,7 +432,7 @@ function ListCard({
         />
       </div>
       <p className="text-[9px] font-mono text-white/30">
-        {list.plates.length} plates · {d.direction} · {d.detectorPlacement} · {d.gateConfig.gateMode} · {d.queueConfig.mode}
+        {list.plates.length} plates · {d.vehicleType ?? 'sedan'} · {d.direction} · {d.detectorPlacement} · {d.gateConfig.gateMode} · {d.queueConfig.mode}
       </p>
       <p className="text-[9px] font-mono text-white/20">
         updated {new Date(list.updatedAt).toLocaleString()}

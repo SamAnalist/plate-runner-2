@@ -1,4 +1,4 @@
-import type { Direction, DetectorPlacement, VehicleColor } from './simulation';
+import type { Direction, DetectorPlacement, VehicleColor, VehicleType } from './simulation';
 import type { PlateQueueMode } from './queue';
 import type { PlateListId } from './plateList';
 import type { ScheduleId } from './scheduler';
@@ -24,6 +24,8 @@ export interface ScheduledExecutionRecord {
   skippedPlates: number;
   failedPlates: number;
   vehicleColor: VehicleColor;
+  /** Optional — absent on records created before the vehicle types feature. */
+  vehicleType?: VehicleType;
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   gateModeSummary: string;

@@ -1,7 +1,7 @@
 /**
- * Per-view, per-color plate anchors — one independent anchor per
- * (VehicleColor, AssetViewKey) pair, all edited in the single
- * PLATE_ANCHORS_BY_COLOR table below.
+ * Per-view, per-type, per-color plate anchors — one independent anchor per
+ * (VehicleType, VehicleColor, AssetViewKey) triple, all edited in the single
+ * PLATE_ANCHORS_BY_TYPE_AND_COLOR table below.
  *
  * Coordinate space: 100 × 72 car local units (CAR_LW × CAR_LH).
  *
@@ -13,14 +13,21 @@
  *               They're separately rendered images, not recolors of 'blue', so
  *               each color gets its own anchor per placement instead of sharing
  *               'blue's.
+ *   Later phase — 'suv' vehicle type added. Its anchors are currently a
+ *               DIRECT COPY of 'sedan's values per color — the SUV assets
+ *               have not yet been visually calibrated (different body
+ *               proportions and plate position than the sedan almost
+ *               certainly mean these are wrong). PENDING VISUAL CALIBRATION,
+ *               same workflow as below, scoped to the 'suv' block.
  *
- * RECALIBRATION WORKFLOW (per color, per placement):
+ * RECALIBRATION WORKFLOW (per type, per color, per placement):
  *   1. Run pnpm dev in apps/web
  *   2. Enable Visual QA overlays in the sidebar → Visual QA → Anchor bounds: ON
- *   3. Select the color you're calibrating (Vehicle Color swatch)
- *   4. For each placement, adjust xPct/yPct/wPct/hPct in that color's block
- *      below until the green dashed rect lands exactly over the plate blank
- *      area in the asset image
+ *   3. Select the vehicle type and color you're calibrating (Vehicle Type /
+ *      Vehicle Color swatches)
+ *   4. For each placement, adjust xPct/yPct/wPct/hPct in that type+color's
+ *      block below until the green dashed rect lands exactly over the plate
+ *      blank area in the asset image
  *   5. Test with ABC123, ABCDEFGHIJ12, and 123456789012
  *   6. Commit updated values
  *
@@ -28,24 +35,28 @@
  *   |skewXDeg| must stay ≤ 12° so 12-character plates remain readable by
  *   external cameras. Do not increase skew for visual effect alone.
  */
-import type { DetectorPlacement, VehicleColor } from '@plate-runner/shared';
+import type { DetectorPlacement, VehicleColor, VehicleType } from '@plate-runner/shared';
 import type { PlateAnchor } from './types';
 
-// ─── Per-color anchor table ─────────────────────────────────────────────────────
+// ─── Per-type, per-color anchor table ────────────────────────────────────────
 //
-// Every color is a full, independent peer here — nothing is merged/inherited
-// from 'blue' at lookup time, so what you see in a color's block below is
-// exactly what renders for that color. When adding a new placement for a
-// color that hasn't been calibrated yet, the simplest starting point is to
-// copy the same placement's values from 'blue'.
+// Every (type, color) pair is a full, independent peer here — nothing is
+// merged/inherited from 'sedan'/'blue' at lookup time, so what you see in a
+// block below is exactly what renders for that type+color. When adding a new
+// placement for a type/color that hasn't been calibrated yet, the simplest
+// starting point is to copy the same placement's values from sedan/blue.
 //
 // CALIBRATION STATUS:
-//   - blue: fully calibrated (original Phase 1.2 baseline).
-//   - red / gray, center_front: measured directly against the blue asset by
-//     pixel inspection (small real offset, ~5-13px on the 1536×1024 canvas).
-//   - red / gray, all other placements: being calibrated in-app via the
-//     Anchor bounds overlay — edit freely below.
-export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlacement, PlateAnchor>> = {
+//   - sedan/blue: fully calibrated (original Phase 1.2 baseline).
+//   - sedan/red, sedan/gray, center_front: measured directly against the
+//     blue asset by pixel inspection (small real offset, ~5-13px on the
+//     1536×1024 canvas).
+//   - sedan/red, sedan/gray, all other placements: being calibrated in-app
+//     via the Anchor bounds overlay — edit freely below.
+//   - suv (all colors): INITIAL estimate, direct copy of the matching
+//     sedan/<color> values — PENDING VISUAL CALIBRATION, not yet verified
+//     against the actual SUV asset images.
+const SEDAN_ANCHORS: Record<VehicleColor, Record<DetectorPlacement, PlateAnchor>> = {
 
   blue: {
     // Straight-on frontal view. Camera elevated ~2–3 m, downward tilt.
@@ -99,7 +110,7 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
       rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'rear',
     },
     driver_back: {
-      xPct: 0.635, yPct: 0.530, wPct: 0.092, hPct: 0.070,
+      xPct: 0.630, yPct: 0.530, wPct: 0.097, hPct: 0.070,
       rotateDeg: -4, skewXDeg: -3, skewYDeg: 0, side: 'rear',
     },
     passenger_back: {
@@ -137,16 +148,113 @@ export const PLATE_ANCHORS_BY_COLOR: Record<VehicleColor, Record<DetectorPlaceme
   },
 };
 
-/** Backwards-compatible alias — the 'blue' anchor set on its own. */
-export const PLATE_ANCHORS: Record<DetectorPlacement, PlateAnchor> = PLATE_ANCHORS_BY_COLOR.blue;
+/**
+ * SUV anchors — INITIAL values, copied from SEDAN_ANCHORS as a starting
+ * point (written out explicitly, not derived, so each value can be edited
+ * in place here without touching SEDAN_ANCHORS). PENDING VISUAL
+ * CALIBRATION — see the module doc comment and RECALIBRATION WORKFLOW
+ * above. Edit freely; nothing else in the codebase depends on these
+ * matching sedan's values.
+ */
+const SUV_ANCHORS: Record<VehicleColor, Record<DetectorPlacement, PlateAnchor>> = {
+  blue: {
+    center_front: {
+      xPct: 0.430, yPct: 0.750, wPct: 0.135, hPct: 0.090,
+      rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'front',
+    },
+    driver_front: {
+      xPct: 0.250, yPct: 0.758, wPct: 0.110, hPct: 0.070,
+      rotateDeg: 9, skewXDeg: 10, skewYDeg: 0, side: 'front',
+    },
+    passenger_front: {
+      xPct: 0.655, yPct: 0.745, wPct: 0.120, hPct: 0.075,
+      rotateDeg: -7, skewXDeg: -5, skewYDeg: 0, side: 'front',
+    },
+    center_back: {
+      xPct: 0.435, yPct: 0.590, wPct: 0.130, hPct: 0.075,
+      rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'rear',
+    },
+    driver_back: {
+      xPct: 0.655, yPct: 0.550, wPct: 0.12, hPct: 0.070,
+      rotateDeg: -8, skewXDeg: -3, skewYDeg: 0, side: 'rear',
+    },
+    passenger_back: {
+      xPct: 0.235, yPct: 0.550, wPct: 0.110, hPct: 0.070,
+      rotateDeg: 10, skewXDeg: 2, skewYDeg: 0, side: 'rear',
+    },
+  },
+
+  red: {
+    center_front: {
+      xPct: 0.430, yPct: 0.750, wPct: 0.135, hPct: 0.090,
+      rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'front',
+    },
+    driver_front: {
+      xPct: 0.250, yPct: 0.758, wPct: 0.110, hPct: 0.070,
+      rotateDeg: 9, skewXDeg: 10, skewYDeg: 0, side: 'front',
+    },
+    passenger_front: {
+      xPct: 0.655, yPct: 0.745, wPct: 0.120, hPct: 0.075,
+      rotateDeg: -7, skewXDeg: 0, skewYDeg: 0, side: 'front',
+    },
+    center_back: {
+      xPct: 0.435, yPct: 0.590, wPct: 0.130, hPct: 0.075,
+      rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'rear',
+    },
+    driver_back: {
+      xPct: 0.655, yPct: 0.550, wPct: 0.12, hPct: 0.070,
+      rotateDeg: -8, skewXDeg: -3, skewYDeg: 0, side: 'rear',
+    },
+    passenger_back: {
+      xPct: 0.235, yPct: 0.550, wPct: 0.110, hPct: 0.070,
+      rotateDeg: 10, skewXDeg: 2, skewYDeg: 0, side: 'rear',
+    },
+  },
+
+  gray: {
+    center_front: {
+      xPct: 0.426, yPct: 0.750, wPct: 0.145, hPct: 0.090,
+      rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'front',
+    },
+    driver_front: {
+      xPct: 0.250, yPct: 0.758, wPct: 0.110, hPct: 0.070,
+      rotateDeg: 9, skewXDeg: 10, skewYDeg: 0, side: 'front',
+    },
+    passenger_front: {
+      xPct: 0.655, yPct: 0.745, wPct: 0.120, hPct: 0.075,
+      rotateDeg: -7, skewXDeg: 0, skewYDeg: 0, side: 'front',
+    },
+    center_back: {
+      xPct: 0.435, yPct: 0.590, wPct: 0.130, hPct: 0.075,
+      rotateDeg: 0, skewXDeg: 0, skewYDeg: 0, side: 'rear',
+    },
+    driver_back: {
+      xPct: 0.655, yPct: 0.550, wPct: 0.12, hPct: 0.070,
+      rotateDeg: -8, skewXDeg: -3, skewYDeg: 0, side: 'rear',
+    },
+    passenger_back: {
+      xPct: 0.235, yPct: 0.550, wPct: 0.110, hPct: 0.070,
+      rotateDeg: 10, skewXDeg: 2, skewYDeg: 0, side: 'rear',
+    },
+  },
+};
+
+export const PLATE_ANCHORS_BY_TYPE_AND_COLOR: Record<VehicleType, Record<VehicleColor, Record<DetectorPlacement, PlateAnchor>>> = {
+  sedan: SEDAN_ANCHORS,
+  suv: SUV_ANCHORS,
+};
+
+/** Backwards-compatible alias — the sedan/'blue' anchor set on its own. */
+export const PLATE_ANCHORS: Record<DetectorPlacement, PlateAnchor> = SEDAN_ANCHORS.blue;
 
 /**
- * Resolves the plate anchor to use for a given vehicle color + placement.
- * Every (color, placement) pair in PLATE_ANCHORS_BY_COLOR is a full,
- * independent value — no merging happens here.
+ * Resolves the plate anchor to use for a given vehicle type + color +
+ * placement. Every (type, color, placement) triple in
+ * PLATE_ANCHORS_BY_TYPE_AND_COLOR is a full, independent value — no merging
+ * happens here.
  */
-export function getPlateAnchor(color: VehicleColor, placement: DetectorPlacement): PlateAnchor {
-  return PLATE_ANCHORS_BY_COLOR[color][placement];
+export function getPlateAnchor(type: VehicleType, color: VehicleColor, placement: DetectorPlacement): PlateAnchor {
+  return PLATE_ANCHORS_BY_TYPE_AND_COLOR[type][color][placement];
 }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────

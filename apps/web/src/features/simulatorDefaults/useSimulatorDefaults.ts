@@ -3,6 +3,7 @@ import {
   DIRECTIONS,
   DETECTOR_PLACEMENTS,
   VEHICLE_COLORS,
+  VEHICLE_TYPES,
   GATE_MODES,
   GATE_INITIAL_STATES,
   SPEED_PRESETS,
@@ -12,6 +13,7 @@ import {
   type Direction,
   type DetectorPlacement,
   type VehicleColor,
+  type VehicleType,
   type GateMode,
   type GateInitialState,
   type SpeedPreset,
@@ -29,6 +31,7 @@ export interface SimulatorDefaults {
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   vehicleColor: VehicleColor;
+  vehicleType: VehicleType;
   speedPreset: SpeedPreset;
   gateMode: GateMode;
   gateInitialState: GateInitialState;
@@ -43,6 +46,7 @@ export const FACTORY_SIMULATOR_DEFAULTS: SimulatorDefaults = {
   direction: DEFAULT_CONFIG.direction,
   detectorPlacement: DEFAULT_CONFIG.detectorPlacement,
   vehicleColor: DEFAULT_CONFIG.vehicleColor,
+  vehicleType: DEFAULT_CONFIG.vehicleType,
   speedPreset: DEFAULT_CONFIG.speedPreset,
   gateMode: DEFAULT_CONFIG.gateMode,
   gateInitialState: DEFAULT_CONFIG.gateInitialState,
@@ -68,6 +72,8 @@ function sanitize(raw: unknown): SimulatorDefaults {
     detectorPlacement,
     vehicleColor: VEHICLE_COLORS.includes(obj.vehicleColor as VehicleColor)
       ? (obj.vehicleColor as VehicleColor) : FACTORY_SIMULATOR_DEFAULTS.vehicleColor,
+    vehicleType: VEHICLE_TYPES.includes(obj.vehicleType as VehicleType)
+      ? (obj.vehicleType as VehicleType) : FACTORY_SIMULATOR_DEFAULTS.vehicleType,
     speedPreset: SPEED_PRESETS.includes(obj.speedPreset as SpeedPreset)
       ? (obj.speedPreset as SpeedPreset) : FACTORY_SIMULATOR_DEFAULTS.speedPreset,
     gateMode: GATE_MODES.includes(obj.gateMode as GateMode)
@@ -108,6 +114,7 @@ export function applySimulatorDefaults(base: SimulationConfig, defaults: Simulat
     direction: defaults.direction,
     detectorPlacement: defaults.detectorPlacement,
     vehicleColor: defaults.vehicleColor,
+    vehicleType: defaults.vehicleType,
     speedPreset: defaults.speedPreset,
     speedIncoming: speedPhases,
     speedAway: speedPhases,

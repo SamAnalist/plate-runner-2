@@ -112,13 +112,17 @@ Write-Host ''
 Write-Host 'IMPORTANT: save the Controller Token now - it is shown only this once.' -ForegroundColor Yellow
 Write-Host 'Treat it like a password: whoever holds it can send commands to this display.'
 
-$resultPath = Join-Path $PSScriptRoot 'pairing-result.json'
+# pairing-result.json always lives at the project root, regardless of where
+# this script itself lives (scripts/windows/) — two levels up.
+$projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$resultPath = Join-Path $projectRoot 'pairing-result.json'
 [ordered]@{
     displayId       = $final.displayId
     displayName     = $displayName
     controllerId    = $final.controllerId
     controllerToken = $final.controllerToken
     apiBaseUrl      = $ApiBaseUrl
+    apiKey          = $ApiKey
     pairedAt        = (Get-Date).ToString('o')
 } | ConvertTo-Json | Out-File -FilePath $resultPath -Encoding utf8
 

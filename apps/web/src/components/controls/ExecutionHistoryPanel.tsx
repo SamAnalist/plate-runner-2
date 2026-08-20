@@ -44,7 +44,7 @@ function RecordRow({ record }: { record: ScheduledExecutionRecord }) {
           style={{ backgroundColor: VEHICLE_COLOR_HEX[record.vehicleColor] }}
           title={record.vehicleColor}
         />
-        <span>{record.direction} · {record.detectorPlacement}</span>
+        <span>{record.vehicleType ?? 'sedan'} · {record.direction} · {record.detectorPlacement}</span>
         <Badge tone="neutral" className="ml-auto">{TRIGGERED_BY_LABEL[record.triggeredBy]}</Badge>
       </div>
       <div className="text-white/25">

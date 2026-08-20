@@ -1,4 +1,4 @@
-import type { Direction, DetectorPlacement, VehicleColor, GateConfig } from './simulation';
+import type { Direction, DetectorPlacement, VehicleColor, VehicleType, GateConfig } from './simulation';
 import type { PlateQueueConfig } from './queue';
 import type { PlateList, PlateListId } from './plateList';
 import type { CommandSource } from './remote';
@@ -56,6 +56,8 @@ export interface RunPlatePayload {
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   vehicleColor: VehicleColor;
+  /** Defaults to 'sedan' server-side when omitted from the request. */
+  vehicleType: VehicleType;
   gateConfig: GateConfig;
   queueConfig: PlateQueueConfig;
   /** Defaults to 'slow' server-side when omitted from the request — see REQUEST_SPEED_PRESETS. */
@@ -67,6 +69,8 @@ export interface RunQueuePayload {
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   vehicleColor: VehicleColor;
+  /** Defaults to 'sedan' server-side when omitted from the request. */
+  vehicleType: VehicleType;
   gateConfig: GateConfig;
   queueConfig: PlateQueueConfig;
   /** Defaults to 'slow' server-side when omitted from the request — see REQUEST_SPEED_PRESETS. */
@@ -93,6 +97,7 @@ export interface SetConfigPayload {
   direction?: Direction;
   detectorPlacement?: DetectorPlacement;
   vehicleColor?: VehicleColor;
+  vehicleType?: VehicleType;
   gateConfig?: GateConfig;
   queueConfig?: PlateQueueConfig;
   speedPreset?: 'slow' | 'regular' | 'fast';

@@ -41,12 +41,22 @@ export interface GateConfig {
 }
 
 /**
- * Supported vehicle colors. Only 'blue' has real asset variants today —
- * 'red' and 'gray' fall back to the blue asset until their PNGs are added.
- * See docs/VEHICLE_COLOR_VARIANTS.md.
+ * Supported vehicle colors. All three ('blue', 'red', 'gray') have real
+ * asset variants for every vehicle type. See docs/VEHICLE_COLOR_VARIANTS.md.
  */
 export type VehicleColor = 'blue' | 'red' | 'gray';
 export const VEHICLE_COLORS: VehicleColor[] = ['blue', 'red', 'gray'];
+
+/**
+ * Supported vehicle body types. 'sedan' is the original/default vehicle
+ * (asset folder `main-car` for historical reasons — the folder name is an
+ * internal detail, not exposed via the API). 'suv' has full asset coverage
+ * (all 3 colors × 6 views) but its plate anchors are an initial estimate
+ * copied from 'sedan' pending visual calibration — see
+ * docs/VEHICLE_COLOR_VARIANTS.md.
+ */
+export type VehicleType = 'sedan' | 'suv';
+export const VEHICLE_TYPES: VehicleType[] = ['sedan', 'suv'];
 
 /**
  * Four phase-specific speed values (1–10) for a single direction.
@@ -120,6 +130,7 @@ export interface SimulationConfig {
   /** Which Speed submenu is active. 'advanced' means speedIncoming/speedAway are hand-tuned per phase; otherwise they're kept in sync with this preset's uniform value. */
   speedPreset: SpeedPreset;
   vehicleColor: VehicleColor;
+  vehicleType: VehicleType;
 }
 
 export interface ValidationResult {
@@ -155,6 +166,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   speedAway:     { initial: 5, stopping: 5, afterStop: 5, final: 5 },
   speedPreset: 'regular',
   vehicleColor: 'blue',
+  vehicleType: 'sedan',
 };
 
 /**

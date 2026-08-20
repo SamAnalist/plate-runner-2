@@ -142,6 +142,7 @@ export function useLocalScheduler({ plateLists, plateQueue, executionHistory }: 
       plateListName: list.name,
       totalPlates: list.plates.length,
       vehicleColor: list.simulationDefaults.vehicleColor,
+      vehicleType: list.simulationDefaults.vehicleType,
       direction: list.simulationDefaults.direction,
       detectorPlacement: list.simulationDefaults.detectorPlacement,
       gateModeSummary: summarizeGateConfig(list.simulationDefaults.gateConfig),

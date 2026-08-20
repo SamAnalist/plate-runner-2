@@ -6,6 +6,7 @@ import type {
   ScheduledExecutionRecord,
   TriggeredBy,
   VehicleColor,
+  VehicleType,
 } from '@plate-runner/shared';
 import type { PlateQueueControls } from '../queue/usePlateQueue';
 import {
@@ -26,6 +27,7 @@ export interface ExecutionMeta {
   plateListName: string;
   totalPlates: number;
   vehicleColor: VehicleColor;
+  vehicleType?: VehicleType;
   direction: Direction;
   detectorPlacement: DetectorPlacement;
   gateModeSummary: string;
@@ -57,6 +59,7 @@ function baseRecord(meta: ExecutionMeta): Omit<ScheduledExecutionRecord, 'id' | 
     skippedPlates: 0,
     failedPlates: 0,
     vehicleColor: meta.vehicleColor,
+    vehicleType: meta.vehicleType,
     direction: meta.direction,
     detectorPlacement: meta.detectorPlacement,
     gateModeSummary: meta.gateModeSummary,

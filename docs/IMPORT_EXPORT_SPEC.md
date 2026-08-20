@@ -61,6 +61,9 @@ Never throws:
    - `simulationDefaults.direction` — must be in the shared `DIRECTIONS` array.
    - `simulationDefaults.detectorPlacement` — must be in `DETECTOR_PLACEMENTS`.
    - `simulationDefaults.vehicleColor` — must be in `VEHICLE_COLORS` (`'blue'|'red'|'gray'`).
+   - `simulationDefaults.vehicleType` — **optional**; when present, must be in
+     `VEHICLE_TYPES` (`'sedan'|'suv'`). Absent is valid (lists exported before
+     this field existed) and leaves the current vehicle type untouched on import.
    - `simulationDefaults.gateConfig` — `gateMode` in `GATE_MODES`, `gateInitialState`
      in `GATE_INITIAL_STATES`, `stopBeforeOpenMs`/`delayAfterOpenMs` numbers.
    - `simulationDefaults.queueConfig` — `mode` in `PLATE_QUEUE_MODES`,
