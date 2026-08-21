@@ -145,7 +145,7 @@ question is answered here).
 **Deployment / operations**
 `DEPLOYMENT.md` (repo root — start here), `DOCKER_SETUP.md`,
 `RAILWAY_DEPLOYMENT_PLAN.md`, `OPERATIONS_GUIDE.md`,
-`RAILWAY_STAGING_SMOKE_TEST.md`.
+`RAILWAY_STAGING_SMOKE_TEST.md`, `DESKTOP_APP.md` (Windows desktop app via Tauri).
 
 **QA / testing**
 `MANUAL_TESTING_GUIDE.md`, `RELEASE_CANDIDATE_QA.md`,

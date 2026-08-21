@@ -248,7 +248,40 @@ changes made under the newer version — only which binary is running.
 
 ---
 
-## 10. Related docs
+## 10. Desktop app (Windows executable)
+
+Beyond the two web services above, `apps/web` can also be shipped as a
+native desktop app — most importantly a Windows `.exe`/`.msi` installer —
+via Tauri (`apps/web/src-tauri`). This is a **distribution channel for
+the frontend only**, not a replacement for `plate-runner-server`: the
+desktop app still talks to a backend over the network exactly like the
+browser version, configured the same way (Settings → API).
+
+```bash
+pnpm desktop:dev     # local dev, opens a native window
+pnpm desktop:build   # builds an installer for whatever OS you run this on
+```
+
+Building an actual **Windows** installer from a non-Windows machine
+requires CI — cross-compiling Tauri's Windows bundler is unreliable.
+[.github/workflows/desktop-build.yml](.github/workflows/desktop-build.yml)
+builds it on a real `windows-latest` GitHub Actions runner, **automatically
+on every relevant push to `main`** (updating a rolling `desktop-latest`
+GitHub Release in place), on manual trigger, or by pushing a `desktop-v*`
+tag (cuts a separate, versioned draft Release instead).
+
+The web app itself has a **"Download for Windows" button** (Settings →
+Desktop App) linking directly to the rolling release's installer — always
+the latest build, no manual step to update the link. This only works
+because the repo is public; see docs/DESKTOP_APP.md if that ever changes.
+
+Full details, known limitations (unsigned installer, placeholder icons,
+no auto-update, no per-build version/changelog on the rolling release):
+[docs/DESKTOP_APP.md](docs/DESKTOP_APP.md).
+
+---
+
+## 11. Related docs
 
 This file is the deployment entry point; these go deeper on one aspect
 each rather than being duplicated here:
@@ -262,5 +295,6 @@ each rather than being duplicated here:
 | [docs/RAILWAY_SECURITY_CHECKLIST.md](docs/RAILWAY_SECURITY_CHECKLIST.md) | Full pre-deploy checklist |
 | [docs/RAILWAY_STAGING_SMOKE_TEST.md](docs/RAILWAY_STAGING_SMOKE_TEST.md) | 25-step post-deploy verification script |
 | [docs/SECURITY_NOTES.md](docs/SECURITY_NOTES.md) | Full security model (secrets, tokens, what's never logged/rendered) |
+| [docs/DESKTOP_APP.md](docs/DESKTOP_APP.md) | Windows desktop app (Tauri) — local dev/build, CI, known limitations |
 | [docs/CONTROLLER_CLI_TOOLS.md](docs/CONTROLLER_CLI_TOOLS.md) | CLI scripts for pairing/sending commands against a deployed backend |
 | [RAILWAY_API_USAGE.md](RAILWAY_API_USAGE.md) | Practical curl-based API usage examples against a live deployment |

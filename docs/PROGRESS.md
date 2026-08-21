@@ -4452,3 +4452,241 @@ themselves, never `vehicleType`/`vehicleColor` — expose that too.
 ### Next Steps
 
 - Manual QA per above.
+
+---
+
+## Phase — Windows Desktop App (Tauri)
+
+**Date:** 2026-08-21
+
+### Goal
+
+Wrap `apps/web`'s existing Vite build as a native desktop app, primarily
+to produce a distributable Windows `.exe`/`.msi` — user explicitly chose
+Tauri over Electron after a tradeoff discussion (smaller installer,
+WebView2-based, fits the kiosk-style Display Mode use case).
+
+### Implemented
+
+- Installed the Rust toolchain (`rustup`, stable channel) on the dev
+  machine — required to build/scaffold Tauri at all, wasn't present
+  before.
+- Added `@tauri-apps/cli` (dev) and `@tauri-apps/api` (runtime) to
+  `apps/web`, then scaffolded `apps/web/src-tauri/` via `tauri init`
+  (Tauri v2).
+- Configured `tauri.conf.json`: real `identifier`
+  (`com.platerunner.app`, was the `tauri init` placeholder
+  `com.tauri.dev`), a 1280×800 default window (1024×680 minimum) sized
+  for the app's sidebar layout rather than Tauri's 800×600 default,
+  `beforeDevCommand`/`beforeBuildCommand` wired to `pnpm dev`/`pnpm
+  build` so `tauri dev`/`tauri build` don't need a separate terminal,
+  and an explicit CSP (was `null`, disabling CSP enforcement in the
+  webview entirely) matching `apps/web/nginx.conf`'s existing
+  `connect-src *` policy (the API Base URL is runtime-configurable, same
+  reasoning as the web deployment's CSP).
+- Added `desktop:dev`/`desktop:build` scripts to both
+  `apps/web/package.json` and the root `package.json`.
+- **Windows build via CI, not local cross-compilation**: Tauri's
+  Windows bundling (NSIS/WiX) isn't reliably cross-compilable from
+  macOS — the dev machine here is a Mac. Added
+  `.github/workflows/desktop-build.yml` using `tauri-apps/tauri-action`
+  on a real `windows-latest` GitHub Actions runner, triggered manually
+  (`workflow_dispatch`) or by pushing a `desktop-v*` tag (which also
+  cuts a draft GitHub Release with the installers attached). Every run
+  also uploads the `.exe`/`.msi` as a plain workflow artifact, tag or
+  not.
+- New doc: `docs/DESKTOP_APP.md` (why Tauri, project layout, local
+  dev/build, how to actually get a Windows installer, known
+  limitations). Linked from `DEPLOYMENT.md` (new §10) and added to the
+  Documentation Index in `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` (and their
+  `docs/` duplicates).
+
+### Files Changed
+
+- `apps/web/src-tauri/**` — new (Tauri v2 scaffold: `Cargo.toml`,
+  `tauri.conf.json`, `src/{main.rs,lib.rs}`, default icons/capabilities).
+- `apps/web/package.json`, `package.json` (root) — `desktop:dev`/
+  `desktop:build` scripts; `apps/web/package.json` gained
+  `@tauri-apps/cli`/`@tauri-apps/api`.
+- `.github/workflows/desktop-build.yml` — new.
+- `docs/DESKTOP_APP.md` — new.
+- `DEPLOYMENT.md` — new §10 "Desktop app (Windows executable)",
+  renumbered old §10 "Related docs" to §11, added `DESKTOP_APP.md` to
+  its table.
+- `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `docs/CLAUDE.md`, `docs/AGENTS.md`
+  — added `DESKTOP_APP.md` to the Documentation Index.
+
+### Decisions
+
+- Tauri lives **inside** `apps/web` (`apps/web/src-tauri/`) rather than
+  as a separate `apps/desktop` workspace member — it's not an
+  independent app, it's a native shell around the exact same frontend
+  build; keeping it colocated means one `pnpm build` output serves both
+  the web deployment and the desktop wrapper.
+- CI (GitHub Actions on `windows-latest`), not local cross-compilation
+  or asking the user for a Windows machine — the only reliable way to
+  produce a real signed-bundle-structure Windows installer from this
+  Mac dev environment. Documented explicitly in both `DESKTOP_APP.md`
+  and inline workflow comments so a future agent doesn't waste time
+  trying `tauri build --target x86_64-pc-windows-msvc` locally and
+  hitting bundler failures.
+- Trigger is manual/tag-based, not "build on every push to main" — a
+  desktop installer build is comparatively expensive and not something
+  needed on every commit; explicit opt-in (dispatch or a `desktop-v*`
+  tag) matches how infrequently a new installer is actually needed.
+- Left the default Tauri icons and default (unnarrowed) capabilities in
+  place rather than customizing — no real branding assets were
+  available to generate icons from, and the app makes no custom
+  Rust-side `invoke` calls yet that would need specific capability
+  scoping. Both flagged explicitly in Known Limitations rather than
+  silently shipped as "done."
+
+### Manual Testing
+
+- `cargo check` inside `apps/web/src-tauri` — compiles clean (confirms
+  the Rust scaffold and all Tauri v2 dependencies resolve correctly).
+- `pnpm --filter web exec tsc --noEmit` and `pnpm build` — clean
+  (confirms adding the Tauri npm packages didn't affect the existing
+  web build).
+- **Not run**: `tauri dev` / `tauri build` (would open a native GUI
+  window — no display available in this session to verify visually) and
+  the actual GitHub Actions workflow (requires pushing to GitHub to
+  execute on a real `windows-latest` runner — not done as part of this
+  local session). Both are explicitly flagged as unverified rather than
+  assumed working.
+
+### Known Limitations
+
+- Unsigned installer — will trigger a Windows SmartScreen warning on
+  first run. Fine for internal/testing use only.
+- Placeholder icons (Tauri's defaults), default/unnarrowed capabilities,
+  no auto-update — see `docs/DESKTOP_APP.md`'s Known Limitations for the
+  full list.
+- The GitHub Actions workflow has never actually been run — first real
+  run may surface a config issue (e.g. `tauri-action` version
+  compatibility, pnpm workspace install quirks) that `cargo check`
+  locally can't catch.
+
+### Next Steps
+
+- Push a commit that includes `.github/workflows/desktop-build.yml` and
+  manually trigger it once (Actions tab → Run workflow) to confirm the
+  CI path actually produces a working `.exe` end to end.
+- Replace placeholder icons with real branding before distributing
+  beyond internal testing.
+- If this becomes a real distribution channel (not just internal
+  testing), add code signing and consider the Tauri updater plugin.
+
+---
+
+## Phase — Auto-updating Windows download button in the web app
+
+**Date:** 2026-08-21
+
+### Goal
+
+Follow-up to the Tauri desktop app phase: let the web app itself offer a
+"Download for Windows" button that always serves the current build —
+updating automatically whenever features/fixes land — instead of
+requiring someone to manually visit GitHub Actions/Releases. Confirmed
+with the user first that the repo (`SamAnalist/plate-runner-2`) is
+public, since that's what makes a direct-link (no backend proxy) approach
+work at all.
+
+### Implemented
+
+- **CI now builds automatically**: `.github/workflows/desktop-build.yml`
+  gained a `push: branches: [main]` trigger (scoped via `paths:` to
+  `apps/web/src/**`, `apps/web/src-tauri/**`, `packages/shared/**`, and a
+  few other relevant paths, so doc-only commits don't trigger a rebuild),
+  in addition to the existing manual-dispatch and `desktop-v*` tag
+  triggers. Added a `concurrency` group keyed on `github.ref` so a rapid
+  second push cancels the superseded in-progress build instead of racing
+  it for the same release.
+- **Rolling release, fixed filename**: split the workflow into a
+  build-only `tauri-apps/tauri-action` step (no `tagName`, so it doesn't
+  auto-release) followed by a separate `softprops/action-gh-release` step
+  that publishes/updates a release at a **fixed tag** (`desktop-latest`)
+  for anything other than a `desktop-v*` tag push — same tag every time,
+  so it updates in place rather than piling up releases. Before
+  publishing, the NSIS `.exe` is copied to a **fixed filename**
+  (`PlateRunner-Setup.exe`, stripped of the version/arch suffix Tauri
+  normally includes) — this is the piece that makes a hardcoded download
+  URL in the frontend safe: the filename never changes even though the
+  file behind it does, on every rebuild.
+  `desktop-v*` tag pushes still go through the same build step but
+  publish a separate, properly versioned **draft** release instead (kept
+  distinct from the always-changing rolling one).
+- **Web UI**: new `DesktopAppPanel.tsx`, added as a "Desktop App" card in
+  `SettingsScreen.tsx` (between Local Storage's neighbors, matching the
+  existing `SettingsCard` pattern). "⬇ Download for Windows" links
+  directly to
+  `https://github.com/SamAnalist/plate-runner-2/releases/download/desktop-latest/PlateRunner-Setup.exe`;
+  a secondary "All releases ↗" link goes to the repo's Releases page for
+  anyone who wants a specific/older version. Both open in a new tab.
+
+### Files Changed
+
+- `.github/workflows/desktop-build.yml` — push-to-main trigger + paths
+  filter, concurrency group, split build/release steps, fixed-filename
+  rename step, `softprops/action-gh-release` for the rolling+versioned
+  release logic, `permissions: contents: write`.
+- `apps/web/src/components/controls/DesktopAppPanel.tsx` — new.
+- `apps/web/src/screens/SettingsScreen.tsx` — added the Desktop App
+  `SettingsCard`.
+- `docs/DESKTOP_APP.md` — documents the rolling vs. versioned release
+  split, the fixed-filename mechanism, and the public-repo dependency.
+- `DEPLOYMENT.md` — §10 updated with the auto-build-on-push behavior and
+  the web download button.
+
+### Decisions
+
+- **Direct GitHub Release link, no backend proxy** — only viable because
+  the repo is confirmed public; explicitly documented as a load-bearing
+  assumption (in both `DesktopAppPanel.tsx`'s comment and
+  `DESKTOP_APP.md`) that breaks silently-into-a-404 if the repo is ever
+  made private. Asked the user before committing to this approach rather
+  than guessing.
+- **Fixed filename via a rename step**, not a GitHub API call from the
+  frontend to resolve the "current" asset URL at runtime — avoids adding
+  a client-side dependency on GitHub's API (rate-limited for unauthenticated
+  requests) just to show a download link; the filename-stability trick
+  achieves the same "always current" property entirely at build time.
+- **Rolling release kept separate from versioned `desktop-v*` releases**
+  (different tags) rather than making every push overwrite a "real"
+  version tag — so an intentional, named release with actual changelog
+  notes is still possible later without fighting the auto-build system.
+- **`paths:` filter on the push trigger** — avoids burning CI minutes
+  (and Windows runner time specifically, which is pricier than Linux) on
+  a full Rust+Tauri build for changes that couldn't possibly affect the
+  desktop app, like a docs-only commit.
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` and `pnpm build` — clean.
+- **Not run**: the actual GitHub Actions workflow (both the build-only
+  and release-publish steps) — this requires pushing to GitHub and
+  executing on a real `windows-latest` runner, not something verifiable
+  from this local session. The `softprops/action-gh-release` "update an
+  existing release in place" behavior at a fixed tag is a well-established
+  pattern (used by many projects for rolling/nightly releases) but hasn't
+  been exercised against this specific repo yet.
+
+### Known Limitations
+
+- Everything already listed in the prior Tauri phase's Known Limitations
+  still applies (unsigned installer, placeholder icons, no auto-update).
+- The rolling release has no version number or changelog — see
+  `docs/DESKTOP_APP.md`'s Known Limitations.
+- First real push-triggered run is unverified — could surface an issue
+  `cargo check`/local `tsc` can't catch (e.g. `softprops/action-gh-release`
+  permissions, path-filter syntax, Windows-runner-specific glob behavior
+  in the rename step).
+
+### Next Steps
+
+- Push and watch the first automatic run (or trigger manually) to confirm
+  the rolling release actually updates and the web button's link
+  resolves to a real, current file.
+- Click through the actual Settings → Desktop App button in a browser to
+  confirm the UI reads as intended.

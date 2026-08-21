@@ -10,7 +10,9 @@
     "build": "pnpm --filter web build",
     "preview": "pnpm --filter web preview",
     "typecheck": "pnpm -r typecheck",
-    "server:start": "pnpm --filter server start"
+    "server:start": "pnpm --filter server start",
+    "desktop:dev": "pnpm --filter web desktop:dev",
+    "desktop:build": "pnpm --filter web desktop:build"
   },
   "devDependencies": {
     "concurrently": "^10.0.4",

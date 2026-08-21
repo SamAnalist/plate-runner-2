@@ -1,0 +1,132 @@
+name: Build Windows Desktop App
+
+# Tauri (apps/web/src-tauri) wraps the Vite frontend into a native desktop
+# app. Producing a real Windows .exe/.msi requires actually compiling on
+# Windows — cross-compiling from macOS/Linux is unreliable for the NSIS/WiX
+# bundling step Tauri uses on Windows — so this runs on a real
+# `windows-latest` GitHub-hosted runner. See docs/DESKTOP_APP.md.
+#
+# Two kinds of release this workflow can produce, at two different tags:
+#
+#   - `desktop-latest` (rolling) — updated in place on every push to `main`
+#     that touches relevant paths, or a manual run. The web app's
+#     "Download for Windows" button (Settings → Desktop App) links to a
+#     FIXED filename under this tag (PlateRunner-Setup.exe), so that link
+#     never goes stale even though the underlying file changes on every
+#     build — see the "Rename to a fixed filename" step below.
+#   - `desktop-vX.Y.Z` (versioned) — created by pushing a matching tag,
+#     e.g. `git tag desktop-v0.1.0 && git push origin desktop-v0.1.0`.
+#     Published as a DRAFT so release notes can be added before publishing
+#     — this one is for an intentional, named release, not the rolling
+#     "whatever's on main right now" build.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/src/**'
+      - 'apps/web/src-tauri/**'
+      - 'apps/web/public/**'
+      - 'apps/web/index.html'
+      - 'apps/web/package.json'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/desktop-build.yml'
+    tags:
+      - 'desktop-v*'
+
+# Cancel a superseded rolling-release build if another push lands on main
+# before the previous run finishes — avoids two runs racing to update the
+# same `desktop-latest` release. Tag pushes get their own unique group
+# (via github.ref) so a version release never gets cancelled by this.
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # required to create/update a GitHub Release
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust build cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/web/src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the Windows desktop app (no auto-release)
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: apps/web
+          # No tagName here on purpose — this step only builds the
+          # installer bundles under src-tauri/target/release/bundle/. The
+          # "Publish / update release" step below handles releasing, so
+          # both the rolling and versioned-tag cases can share one build.
+
+      - name: Determine release target
+        id: rel
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/desktop-v* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "name=Plate Runner Desktop ${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "draft=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=desktop-latest" >> "$GITHUB_OUTPUT"
+            echo "name=Plate Runner Desktop — Latest Build" >> "$GITHUB_OUTPUT"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rename to a fixed filename for the stable web download link
+        shell: bash
+        run: |
+          set -euo pipefail
+          nsis_dir="apps/web/src-tauri/target/release/bundle/nsis"
+          src="$(ls "$nsis_dir"/*.exe | head -n1)"
+          cp "$src" "$nsis_dir/PlateRunner-Setup.exe"
+
+      - name: Publish / update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: ${{ steps.rel.outputs.name }}
+          draft: ${{ steps.rel.outputs.draft }}
+          # PlateRunner-Setup.exe is the stable, always-the-same-name asset
+          # the web app's download button links to. The version-suffixed
+          # *.exe/*.msi are included too, for anyone browsing the Releases
+          # page directly who wants to see the actual version/architecture.
+          files: |
+            apps/web/src-tauri/target/release/bundle/nsis/PlateRunner-Setup.exe
+            apps/web/src-tauri/target/release/bundle/nsis/*.exe
+            apps/web/src-tauri/target/release/bundle/msi/*.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installers as a workflow run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plate-runner-windows-installers
+          path: |
+            apps/web/src-tauri/target/release/bundle/nsis/*.exe
+            apps/web/src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error

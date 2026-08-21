@@ -13,6 +13,7 @@ import { ScreenSaverSettingsPanel } from '../components/controls/ScreenSaverSett
 import { SimulatorDefaultsPanel } from '../components/controls/SimulatorDefaultsPanel';
 import { BackupPanel } from '../components/controls/BackupPanel';
 import { LocalStorageManagementPanel } from '../components/controls/LocalStorageManagementPanel';
+import { DesktopAppPanel } from '../components/controls/DesktopAppPanel';
 import { SettingsCard } from '../components/ui/SettingsCard';
 
 interface SettingsScreenProps {
@@ -93,6 +94,11 @@ export function SettingsScreen({
             lastScreen={screen}
             screenSaver={screenSaver.settings}
           />
+        </SettingsCard>
+
+        <SettingsCard title="Desktop App" accent="amber"
+          description="Native Windows build of this app, distributed via GitHub Releases.">
+          <DesktopAppPanel />
         </SettingsCard>
 
         <SettingsCard title="Local Storage" accent="red">
