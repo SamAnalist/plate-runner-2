@@ -118,19 +118,24 @@ release-creation rights for this repo only).
 ### The web download button
 
 Settings → Desktop App (`apps/web/src/components/controls/DesktopAppPanel.tsx`)
-links directly to:
+links to the **release page**, not a raw asset URL:
 
 ```txt
-https://github.com/SamAnalist/plate-runner-2/releases/download/desktop-latest/PlateRunner-Setup.exe
+https://github.com/SamAnalist/plate-runner-2/releases/tag/desktop-latest
 ```
 
-This is a direct GitHub Release asset URL, not a proxy — it only works
-because **the repo is public** (confirmed 2026-08-21; anonymous downloads
-of release assets from a private repo require authentication and would
-404 for a random web visitor). If the repo is ever made private, this
-button needs to change to a backend-proxied download (an authenticated
-server-side fetch of the asset, streamed to the client) — it will not
-silently keep working.
+Deliberate: a direct asset-download URL 404s for anonymous visitors on a
+private repo, but a link to the release *page* works either way — GitHub
+itself prompts for login when needed (normal browser session auth), and
+the visitor then clicks the actual `PlateRunner-Setup.exe` asset from a
+page they can already see. **This means the button needs no change if the
+repo moves into a private org** (as planned) — anyone with repo access,
+logged into github.com in their browser, can click through; anyone
+without access sees GitHub's normal "you don't have access" page instead
+of a silent 404. The CI workflow still renames the installer to a fixed
+filename before publishing (see above) — no longer strictly required for
+the button itself, but kept since it's still useful for anyone
+downloading via a script instead of the browser.
 
 ## Known Limitations
 
@@ -154,8 +159,6 @@ silently keep working.
   Fine for an internal/testing distribution channel, not a substitute for
   actual versioned releases (`desktop-v*` tags) if this ever needs real
   release notes for end users.
-- **The download button depends on the repo staying public** — see "The
-  web download button" above.
 - **No auto-update** — Tauri supports an updater plugin, not set up here.
   Each new desktop release currently means re-downloading the installer
   manually.

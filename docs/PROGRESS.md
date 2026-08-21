@@ -4690,3 +4690,74 @@ work at all.
   resolves to a real, current file.
 - Click through the actual Settings → Desktop App button in a browser to
   confirm the UI reads as intended.
+
+---
+
+## Phase — Desktop download button: link to the release page, not the raw asset
+
+**Date:** 2026-08-21
+
+### Goal
+
+User mentioned this repo is moving into a private GitHub organization.
+The previous download button linked directly to the GitHub Release
+*asset* URL, which only works for anonymous/unauthenticated visitors on
+a **public** repo — on a private repo it 404s for anyone without repo
+access (or without an active GitHub session), silently breaking the
+button after the repo move. Fix it now, ahead of that move, rather than
+after it breaks.
+
+### Implemented
+
+- `DesktopAppPanel.tsx`: changed the primary button from a direct asset
+  URL (`.../releases/download/desktop-latest/PlateRunner-Setup.exe`) to
+  the release **page** URL (`.../releases/tag/desktop-latest`). GitHub's
+  own release page handles the login prompt itself when the repo is
+  private (normal browser session auth) — the visitor lands on a page
+  they can already see (or a GitHub access-denied page if they truly
+  have no access, not a bare 404) and clicks the actual asset from
+  there. This works identically whether the repo is public or private,
+  so **the button needs no further change when the repo moves into the
+  org**.
+- Updated the explanatory copy under the button (now says "grab
+  PlateRunner-Setup.exe from the Assets list" instead of implying a
+  direct one-click download).
+- `docs/DESKTOP_APP.md` and `DEPLOYMENT.md` updated to match — removed
+  the "breaks if repo goes private" caveat (no longer true) and the
+  Known Limitations bullet that flagged it.
+
+### Files Changed
+
+- `apps/web/src/components/controls/DesktopAppPanel.tsx` — swapped
+  `DOWNLOAD_URL` (raw asset) for `LATEST_RELEASE_URL` (release page).
+- `docs/DESKTOP_APP.md`, `DEPLOYMENT.md` — updated to describe the
+  release-page link and why it's private-repo-safe.
+
+### Decisions
+
+- The CI workflow's fixed-filename rename step
+  (`PlateRunner-Setup.exe`) is **kept**, even though it's no longer
+  strictly required for the button (which now just links to a page, not
+  a specific filename) — still useful for anyone downloading via a
+  script rather than a browser, and for the Assets list itself being
+  predictably named across builds.
+- Did not add a backend download-proxy endpoint (the other option raised
+  when this was first built) — the release-page-link approach is simpler,
+  needs no server-side code or GitHub token, and fully solves the actual
+  problem (button breaking on the repo move).
+
+### Manual Testing
+
+- `pnpm --filter web exec tsc --noEmit` and `pnpm build` — clean.
+- Not visually verified in a browser (no display available in this
+  session) — same caveat as the original desktop-app phase.
+
+### Known Limitations
+
+- None new — this phase specifically *removes* a previously-known
+  limitation (the public-repo dependency) rather than adding one.
+
+### Next Steps
+
+- After the repo actually moves to the org, confirm the button still
+  resolves correctly for an org member logged into GitHub.

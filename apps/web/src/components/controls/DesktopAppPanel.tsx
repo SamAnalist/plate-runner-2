@@ -1,23 +1,21 @@
 import { Button } from '../ui/Button';
 
 /**
- * Repo is public (confirmed 2026-08-21) — direct GitHub Release asset
- * links work for anonymous visitors, no download proxy needed. If the
- * repo is ever made private, this link breaks (GitHub requires auth to
- * download release assets from a private repo) — swap for a backend
- * proxy endpoint at that point, see docs/DESKTOP_APP.md.
+ * Links to the GitHub Release PAGE, not a raw asset URL — deliberately,
+ * so this works the same whether the repo is public or private. A direct
+ * asset-download link 404s for anonymous visitors on a private repo;
+ * linking to the release page instead lets GitHub itself prompt for login
+ * when needed (browser session auth), then the visitor clicks the actual
+ * asset from a page they can already see. Works unconditionally, so
+ * moving the repo into a private org later needs no change here.
+ *
+ * `desktop-latest` is a rolling tag .github/workflows/desktop-build.yml
+ * updates in place on every relevant push to main — this always points
+ * at the release for the most recently built installer, not a pinned
+ * version. See docs/DESKTOP_APP.md.
  */
 const REPO = 'SamAnalist/plate-runner-2';
-
-/**
- * Fixed filename, deliberately NOT versioned (no "_0.1.0_x64" in the
- * name) — .github/workflows/desktop-build.yml renames the NSIS output to
- * this exact name before publishing, so this URL never goes stale across
- * rebuilds. The `desktop-latest` tag is a rolling release the workflow
- * updates in place on every relevant push to main — this always points
- * at the most recently built installer, not a specific version.
- */
-const DOWNLOAD_URL = `https://github.com/${REPO}/releases/download/desktop-latest/PlateRunner-Setup.exe`;
+const LATEST_RELEASE_URL = `https://github.com/${REPO}/releases/tag/desktop-latest`;
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
 export function DesktopAppPanel() {
@@ -28,20 +26,20 @@ export function DesktopAppPanel() {
         useful for a dedicated Display machine that shouldn't depend on a
         browser tab staying open. Rebuilt automatically from the latest{' '}
         <code className="text-white/50">main</code> whenever relevant code
-        changes; the link below always points at that latest build, not a
-        pinned version.
+        changes.
       </p>
       <div className="flex gap-2 flex-wrap">
-        <Button tone="primary" onClick={() => window.open(DOWNLOAD_URL, '_blank', 'noopener,noreferrer')}>
-          ⬇ Download for Windows
+        <Button tone="primary" onClick={() => window.open(LATEST_RELEASE_URL, '_blank', 'noopener,noreferrer')}>
+          ⬇ Download for Windows ↗
         </Button>
         <Button tone="neutral" onClick={() => window.open(RELEASES_URL, '_blank', 'noopener,noreferrer')}>
           All releases ↗
         </Button>
       </div>
       <p className="text-[9px] text-white/25 font-mono leading-snug">
-        Unsigned installer — Windows SmartScreen will warn on first run
-        ("More info" → "Run anyway"). See docs/DESKTOP_APP.md for details.
+        Opens the release on GitHub — grab <code className="text-white/40">PlateRunner-Setup.exe</code> from
+        the Assets list. Unsigned installer — Windows SmartScreen will warn on
+        first run ("More info" → "Run anyway"). See docs/DESKTOP_APP.md.
       </p>
     </div>
   );

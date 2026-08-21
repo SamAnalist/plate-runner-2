@@ -271,9 +271,11 @@ GitHub Release in place), on manual trigger, or by pushing a `desktop-v*`
 tag (cuts a separate, versioned draft Release instead).
 
 The web app itself has a **"Download for Windows" button** (Settings →
-Desktop App) linking directly to the rolling release's installer — always
-the latest build, no manual step to update the link. This only works
-because the repo is public; see docs/DESKTOP_APP.md if that ever changes.
+Desktop App) linking to the rolling release's GitHub page — always the
+latest build, no manual step to update the link. It links to the release
+*page* rather than the raw file on purpose, so it keeps working
+unchanged whether the repo is public or (as planned) moved into a
+private org — GitHub handles the login prompt itself when needed.
 
 Full details, known limitations (unsigned installer, placeholder icons,
 no auto-update, no per-build version/changelog on the rolling release):
